@@ -111,3 +111,10 @@ dist/
 # Vercel / Netlify / Deploy
 .vercel
 .netlify
+
+# =========================
+# Herramientas de IA y Agentes
+# =========================
+.gemini/
+.ai/
+.copilot/
