@@ -13,5 +13,6 @@ public class RequierePrivilegioAttribute : AuthorizeAttribute, IAuthorizationReq
     {
         CodigoPrivilegio = codigoPrivilegio;
         NivelRequerido = nivelRequerido;
+        AuthenticationSchemes = "Bearer";
     }
 }

@@ -1,39 +1,35 @@
 using AutoMapper;
-using Microsoft.EntityFrameworkCore;
 using Sia.Application.Abstracciones;
+using Sia.Application.Abstracciones.Repositorios;
 using Sia.Application.Dtos.Operaciones;
+using Sia.Application.Resultados;
 using Sia.Domain.Constantes;
 using Sia.Domain.Entidades;
 using Sia.Domain.Enums;
 using Sia.Domain.Excepciones;
-using Sia.Infrastructure.Persistencia;
 
-namespace Sia.Infrastructure.ServiciosAplicacion;
+namespace Sia.Application.Servicios;
 
 public class ServicioOperaciones
 {
-    private readonly SiaDbContext _db;
+    private readonly IOperacionesRepository _repository;
     private readonly IMapper _mapper;
     private readonly IContextoEmpresa _contextoEmpresa;
     private readonly IContextoUsuario _contextoUsuario;
 
-    public ServicioOperaciones(SiaDbContext db, IMapper mapper, IContextoEmpresa contextoEmpresa, IContextoUsuario contextoUsuario)
+    public ServicioOperaciones(IOperacionesRepository repository, IMapper mapper, IContextoEmpresa contextoEmpresa, IContextoUsuario contextoUsuario)
     {
-        _db = db;
+        _repository = repository;
         _mapper = mapper;
         _contextoEmpresa = contextoEmpresa;
         _contextoUsuario = contextoUsuario;
     }
 
-    public async Task<OperacionDetalleResponse> ObtenerPorIdAsync(Guid id, CancellationToken ct)
+    public async Task<Result<OperacionDetalleResponse>> ObtenerPorIdAsync(Guid id, CancellationToken ct)
     {
-        OperacionItem operacion = await _db.OperacionesItem
-            .Include(o => o.ItemEscaneado)
-            .Include(o => o.Persona)
-            .Include(o => o.Detalles).ThenInclude(d => d.Item)
-            .Include(o => o.Movimientos).ThenInclude(m => m.RegistradoPorPersona)
-            .FirstOrDefaultAsync(o => o.Id == id, ct)
-            ?? throw new EntidadNoEncontradaException(nameof(OperacionItem), id);
+        OperacionItem? operacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (operacion is null)
+            throw new EntidadNoEncontradaException(nameof(OperacionItem), id);
 
         var response = new OperacionDetalleResponse
         {
@@ -67,18 +63,17 @@ public class ServicioOperaciones
             }).ToList()
         };
 
-        return response;
+        return Result<OperacionDetalleResponse>.Exitoso(response);
     }
 
-    public async Task<OperacionResponse> CrearOperacionAsync(CrearOperacionRequest request, CancellationToken ct)
+    public async Task<Result<OperacionResponse>> CrearOperacionAsync(CrearOperacionRequest request, CancellationToken ct)
     {
-        Item item = await _db.Items
-            .Include(i => i.ComponentesDe)
-            .FirstOrDefaultAsync(i => i.Id == request.ItemEscaneadoId, ct)
-            ?? throw new EntidadNoEncontradaException(nameof(Item), request.ItemEscaneadoId);
+        Item? item = await _repository.ObtenerItemConComponentesAsync(request.ItemEscaneadoId, ct);
+        if (item is null)
+            throw new EntidadNoEncontradaException(nameof(Item), request.ItemEscaneadoId);
 
         if (item.EstadoActual != EstadoItem.Disponible)
-            throw new ReglaNegocioException("ITEM_NO_DISPONIBLE", $"El ítem se encuentra en estado {item.EstadoActual}");
+            return Result<OperacionResponse>.Fallido("ITEM_NO_DISPONIBLE", $"El ítem se encuentra en estado {item.EstadoActual}");
 
         var operacion = new OperacionItem
         {
@@ -97,58 +92,60 @@ public class ServicioOperaciones
         item.EstadoActual = EstadoItem.Prestado;
 
         // Crear detalle para el ítem principal
-        _db.OperacionItemDetalles.Add(new OperacionItemDetalle
+        await _repository.AgregarOperacionDetalleAsync(new OperacionItemDetalle
         {
             Id = Guid.NewGuid(),
             EmpresaId = _contextoEmpresa.EmpresaId,
             OperacionItemId = operacion.Id,
             ItemId = item.Id
-        });
+        }, ct);
 
         // Crear detalle y cambiar estado de componentes si es agrupador
         if (item.EsAgrupador)
         {
             foreach (var comp in item.ComponentesDe)
             {
-                Item componente = await _db.Items.FindAsync([comp.ItemComponenteId], ct) ?? throw new Exception("Componente no encontrado.");
+                Item? componente = await _repository.ObtenerItemBasicoAsync(comp.ItemComponenteId, ct);
+                if (componente is null)
+                    throw new EntidadNoEncontradaException(nameof(Item), comp.ItemComponenteId);
+                
                 componente.EstadoActual = EstadoItem.Prestado;
 
-                _db.OperacionItemDetalles.Add(new OperacionItemDetalle
+                await _repository.AgregarOperacionDetalleAsync(new OperacionItemDetalle
                 {
                     Id = Guid.NewGuid(),
                     EmpresaId = _contextoEmpresa.EmpresaId,
                     OperacionItemId = operacion.Id,
                     ItemId = componente.Id
-                });
+                }, ct);
             }
         }
 
-        RegistrarMovimiento(operacion, EstadoOperacionItem.Aprobado, EstadoOperacionItem.Aprobado, "Operación creada");
+        await RegistrarMovimiento(operacion, EstadoOperacionItem.Aprobado, EstadoOperacionItem.Aprobado, "Operación creada", ct);
 
-        _db.OperacionesItem.Add(operacion);
-        await _db.SaveChangesAsync(ct);
+        await _repository.AgregarOperacionAsync(operacion, ct);
+        await _repository.SaveChangesAsync(ct);
 
-        return new OperacionResponse
+        return Result<OperacionResponse>.Exitoso(new OperacionResponse
         {
             Id = operacion.Id,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
             PersonaId = operacion.PersonaId,
             EstadoActual = operacion.EstadoActual.ToString()
-        };
+        });
     }
 
-    public async Task<OperacionResponse> DevolverAsync(Guid operacionId, DevolverRequest request, CancellationToken ct)
+    public async Task<Result<OperacionResponse>> DevolverAsync(Guid operacionId, DevolverRequest request, CancellationToken ct)
     {
-        OperacionItem operacion = await _db.OperacionesItem
-            .Include(o => o.Detalles).ThenInclude(d => d.Item)
-            .FirstOrDefaultAsync(o => o.Id == operacionId, ct)
-            ?? throw new EntidadNoEncontradaException(nameof(OperacionItem), operacionId);
+        OperacionItem? operacion = await _repository.ObtenerPorIdAsync(operacionId, ct);
+        if (operacion is null)
+            throw new EntidadNoEncontradaException(nameof(OperacionItem), operacionId);
 
         EstadoOperacionItem estadoAnterior = operacion.EstadoActual;
 
         // La validación de transiciones centralizada
         if (!TransicionesOperacion.EsValida(estadoAnterior, EstadoOperacionItem.Entregado))
-            throw new ReglaNegocioException("TRANSICION_INVALIDA", $"No se puede devolver desde el estado {estadoAnterior}");
+            return Result<OperacionResponse>.Fallido("TRANSICION_INVALIDA", $"No se puede devolver desde el estado {estadoAnterior}");
 
         foreach (DevolucionDetalleRequest detReq in request.Detalles)
         {
@@ -156,7 +153,7 @@ public class ServicioOperaciones
             if (detalle == null || detalle.FechaDevolucion.HasValue) continue;
 
             if (!Enum.TryParse<CondicionDevolucion>(detReq.CondicionDevolucion, out CondicionDevolucion condicion))
-                throw new ReglaNegocioException("CONDICION_INVALIDA", $"Condición '{detReq.CondicionDevolucion}' inválida.");
+                return Result<OperacionResponse>.Fallido("CONDICION_INVALIDA", $"Condición '{detReq.CondicionDevolucion}' inválida.");
 
             detalle.CondicionDevolucion = condicion;
             detalle.Observacion = detReq.Observacion;
@@ -190,22 +187,22 @@ public class ServicioOperaciones
             }
         }
 
-        RegistrarMovimiento(operacion, estadoAnterior, estadoNuevo, "Devolución registrada");
+        await RegistrarMovimiento(operacion, estadoAnterior, estadoNuevo, "Devolución registrada", ct);
 
-        await _db.SaveChangesAsync(ct);
+        await _repository.SaveChangesAsync(ct);
 
-        return new OperacionResponse
+        return Result<OperacionResponse>.Exitoso(new OperacionResponse
         {
             Id = operacion.Id,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
             PersonaId = operacion.PersonaId,
             EstadoActual = operacion.EstadoActual.ToString()
-        };
+        });
     }
 
-    private void RegistrarMovimiento(OperacionItem operacion, EstadoOperacionItem estadoAnterior, EstadoOperacionItem estadoNuevo, string observacion)
+    private async Task RegistrarMovimiento(OperacionItem operacion, EstadoOperacionItem estadoAnterior, EstadoOperacionItem estadoNuevo, string observacion, CancellationToken ct)
     {
-        _db.OperacionMovimientos.Add(new OperacionMovimiento
+        await _repository.AgregarMovimientoAsync(new OperacionMovimiento
         {
             Id = Guid.NewGuid(),
             EmpresaId = operacion.EmpresaId,
@@ -215,6 +212,6 @@ public class ServicioOperaciones
             RegistradoPorPersonaId = _contextoUsuario.PersonaId, // Guid de la persona logueada
             FechaHora = DateTimeOffset.UtcNow,
             Observacion = observacion
-        });
+        }, ct);
     }
 }

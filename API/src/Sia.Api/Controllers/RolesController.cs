@@ -2,14 +2,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
-using Sia.Infrastructure.ServiciosAplicacion;
+using Sia.Application.Servicios;
 
 namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/roles")]
 [Authorize]
-public class RolesController : ControllerBase
+public class RolesController : SiaControllerBase
 {
     private readonly ServicioRoles _servicio;
 
@@ -21,42 +21,42 @@ public class RolesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> ObtenerTodos(CancellationToken ct)
     {
-        List<RolResponse> resultado = await _servicio.ObtenerTodosAsync(ct);
-        return Ok(RespuestaEnvuelta<List<RolResponse>>.Exitosa(resultado));
+        var resultado = await _servicio.ObtenerTodosAsync(ct);
+        return HandleResult(resultado);
     }
 
     [HttpPost]
     public async Task<IActionResult> Crear([FromBody] CrearRolRequest request, CancellationToken ct)
     {
-        RolResponse resultado = await _servicio.CrearAsync(request, ct);
-        return CreatedAtAction(nameof(ObtenerTodos), null, RespuestaEnvuelta<RolResponse>.Exitosa(resultado));
+        var resultado = await _servicio.CrearAsync(request, ct);
+        return HandleResult(resultado);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Actualizar(string id, [FromBody] CrearRolRequest request, CancellationToken ct)
     {
-        RolResponse resultado = await _servicio.ActualizarAsync(id, request, ct);
-        return Ok(RespuestaEnvuelta<RolResponse>.Exitosa(resultado));
+        var resultado = await _servicio.ActualizarAsync(id, request, ct);
+        return HandleResult(resultado);
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Eliminar(string id, CancellationToken ct)
     {
-        await _servicio.EliminarAsync(id, ct);
-        return NoContent();
+        var resultado = await _servicio.EliminarAsync(id, ct);
+        return HandleResult(resultado);
     }
 
     [HttpGet("{id}/privilegios")]
     public async Task<IActionResult> ObtenerPrivilegios(string id, CancellationToken ct)
     {
-        List<RolPrivilegioResponse> resultado = await _servicio.ObtenerPrivilegiosRolAsync(id, ct);
-        return Ok(RespuestaEnvuelta<List<RolPrivilegioResponse>>.Exitosa(resultado));
+        var resultado = await _servicio.ObtenerPrivilegiosRolAsync(id, ct);
+        return HandleResult(resultado);
     }
 
     [HttpPut("{id}/privilegios")]
     public async Task<IActionResult> ReemplazarPrivilegios(string id, [FromBody] MatrizPrivilegiosRequest request, CancellationToken ct)
     {
-        await _servicio.ReemplazarMatrizAsync(id, request, ct);
-        return NoContent();
+        var resultado = await _servicio.ReemplazarMatrizAsync(id, request, ct);
+        return HandleResult(resultado);
     }
 }

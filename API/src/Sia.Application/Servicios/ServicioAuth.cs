@@ -1,32 +1,37 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Sia.Application.Abstracciones;
+using Sia.Application.Abstracciones.Repositorios;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Resultados;
 using Sia.Domain.Constantes;
 using Sia.Domain.Entidades;
-using Sia.Infrastructure.Persistencia;
 
-namespace Sia.Infrastructure.ServiciosAplicacion;
+namespace Sia.Application.Servicios;
 
 public class ServicioAuth
 {
     private readonly UserManager<IdentityUser> _userManager;
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IServicioJwt _servicioJwt;
-    private readonly SiaDbContext _db;
+    private readonly ISeguridadRepository _seguridadRepository;
+    private readonly IPersonasRepository _personasRepository;
+    private readonly IEstacionesRepository _estacionesRepository;
 
     public ServicioAuth(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IServicioJwt servicioJwt,
-        SiaDbContext db)
+        ISeguridadRepository seguridadRepository,
+        IPersonasRepository personasRepository,
+        IEstacionesRepository estacionesRepository)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _servicioJwt = servicioJwt;
-        _db = db;
+        _seguridadRepository = seguridadRepository;
+        _personasRepository = personasRepository;
+        _estacionesRepository = estacionesRepository;
     }
 
     public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -83,10 +88,7 @@ public class ServicioAuth
         if (usuario is null)
             return Result<PerfilResponse>.Fallido("USUARIO_NO_ENCONTRADO", "Usuario no encontrado.");
 
-        Persona? persona = await _db.Personas
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.UserId == userId, ct);
-
+        Persona? persona = await _personasRepository.ObtenerPorUserIdAsync(userId, ct);
         IList<string> roles = await _userManager.GetRolesAsync(usuario);
 
         List<PrivilegioEfectivoDto> privilegiosEfectivos = await ResolverPrivilegiosEfectivosAsync(roles, ct);
@@ -105,9 +107,7 @@ public class ServicioAuth
 
     public async Task<Result<TokenResponse>> ClientCredentialsAsync(ClientCredentialsRequest request, IServicioHashSecreto hashService, CancellationToken ct)
     {
-        Estacion? estacion = await _db.Estaciones
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(e => e.ClientId == request.ClientId && e.Estado, ct);
+        Estacion? estacion = await _estacionesRepository.ObtenerPorClientIdAsync(request.ClientId, ct);
 
         if (estacion is null)
             return Result<TokenResponse>.Fallido(CodigosError.SecretoEstacionInvalido, "Estación no encontrada.");
@@ -125,6 +125,46 @@ public class ServicioAuth
         });
     }
 
+    public async Task<Result<TokenResponse>> LoginQrAsync(LoginQrRequest request, CancellationToken ct)
+    {
+        Persona? persona = await _personasRepository.ObtenerPorCodigoAsync(request.CodigoQr, ct);
+        
+        if (persona is null || !persona.Estado)
+            return Result<TokenResponse>.Fallido(CodigosError.PersonaNoEncontrada, "Código QR inválido o persona inactiva.");
+
+        List<Claim> claims = new();
+
+        if (!string.IsNullOrEmpty(persona.UserId))
+        {
+            IdentityUser? usuario = await _userManager.FindByIdAsync(persona.UserId);
+            if (usuario is not null)
+            {
+                claims = await ConstruirClaimsUsuarioAsync(usuario, ct);
+            }
+        }
+        
+        if (!claims.Any())
+        {
+            claims = new List<Claim>
+            {
+                new Claim(System.Security.Claims.ClaimTypes.NameIdentifier, persona.Id.ToString()),
+                new Claim(Domain.Constantes.ClaimTypes.PersonaId, persona.Id.ToString()),
+                new Claim(Domain.Constantes.ClaimTypes.EmpresaId, persona.EmpresaId.ToString()),
+                new Claim(System.Security.Claims.ClaimTypes.Role, "Estudiante")
+            };
+        }
+
+        string accessToken = _servicioJwt.GenerarTokenAcceso(claims);
+        string refreshToken = _servicioJwt.GenerarRefreshToken();
+
+        return Result<TokenResponse>.Exitoso(new TokenResponse
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+            ExpiresInMinutes = 30
+        });
+    }
+
     private async Task<List<Claim>> ConstruirClaimsUsuarioAsync(IdentityUser usuario, CancellationToken ct)
     {
         var claims = new List<Claim>
@@ -133,9 +173,7 @@ public class ServicioAuth
             new(System.Security.Claims.ClaimTypes.Email, usuario.Email ?? string.Empty),
         };
 
-        Persona? persona = await _db.Personas
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.UserId == usuario.Id, ct);
+        Persona? persona = await _personasRepository.ObtenerPorUserIdAsync(usuario.Id, ct);
 
         if (persona is not null)
         {
@@ -149,12 +187,7 @@ public class ServicioAuth
             claims.Add(new Claim(System.Security.Claims.ClaimTypes.Role, rol));
         }
 
-        List<RolPrivilegio> rolPrivilegios = await _db.RolPrivilegios
-            .IgnoreQueryFilters()
-            .Include(rp => rp.Privilegio)
-            .Include(rp => rp.NivelPermiso)
-            .Where(rp => roles.Contains(rp.RoleId) && rp.Estado)
-            .ToListAsync(ct);
+        List<RolPrivilegio> rolPrivilegios = await _seguridadRepository.ObtenerPrivilegiosRolesAsync(roles, ct);
 
         foreach (RolPrivilegio rp in rolPrivilegios)
         {
@@ -168,12 +201,7 @@ public class ServicioAuth
 
     private async Task<List<PrivilegioEfectivoDto>> ResolverPrivilegiosEfectivosAsync(IList<string> roles, CancellationToken ct)
     {
-        List<RolPrivilegio> rolPrivilegios = await _db.RolPrivilegios
-            .IgnoreQueryFilters()
-            .Include(rp => rp.Privilegio)
-            .Include(rp => rp.NivelPermiso)
-            .Where(rp => roles.Contains(rp.RoleId) && rp.Estado)
-            .ToListAsync(ct);
+        List<RolPrivilegio> rolPrivilegios = await _seguridadRepository.ObtenerPrivilegiosRolesAsync(roles, ct);
 
         return rolPrivilegios
             .GroupBy(rp => rp.Privilegio.Codigo)

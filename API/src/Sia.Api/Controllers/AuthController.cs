@@ -4,13 +4,13 @@ using Sia.Application.Abstracciones;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Resultados;
-using Sia.Infrastructure.ServiciosAplicacion;
+using Sia.Application.Servicios;
 
 namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public class AuthController : SiaControllerBase
 {
     private readonly ServicioAuth _servicio;
 
@@ -24,10 +24,15 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         Result<TokenResponse> resultado = await _servicio.LoginAsync(request, ct);
-        if (!resultado.EsExitoso)
-            return Unauthorized(RespuestaEnvuelta<object>.ConError(resultado.Error!.Codigo, resultado.Error.Mensaje));
+        return HandleResult(resultado);
+    }
 
-        return Ok(RespuestaEnvuelta<TokenResponse>.Exitosa(resultado.Valor!));
+    [HttpPost("login-qr")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginQr([FromBody] LoginQrRequest request, CancellationToken ct)
+    {
+        Result<TokenResponse> resultado = await _servicio.LoginQrAsync(request, ct);
+        return HandleResult(resultado);
     }
 
     [HttpPost("refresh")]
@@ -35,10 +40,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct)
     {
         Result<TokenResponse> resultado = await _servicio.RefreshAsync(request, ct);
-        if (!resultado.EsExitoso)
-            return Unauthorized(RespuestaEnvuelta<object>.ConError(resultado.Error!.Codigo, resultado.Error.Mensaje));
-
-        return Ok(RespuestaEnvuelta<TokenResponse>.Exitosa(resultado.Valor!));
+        return HandleResult(resultado);
     }
 
     [HttpPost("logout")]
@@ -56,9 +58,6 @@ public class AuthController : ControllerBase
         if (userId is null) return Unauthorized();
 
         Result<PerfilResponse> resultado = await _servicio.ObtenerPerfilAsync(userId, ct);
-        if (!resultado.EsExitoso)
-            return NotFound(RespuestaEnvuelta<object>.ConError(resultado.Error!.Codigo, resultado.Error.Mensaje));
-
-        return Ok(RespuestaEnvuelta<PerfilResponse>.Exitosa(resultado.Valor!));
+        return HandleResult(resultado);
     }
 }

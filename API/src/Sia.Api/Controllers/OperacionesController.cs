@@ -3,14 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Sia.Api.Filtros;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Operaciones;
-using Sia.Infrastructure.ServiciosAplicacion;
+using Sia.Application.Servicios;
 
 namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/operaciones")]
 [Authorize]
-public class OperacionesController : ControllerBase
+public class OperacionesController : SiaControllerBase
 {
     private readonly ServicioOperaciones _servicio;
 
@@ -23,15 +23,15 @@ public class OperacionesController : ControllerBase
     [RequierePrivilegio("OPE", "L")]
     public async Task<IActionResult> ObtenerPorId(Guid id, CancellationToken ct)
     {
-        OperacionDetalleResponse resultado = await _servicio.ObtenerPorIdAsync(id, ct);
-        return Ok(RespuestaEnvuelta<OperacionDetalleResponse>.Exitosa(resultado));
+        var resultado = await _servicio.ObtenerPorIdAsync(id, ct);
+        return HandleResult(resultado);
     }
 
     [HttpPost("devolver/{id:guid}")]
     [RequierePrivilegio("OPE", "E")]
     public async Task<IActionResult> Devolver(Guid id, [FromBody] DevolverRequest request, CancellationToken ct)
     {
-        OperacionResponse resultado = await _servicio.DevolverAsync(id, request, ct);
-        return Ok(RespuestaEnvuelta<OperacionResponse>.Exitosa(resultado));
+        var resultado = await _servicio.DevolverAsync(id, request, ct);
+        return HandleResult(resultado);
     }
 }

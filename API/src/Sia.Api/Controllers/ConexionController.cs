@@ -4,13 +4,13 @@ using Sia.Application.Abstracciones;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Resultados;
-using Sia.Infrastructure.ServiciosAplicacion;
+using Sia.Application.Servicios;
 
 namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/connect")]
-public class ConexionController : ControllerBase
+public class ConexionController : SiaControllerBase
 {
     private readonly ServicioAuth _servicio;
     private readonly IServicioHashSecreto _hashService;
@@ -26,9 +26,6 @@ public class ConexionController : ControllerBase
     public async Task<IActionResult> Token([FromBody] ClientCredentialsRequest request, CancellationToken ct)
     {
         Result<TokenResponse> resultado = await _servicio.ClientCredentialsAsync(request, _hashService, ct);
-        if (!resultado.EsExitoso)
-            return Unauthorized(RespuestaEnvuelta<object>.ConError(resultado.Error!.Codigo, resultado.Error.Mensaje));
-
-        return Ok(RespuestaEnvuelta<TokenResponse>.Exitosa(resultado.Valor!));
+        return HandleResult(resultado);
     }
 }

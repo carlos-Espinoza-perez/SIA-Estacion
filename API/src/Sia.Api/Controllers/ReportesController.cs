@@ -3,14 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Sia.Api.Filtros;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Reportes;
-using Sia.Infrastructure.ServiciosAplicacion;
+using Sia.Application.Servicios;
 
 namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/reportes")]
 [Authorize]
-public class ReportesController : ControllerBase
+public class ReportesController : SiaControllerBase
 {
     private readonly ServicioReportes _servicio;
 
@@ -24,7 +24,7 @@ public class ReportesController : ControllerBase
     public async Task<IActionResult> ObtenerPresencia(CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerPresenciaActualAsync(ct);
-        return Ok(RespuestaEnvuelta<List<PresenciaResponse>>.Exitosa(resultado));
+        return HandleResult(resultado);
     }
 
     [HttpGet("accesos")]
@@ -32,7 +32,7 @@ public class ReportesController : ControllerBase
     public async Task<IActionResult> ObtenerAccesos([FromQuery] DateTimeOffset desde, [FromQuery] DateTimeOffset hasta, CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerHistorialAccesoAsync(desde, hasta, ct);
-        return Ok(RespuestaEnvuelta<List<EventoReporteResponse>>.Exitosa(resultado));
+        return HandleResult(resultado);
     }
 
     [HttpGet("prestamos-vencidos")]
@@ -40,7 +40,7 @@ public class ReportesController : ControllerBase
     public async Task<IActionResult> ObtenerPrestamosVencidos(CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerPrestamosVencidosAsync(ct);
-        return Ok(RespuestaEnvuelta<List<PrestamoVencidoResponse>>.Exitosa(resultado));
+        return HandleResult(resultado);
     }
 
     [HttpGet("trazabilidad-item/{itemId:guid}")]
@@ -48,6 +48,6 @@ public class ReportesController : ControllerBase
     public async Task<IActionResult> ObtenerTrazabilidad(Guid itemId, CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerTrazabilidadItemAsync(itemId, ct);
-        return Ok(RespuestaEnvuelta<TrazabilidadItemResponse>.Exitosa(resultado));
+        return HandleResult(resultado);
     }
 }
