@@ -1,0 +1,167 @@
+:root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+  
+  /* Paleta Base Figma / Apple Dark */
+  --bg-main: #17171c;
+  --bg-surface: rgba(31, 31, 31, 0.85);
+  --bg-surface-elevated: #22222a;
+  --bg-surface-hover: rgba(255, 255, 255, 0.08);
+  --bg-glass: rgba(23, 23, 28, 0.82);
+  --bg-glass-card: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.07);
+
+  /* Bordes ultra-finos de Figma */
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-figma: 0.5px solid rgba(255, 255, 255, 0.15);
+  --border-focus: #0a84ff;
+  --border-hover: rgba(255, 255, 255, 0.24);
+
+  /* Texto */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-subtle: rgba(255, 255, 255, 0.2);
+  --text-inverse: #000000;
+
+  /* Colores de Marca y Estados */
+  --primary: #0a84ff;
+  --primary-hover: #0070e0;
+  --primary-light: rgba(10, 132, 255, 0.15);
+  --primary-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%), #0a84ff;
+
+  /* Acentos de Figma */
+  --accent-mint: #6be6d3;
+  --accent-lavender: #b899eb;
+  --accent-sky: #7dbbff;
+  --accent-green: #30d158;
+  --accent-purple: #bf5af2;
+
+  --success: #30d158;
+  --success-light: rgba(48, 209, 88, 0.15);
+
+  --warning: #ff9f0a;
+  --warning-light: rgba(255, 159, 10, 0.15);
+
+  --danger: #ff453a;
+  --danger-light: rgba(255, 69, 58, 0.15);
+
+  /* Sombras y Efectos */
+  --shadow-figma-sm: 0px 0.5px 0.5px 0px rgba(0, 0, 0, 0.1);
+  --shadow-figma-lg: 0px 24px 60px 0px rgba(0, 0, 0, 0.45);
+  --shadow-glow-primary: 0 0 24px rgba(10, 132, 255, 0.35);
+
+  /* Radios */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 80px;
+
+  /* Transiciones */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Scrollbar estilizada */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 80px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 80px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Utilidades Glassmorphism Apple / Figma */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: var(--border-figma);
+}
+
+.glass-card {
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: var(--border-figma);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-figma-sm);
+  transition: transform var(--transition-normal), border-color var(--transition-normal), background-color var(--transition-normal);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: var(--bg-glass-hover);
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Responsividad de Login Figma */
+@media (max-width: 1024px) {
+  .sia-login-container {
+    flex-direction: column !important;
+    min-height: auto !important;
+  }
+  .sia-login-left-panel,
+  .sia-login-right-panel {
+    padding: 40px 28px !important;
+  }
+}
+

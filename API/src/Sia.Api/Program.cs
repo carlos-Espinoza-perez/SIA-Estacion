@@ -19,6 +19,16 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddAutoMapper(config => 
@@ -153,12 +163,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sia API v1"));
 }
 
+app.UseCors();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ContextoEmpresaMiddleware>();
 
-using (var scope = app.Services.CreateScope())
+_ = Task.Run(async () =>
 {
+    using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
     try
     {
@@ -172,9 +185,9 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurrió un error al sembrar la base de datos.");
+        logger.LogWarning("Aviso al verificar la base de datos: {Message}", ex.Message);
     }
-}
+});
 
 app.MapControllers();
 app.MapHub<MonitoreoHub>("/hubs/monitoreo");
