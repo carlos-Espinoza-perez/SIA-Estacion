@@ -18,14 +18,10 @@
   "Reconocimiento": {
     "UmbralSimilitud": 0.5,
     "RutaModelos": "modelos",
-    "TimeoutMs": 10000
+    "TimeoutMs": 5000
   },
   "Qr": {
     "PatronCodigoInstitucional": "([0-9]{2}-[A-Z0-9]+-[0-9]+)$"
-  },
-  "Sincronizacion": {
-    "TamanoLote": 100,
-    "IntervaloHeartbeatSegundos": 60
   },
   "Logging": {
     "LogLevel": {

@@ -73,6 +73,13 @@ TestResults/
 *.log
 *.err
 
+# AppSettings con credenciales / variables locales
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+appsettings.*.local.json
+appsettings.staging.json
+
 # =========================
 # Node / React (Frontend)
 # =========================
