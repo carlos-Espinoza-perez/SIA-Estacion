@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../../atoms/Avatar/Avatar';
+import { useNavStorage } from '../../../services/navigationStorageService';
 
 export interface SidebarProps {
   isOpen?: boolean;
@@ -10,6 +11,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'favoritos' | 'recientes'>('favoritos');
+  const { favorites, recents, removeFavorite } = useNavStorage();
 
   const mainNavItems = [
     {
@@ -179,39 +181,160 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
         </button>
       </div>
 
-      {/* Bullets de acceso rápido */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div
-          onClick={() => navigate('/dashboard')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 8px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            backgroundColor: location.pathname === '/dashboard' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.4)' }} />
-          <span style={{ fontSize: '12px', color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>Dashboard</span>
-        </div>
+      {/* Bullets de acceso rápido (Favoritos / Recientes) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '48px' }}>
+        {activeTab === 'favoritos' ? (
+          favorites.length === 0 ? (
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'rgba(255, 255, 255, 0.3)',
+                padding: '6px 8px',
+                fontFamily: 'Inter, sans-serif',
+                fontStyle: 'italic',
+              }}
+            >
+              Sin favoritos guardados
+            </div>
+          ) : (
+            favorites.map((fav) => {
+              const isActive = location.pathname === fav.path;
+              return (
+                <div
+                  key={fav.path}
+                  onClick={() => navigate(fav.path)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    transition: 'background 0.15s ease',
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: isActive ? '#F59E0B' : 'rgba(255, 255, 255, 0.4)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                        fontFamily: 'Inter, sans-serif',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {fav.label}
+                    </span>
+                  </div>
 
-        <div
-          onClick={() => navigate('/accesos')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 8px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            backgroundColor: location.pathname === '/accesos' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.4)' }} />
-          <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif' }}>Accesos</span>
-        </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFavorite(fav.path);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.25)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      padding: '0 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                    title="Quitar de favoritos"
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.color = '#EF4444';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.color = 'rgba(255, 255, 255, 0.25)';
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })
+          )
+        ) : recents.length === 0 ? (
+          <div
+            style={{
+              fontSize: '11px',
+              color: 'rgba(255, 255, 255, 0.3)',
+              padding: '6px 8px',
+              fontFamily: 'Inter, sans-serif',
+              fontStyle: 'italic',
+            }}
+          >
+            Sin historial reciente
+          </div>
+        ) : (
+          recents.map((rec) => {
+            const isActive = location.pathname === rec.path;
+            return (
+              <div
+                key={rec.path}
+                onClick={() => navigate(rec.path)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                }}
+                onMouseOut={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <div
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: isActive ? '#3B82F6' : 'rgba(255, 255, 255, 0.4)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '12px',
+                    color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontFamily: 'Inter, sans-serif',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {rec.label}
+                </span>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* 3. Sección Principal */}

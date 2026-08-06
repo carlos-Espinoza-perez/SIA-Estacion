@@ -7,8 +7,10 @@ import {
   ModalAprobacionPrestamo,
   AprobacionPrestamoData,
 } from '../../components/organisms/Modal/ModalAprobacionPrestamo';
+import { useToast } from '../../context/ToastContext';
+import { auditoriaService } from '../../services/auditoriaService';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// Tipos
 
 export type EstadoOperacion =
   | 'Pendiente'
@@ -31,7 +33,7 @@ interface OperacionRow {
   estado: EstadoOperacion;
 }
 
-// ─── Badge de estado ──────────────────────────────────────────────────────────
+// Badge de estado
 
 const ESTADO_COLOR: Record<EstadoOperacion, string> = {
   Pendiente: '#ADADFB',
@@ -62,7 +64,7 @@ const EstadoBadge: React.FC<{ value: EstadoOperacion }> = ({ value }) => {
   );
 };
 
-// ─── Datos mock (del Figma) ───────────────────────────────────────────────────
+// Datos de demostración iniciales
 
 const MOCK_DATA: OperacionRow[] = [
   { id: '1',  folio: 'OP-1042', fechaHora: '28/07/2026 08:20', solicitante: 'Ana Morales',    item: 'Multímetro digital UNI-T',    estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Pendiente' },
@@ -79,7 +81,7 @@ const MOCK_DATA: OperacionRow[] = [
   { id: '12', folio: 'OP-1031', fechaHora: '26/07/2026 15:00', solicitante: 'Diego Vargas',   item: 'Kit resistencias surtidas',   estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Entregada' },
 ];
 
-// ─── Opciones de filtros ───────────────────────────────────────────────────────
+// Opciones de filtros
 
 const ESTACION_OPTIONS: SelectOption[] = [
   { value: '',             label: 'Estación: Todas' },
@@ -105,7 +107,7 @@ const FECHA_OPTIONS: SelectOption[] = [
   { value: '28/07',  label: '28 jul 2026' },
 ];
 
-// ─── Columnas ─────────────────────────────────────────────────────────────────
+// Definición de Columnas
 
 // Folio column defined inside component so it can access setModalData
 const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
@@ -167,16 +169,15 @@ const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
   },
 ];
 
-// ─── Página ───────────────────────────────────────────────────────────────────
-
 export const OperacionesPage: React.FC = () => {
+  const { showToast } = useToast();
+  const [operaciones, setOperaciones] = useState<OperacionRow[]>(MOCK_DATA);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [estado,    setEstado]    = useState('');
   const [fecha,     setFecha]     = useState('28/07');
   const [modalData, setModalData] = useState<AprobacionPrestamoData | null>(null);
 
-  /* Abre el modal solo para filas Pendientes */
   const handleFolioClick = (row: OperacionRow) => {
     if (row.estado !== 'Pendiente') return;
     setModalData({
@@ -204,7 +205,6 @@ export const OperacionesPage: React.FC = () => {
     });
   };
 
-  /* Columna folio con click interactivo */
   const folioColumn: TableColumn<OperacionRow> = {
     key: 'folio',
     header: 'Folio',
@@ -220,7 +220,7 @@ export const OperacionesPage: React.FC = () => {
             fontFamily: 'Inter, sans-serif',
             cursor: isPendiente ? 'pointer' : 'default',
             textDecoration: isPendiente ? 'underline' : 'none',
-            textUnderlineOffset: '3px',
+            fontWeight: isPendiente ? 600 : 400,
           }}
         >
           {row.folio}
@@ -229,10 +229,10 @@ export const OperacionesPage: React.FC = () => {
     },
   };
 
-  const COLUMNS: TableColumn<OperacionRow>[] = [folioColumn, ...STATIC_COLUMNS_WITHOUT_FOLIO];
+  const allColumns = useMemo(() => [folioColumn, ...STATIC_COLUMNS_WITHOUT_FOLIO], []);
 
   const filtered = useMemo(() => {
-    return MOCK_DATA.filter((row) => {
+    return operaciones.filter((row) => {
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -243,7 +243,51 @@ export const OperacionesPage: React.FC = () => {
       const matchEstado   = !estado   || row.estado   === estado;
       return matchSearch && matchEstacion && matchEstado;
     });
-  }, [search, estacion, estado]);
+  }, [operaciones, search, estacion, estado]);
+
+  const handleAprobarOperacion = async (nota?: string, fechaLimite?: string, cantidad?: number) => {
+    if (!modalData) return;
+    setOperaciones((prev) =>
+      prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Aprobada' } : op))
+    );
+
+    const detalleStr = [
+      cantidad ? `${cantidad} ud.` : '',
+      fechaLimite ? `Hasta: ${fechaLimite}` : '',
+      nota ? `Nota: "${nota}"` : '',
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    await auditoriaService.registrarEvento({
+      tipo: 'Ítem',
+      actor: 'Encargado de recurso',
+      descripcion: `Aprobación de préstamo ${modalData.folio} para ${modalData.solicitante.nombre} (${modalData.item.nombre})${detalleStr ? ` - ${detalleStr}` : ''}`,
+      origen: 'Panel',
+      estacion: modalData.estacion,
+    });
+
+    showToast(`Solicitud ${modalData.folio} aprobada con éxito`, 'success');
+    setModalData(null);
+  };
+
+  const handleRechazarOperacion = async () => {
+    if (!modalData) return;
+    setOperaciones((prev) =>
+      prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Cancelada' } : op))
+    );
+
+    await auditoriaService.registrarEvento({
+      tipo: 'Ítem',
+      actor: 'Encargado de recurso',
+      descripcion: `Rechazo de préstamo ${modalData.folio} solicitado por ${modalData.solicitante.nombre}`,
+      origen: 'Panel',
+      estacion: modalData.estacion,
+    });
+
+    showToast(`Solicitud ${modalData.folio} rechazada`, 'info');
+    setModalData(null);
+  };
 
   return (
     <DashboardLayoutTemplate breadcrumbTitle="Operaciones">
@@ -257,7 +301,7 @@ export const OperacionesPage: React.FC = () => {
           width: '100%',
         }}
       >
-        {/* ─── Título ─── */}
+        {/* Título */}
         <h2
           style={{
             fontSize: '14px',
@@ -270,7 +314,7 @@ export const OperacionesPage: React.FC = () => {
           Operaciones
         </h2>
 
-        {/* ─── Barra de filtros ─── */}
+        {/* Barra de filtros */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <SearchInput
             value={search}
@@ -301,30 +345,24 @@ export const OperacionesPage: React.FC = () => {
           />
         </div>
 
-        {/* ─── Tabla ─── */}
+        {/* Tabla */}
         <Table<OperacionRow>
-          columns={COLUMNS}
+          columns={allColumns}
           data={filtered}
           rowKey={(row) => row.id}
-          footerText={`Mostrando ${filtered.length} de ${MOCK_DATA.length} operaciones`}
+          footerText={`Mostrando ${filtered.length} de ${operaciones.length} operaciones`}
           emptyMessage="No hay operaciones que coincidan con los filtros."
         />
       </div>
 
-      {/* ─── Modal Aprobación ─── */}
+      {/* Modal Aprobación */}
       {modalData && (
         <ModalAprobacionPrestamo
           isOpen={true}
           onClose={() => setModalData(null)}
           data={modalData}
-          onAprobar={(nota, fecha, cantidad) => {
-            console.log('Aprobado:', { nota, fecha, cantidad });
-            setModalData(null);
-          }}
-          onRechazar={() => {
-            console.log('Rechazado:', modalData.folio);
-            setModalData(null);
-          }}
+          onAprobar={handleAprobarOperacion}
+          onRechazar={handleRechazarOperacion}
         />
       )}
     </DashboardLayoutTemplate>

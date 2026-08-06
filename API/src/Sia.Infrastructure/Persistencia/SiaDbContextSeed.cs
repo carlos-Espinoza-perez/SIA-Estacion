@@ -12,7 +12,7 @@ public static class SiaDbContextSeed
         UserManager<IdentityUser> userManager,
         RoleManager<IdentityRole> roleManager)
     {
-        // 1. Asegurar Empresa por Defecto
+        // Empresa inicial
         var empresa = await context.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Codigo == "123456789");
         if (empresa == null)
         {
@@ -27,14 +27,14 @@ public static class SiaDbContextSeed
             await context.SaveChangesAsync();
         }
 
-        // 2. Asegurar Rol Administrador
+        // Rol Administrador
         const string rolAdmin = "Administrador Global";
         if (!await roleManager.RoleExistsAsync(rolAdmin))
         {
             await roleManager.CreateAsync(new IdentityRole(rolAdmin));
         }
 
-        // 3. Asegurar Usuario Administrador
+        // Usuario Administrador
         var user = await userManager.FindByEmailAsync("admin@sia.com");
         if (user == null)
         {
@@ -52,7 +52,7 @@ public static class SiaDbContextSeed
             }
         }
 
-        // 4. Asegurar Persona para el Administrador (Para Login por QR)
+        // Perfil de persona asociado al administrador
         var persona = await context.Personas.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.UserId == user.Id);
         if (persona == null)
         {

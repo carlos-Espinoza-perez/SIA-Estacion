@@ -1,8 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 export interface ModalProps {
   /** Controla visibilidad */
   isOpen: boolean;
@@ -19,8 +17,6 @@ export interface ModalProps {
   /** Footer (botones de acción) */
   footer?: React.ReactNode;
 }
-
-// ─── Componente Base ─────────────────────────────────────────────────────────
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -186,7 +182,7 @@ export const Modal: React.FC<ModalProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '0 28px',
+            padding: '0 28px 24px',
           }}
         >
           {children}
@@ -194,28 +190,26 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* ── Footer ── */}
         {footer && (
-          <>
+          <div style={{ flexShrink: 0 }}>
             <div
               style={{
                 height: '1px',
                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                margin: '0 0',
-                flexShrink: 0,
+                margin: '0 28px',
               }}
             />
             <div
               style={{
-                padding: '16px 28px 24px',
+                padding: '20px 28px 24px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
                 gap: '12px',
-                flexShrink: 0,
               }}
             >
               {footer}
             </div>
-          </>
+          </div>
         )}
       </div>
 

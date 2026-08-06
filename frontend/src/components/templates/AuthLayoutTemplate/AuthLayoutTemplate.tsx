@@ -19,9 +19,7 @@ export const AuthLayoutTemplate: React.FC<AuthLayoutTemplateProps> = ({ children
       }}
       className="sia-login-container"
     >
-      {/* =========================================================
-          HALOS DE LUZ GLOBALES (Atraviesan ambas columnas como en Figma)
-         ========================================================= */}
+      {/* Efectos de Iluminación Ambiental */}
 
       {/* 1. Halo Superior Izquierdo (Lavanda / Periwinkle #ADADFB) */}
       <div

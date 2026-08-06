@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal/Modal';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 export interface AprobacionPrestamoData {
   folio: string;
   fechaSolicitud: string;
@@ -34,8 +32,6 @@ export interface ModalAprobacionPrestamoProps {
   onAprobar: (nota: string, fechaDevolucion: string, cantidad: number) => void;
   onRechazar: () => void;
 }
-
-// ─── Sub-componentes internos ─────────────────────────────────────────────────
 
 const Divider = () => (
   <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 0 20px' }} />
@@ -113,8 +109,6 @@ const ModalInput: React.FC<{
     onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
   />
 );
-
-// ─── Modal principal ─────────────────────────────────────────────────────────
 
 export const ModalAprobacionPrestamo: React.FC<ModalAprobacionPrestamoProps> = ({
   isOpen,

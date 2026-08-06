@@ -45,14 +45,14 @@ export const Button: React.FC<ButtonProps> = ({
         return {
           backgroundColor: 'rgba(255, 255, 255, 0.08)',
           color: '#ffffff',
-          border: 'var(--border-figma)',
-          boxShadow: 'var(--shadow-figma-sm)',
+          border: 'var(--border-subtle)',
+          boxShadow: 'var(--shadow-sm)',
         };
       case 'subtle':
         return {
           backgroundColor: 'rgba(255, 255, 255, 0.04)',
           color: 'var(--text-secondary)',
-          border: 'var(--border-figma)',
+          border: 'var(--border-subtle)',
         };
       case 'danger':
         return {

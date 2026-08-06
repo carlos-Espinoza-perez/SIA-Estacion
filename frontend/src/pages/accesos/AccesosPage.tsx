@@ -4,8 +4,10 @@ import { Table, TableColumn } from '../../components/molecules/Table/Table';
 import { SearchInput } from '../../components/atoms/SearchInput/SearchInput';
 import { Select, SelectOption } from '../../components/atoms/Select/Select';
 import { ResultadoBadge, ResultadoAcceso } from '../../components/atoms/ResultadoBadge/ResultadoBadge';
+import { useToast } from '../../context/ToastContext';
+import { auditoriaService } from '../../services/auditoriaService';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// Tipos
 
 interface AccesoRow {
   id: string;
@@ -18,7 +20,7 @@ interface AccesoRow {
   resultado: ResultadoAcceso;
 }
 
-// ─── Datos mock (del Figma) ───────────────────────────────────────────────────
+// Datos de demostración iniciales
 
 const MOCK_DATA: AccesoRow[] = [
   { id: '1',  fechaHora: '28/07/2026 08:12', persona: 'Ana Morales',    carnet: '22-A0200-0056', estacion: 'Entrada principal', direccion: 'Ingreso', validacion: 'QR + Facial', resultado: 'Concedido' },
@@ -35,7 +37,7 @@ const MOCK_DATA: AccesoRow[] = [
   { id: '12', fechaHora: '28/07/2026 09:56', persona: 'Sofía Méndez',   carnet: '20-A0098-0104', estacion: 'Entrada principal', direccion: 'Egreso',  validacion: 'QR + Facial', resultado: 'Concedido' },
 ];
 
-// ─── Opciones de filtros ───────────────────────────────────────────────────────
+// Opciones de filtros
 
 const ESTACION_OPTIONS: SelectOption[] = [
   { value: '', label: 'Estación: Todas' },
@@ -62,7 +64,7 @@ const FECHA_OPTIONS: SelectOption[] = [
   { value: '28/07',    label: '28 jul 2026' },
 ];
 
-// ─── Columnas de la tabla ────────────────────────────────────────────────────
+// Definición de Columnas
 
 const COLUMNS: TableColumn<AccesoRow>[] = [
   {
@@ -133,16 +135,16 @@ const COLUMNS: TableColumn<AccesoRow>[] = [
   },
 ];
 
-// ─── Página ───────────────────────────────────────────────────────────────────
-
 export const AccesosPage: React.FC = () => {
+  const { showToast } = useToast();
+  const [accesos,   setAccesos]   = useState<AccesoRow[]>(MOCK_DATA);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [resultado, setResultado] = useState('');
   const [fecha,     setFecha]     = useState('28/07');
 
   const filtered = useMemo(() => {
-    return MOCK_DATA.filter((row) => {
+    return accesos.filter((row) => {
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -152,7 +154,45 @@ export const AccesosPage: React.FC = () => {
       const matchResultado = !resultado || row.resultado === resultado;
       return matchSearch && matchEstacion && matchResultado;
     });
-  }, [search, estacion, resultado]);
+  }, [accesos, search, estacion, resultado]);
+
+  const handleSimularAcceso = async () => {
+    const nombres = ['Ana Morales', 'Luis Herrera', 'María López', 'Carlos Ruiz', 'Sofía Méndez', 'Diego Vargas'];
+    const carnets = ['22-A0200-0056', '21-A0134-0012', '23-A0311-0087', '22-A0200-0057', '20-A0098-0104', '23-A0311-0088'];
+    const estaciones = ['Entrada principal', 'Laboratorio A', 'Biblioteca', 'Taller', 'Cafetería'];
+    const idx = Math.floor(Math.random() * nombres.length);
+    const estacionRand = estaciones[Math.floor(Math.random() * estaciones.length)];
+    const resultadoRand: ResultadoAcceso = Math.random() > 0.15 ? 'Concedido' : 'Denegado';
+
+    const now = new Date();
+    const fechaHoraStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const nuevoAcceso: AccesoRow = {
+      id: `acc-${Date.now()}`,
+      fechaHora: fechaHoraStr,
+      persona: nombres[idx],
+      carnet: carnets[idx],
+      estacion: estacionRand,
+      direccion: Math.random() > 0.5 ? 'Ingreso' : 'Egreso',
+      validacion: 'QR + Facial',
+      resultado: resultadoRand,
+    };
+
+    setAccesos((prev) => [nuevoAcceso, ...prev]);
+
+    await auditoriaService.registrarEvento({
+      tipo: 'Acceso',
+      actor: nuevoAcceso.persona,
+      descripcion: `Validación de acceso (${nuevoAcceso.direccion}) - Resultado: ${nuevoAcceso.resultado}`,
+      origen: 'Estación',
+      estacion: nuevoAcceso.estacion,
+    });
+
+    showToast(
+      `Acceso ${resultadoRand === 'Concedido' ? 'permitido' : 'denegado'} a ${nuevoAcceso.persona} en ${nuevoAcceso.estacion}`,
+      resultadoRand === 'Concedido' ? 'success' : 'error'
+    );
+  };
 
   return (
     <DashboardLayoutTemplate breadcrumbTitle="Accesos">
@@ -166,20 +206,50 @@ export const AccesosPage: React.FC = () => {
           width: '100%',
         }}
       >
-        {/* ─── Título ─── */}
-        <h2
-          style={{
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#FFFFFF',
-            fontFamily: 'Inter, sans-serif',
-            margin: 0,
-          }}
-        >
-          Accesos
-        </h2>
+        {/* Encabezado y Simulación */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2
+            style={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              fontFamily: 'Inter, sans-serif',
+              margin: 0,
+            }}
+          >
+            Accesos
+          </h2>
 
-        {/* ─── Barra de filtros ─── */}
+          <button
+            onClick={handleSimularAcceso}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '7px 14px',
+              height: '34px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              color: '#FFFFFF',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              fontSize: '13px',
+              fontWeight: 500,
+              fontFamily: 'Inter, sans-serif',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14" />
+              <path d="M12 5l7 7-7 7" />
+            </svg>
+            Simular validación NFC/QR
+          </button>
+        </div>
+
+        {/* Barra de filtros */}
         <div
           style={{
             display: 'flex',
@@ -217,15 +287,16 @@ export const AccesosPage: React.FC = () => {
           />
         </div>
 
-        {/* ─── Tabla ─── */}
+        {/* Tabla */}
         <Table<AccesoRow>
           columns={COLUMNS}
           data={filtered}
           rowKey={(row) => row.id}
-          footerText={`Mostrando ${filtered.length} de ${MOCK_DATA.length} eventos`}
+          footerText={`Mostrando ${filtered.length} de ${accesos.length} eventos`}
           emptyMessage="No hay accesos que coincidan con los filtros."
         />
       </div>
     </DashboardLayoutTemplate>
   );
 };
+

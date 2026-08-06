@@ -26,19 +26,14 @@ public class ServicioReconocimientoFacial : IServicioReconocimientoFacial, IDisp
             _logger.LogWarning("El directorio de modelos FaceONNX no existía y fue creado en: {Ruta}. Se requieren los modelos .onnx.", modelosRuta);
         }
 
-        // En un entorno de producción, los modelos .onnx deben estar en _opciones.RutaModelos
-        // Para que FaceONNX funcione sin errores, debe encontrar los archivos allí.
         try 
         {
-            // FaceONNX busca los modelos en la carpeta de ejecución por defecto si no están instanciados explícitamente.
-            // Para simplificar la inyección, si los archivos no existen, la librería podría tirar excepción.
-            // Asumimos que los archivos (version-RFB-320.onnx y resnet100.onnx) están descargados o se descargarán.
             _faceDetector = new FaceDetector(0.95f, 0.5f, 0.5f);
             _faceEmbedder = new FaceEmbedder();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al inicializar FaceONNX. ¿Faltan los archivos de modelo en el directorio de ejecución?");
+            _logger.LogError(ex, "Error al inicializar modelos de reconocimiento facial.");
             throw;
         }
     }
@@ -69,12 +64,9 @@ public class ServicioReconocimientoFacial : IServicioReconocimientoFacial, IDisp
                 var face1 = faces1.OrderByDescending(f => f.Score).First();
                 var face2 = faces2.OrderByDescending(f => f.Score).First();
 
-                // En FaceONNX 4.x, FaceDetector devuelve un Rectangle (o estructura similar con ubicación).
-                // Se debe recortar el rostro antes de pasarlo al FaceEmbedder.
                 Rectangle rect1 = face1.Rectangle;
                 Rectangle rect2 = face2.Rectangle;
                 
-                // Asegurar que el rectángulo esté dentro de los límites
                 rect1.Intersect(new Rectangle(0, 0, image1.Width, image1.Height));
                 rect2.Intersect(new Rectangle(0, 0, image2.Width, image2.Height));
 
@@ -84,7 +76,6 @@ public class ServicioReconocimientoFacial : IServicioReconocimientoFacial, IDisp
                 var embedding1 = _faceEmbedder.Forward(crop1);
                 var embedding2 = _faceEmbedder.Forward(crop2);
 
-                // Calcular similitud coseno
                 float dot = 0f, mag1 = 0f, mag2 = 0f;
                 for (int i = 0; i < embedding1.Length; i++)
                 {

@@ -46,7 +46,7 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div style={{ width: '100%', fontFamily: 'Inter, sans-serif' }}>
-      {/* Título y Subtítulo del Figma */}
+      {/* Encabezado */}
       <h2
         style={{
           fontSize: '24px',

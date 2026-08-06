@@ -6,3 +6,5 @@ export * from './Card/Card';
 export * from './Avatar/Avatar';
 export * from './Kbd/Kbd';
 export * from './StatCard/StatCard';
+export * from './Drawer/Drawer';
+export * from './StatusBadge/StatusBadge';

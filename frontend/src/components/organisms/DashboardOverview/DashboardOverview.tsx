@@ -18,7 +18,7 @@ export const DashboardOverview: React.FC = () => {
         boxSizing: 'border-box',
       }}
     >
-      {/* ─── 1. Header de Vista ─── */}
+      {/* Header de Resumen */}
       <div
         style={{
           display: 'flex',
@@ -60,7 +60,7 @@ export const DashboardOverview: React.FC = () => {
         </button>
       </div>
 
-      {/* ─── 2. Bloque de 4 Tarjetas Stat (fondo pastel, texto negro) ─── */}
+      {/* Tarjetas Estadísticas */}
       <div
         style={{
           display: 'grid',
@@ -75,7 +75,7 @@ export const DashboardOverview: React.FC = () => {
         <StatCard title="Estaciones"   value="2,318" trend="+6.08%"  isPositive={true}  bgColor="#EDEEFC" />
       </div>
 
-      {/* ─── 3. Gráfico Accesos + Desglose por Estación (fila 2 columnas) ─── */}
+      {/* Gráfico Accesos y Desglose por Estación */}
       <div
         style={{
           display: 'grid',
@@ -89,7 +89,7 @@ export const DashboardOverview: React.FC = () => {
         <StationAccessBreakdown />
       </div>
 
-      {/* ─── 4. Ítems por estado + Resultado de acceso (fila 2 columnas) ─── */}
+      {/* Distribución de Ítems y Resultados */}
       <div
         style={{
           display: 'grid',
@@ -103,7 +103,7 @@ export const DashboardOverview: React.FC = () => {
         <AccesosResultChart />
       </div>
 
-      {/* ─── 5. Operaciones mensuales (ancho completo) ─── */}
+      {/* Operaciones Mensuales */}
       <OperacionesMensualesChart />
     </div>
   );

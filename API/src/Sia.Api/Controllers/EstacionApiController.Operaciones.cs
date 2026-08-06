@@ -1,4 +1,3 @@
-// Agregando endpoints para la estación interactuando con operaciones (Fase 9)
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sia.Application.Dtos.Acceso;

@@ -41,7 +41,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               paddingLeft: leftIcon ? '38px' : '14px',
               paddingRight: rightIcon ? '38px' : '14px',
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: error ? '0.5px solid var(--danger)' : 'var(--border-figma)',
+              border: error ? '0.5px solid var(--danger)' : 'var(--border-subtle)',
               borderRadius: 'var(--radius-lg)',
               color: 'var(--text-primary)',
               fontSize: '14px',

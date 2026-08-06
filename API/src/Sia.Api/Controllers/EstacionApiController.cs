@@ -8,7 +8,7 @@ namespace Sia.Api.Controllers;
 
 [ApiController]
 [Route("api/estacion-api")]
-[Authorize] // Station client credentials will authorize these requests
+[Authorize]
 public partial class EstacionApiController : SiaControllerBase
 {
     private readonly ServicioAcceso _servicioAcceso;

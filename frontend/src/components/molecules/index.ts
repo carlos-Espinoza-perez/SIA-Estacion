@@ -5,3 +5,4 @@ export * from './UserContactItem/UserContactItem';
 export * from './ChartMotion/AccessChart';
 export * from './ChartMotion/ItemStatusChart';
 export * from './StationBarItem/StationAccessBreakdown';
+export * from './ConfirmModal/ConfirmModal';

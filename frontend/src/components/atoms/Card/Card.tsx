@@ -58,17 +58,17 @@ export const Card: React.FC<CardProps> = ({
       case 'gradientDark':
         return {
           background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%), #17171c',
-          border: 'var(--border-figma)',
-          boxShadow: 'var(--shadow-figma-sm)',
+          border: 'var(--border-subtle)',
+          boxShadow: 'var(--shadow-sm)',
         };
       case 'default':
       default:
         return {
           backgroundColor: glass ? 'var(--bg-glass-card)' : 'var(--bg-surface)',
-          border: 'var(--border-figma)',
+          border: 'var(--border-subtle)',
           backdropFilter: glass ? 'blur(20px)' : 'none',
           WebkitBackdropFilter: glass ? 'blur(20px)' : 'none',
-          boxShadow: 'var(--shadow-figma-sm)',
+          boxShadow: 'var(--shadow-sm)',
         };
     }
   };

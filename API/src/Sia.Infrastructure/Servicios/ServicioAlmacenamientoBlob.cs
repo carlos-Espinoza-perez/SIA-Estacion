@@ -18,8 +18,6 @@ public class ServicioAlmacenamientoBlob : IServicioAlmacenamiento
         _opciones = opciones.Value;
         _blobServiceClient = new BlobServiceClient(_opciones.ConnectionString);
         _containerClient = _blobServiceClient.GetBlobContainerClient(_opciones.Contenedor);
-        
-        // Ensure container exists
         _containerClient.CreateIfNotExists(PublicAccessType.None);
     }
 

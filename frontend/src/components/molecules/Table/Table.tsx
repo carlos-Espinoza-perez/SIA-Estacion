@@ -1,7 +1,5 @@
 import React from 'react';
 
-// ─── Tipos públicos ───────────────────────────────────────────────────────────
-
 export interface TableColumn<T> {
   /** Clave única de columna */
   key: string;
@@ -26,9 +24,9 @@ export interface TableProps<T> {
   footerText?: string;
   /** Sin datos — mensaje vacío */
   emptyMessage?: string;
+  /** Callback al hacer clic en una fila */
+  onRowClick?: (row: T) => void;
 }
-
-// ─── Estilos internos ─────────────────────────────────────────────────────────
 
 const FONT: React.CSSProperties = {
   fontFamily: 'Inter, sans-serif',
@@ -56,14 +54,13 @@ const ROW_CELL: React.CSSProperties = {
   borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
 };
 
-// ─── Componente ───────────────────────────────────────────────────────────────
-
 export function Table<T>({
   columns,
   data,
   rowKey,
   footerText,
   emptyMessage = 'Sin resultados',
+  onRowClick,
 }: TableProps<T>) {
   return (
     <div
@@ -135,7 +132,11 @@ export function Table<T>({
             data.map((row, idx) => (
               <tr
                 key={rowKey(row)}
-                style={{ transition: 'background 0.1s ease' }}
+                onClick={() => onRowClick && onRowClick(row)}
+                style={{
+                  transition: 'background 0.1s ease',
+                  cursor: onRowClick ? 'pointer' : 'default',
+                }}
                 onMouseOver={(e) =>
                   ((e.currentTarget as HTMLTableRowElement).style.backgroundColor =
                     'rgba(255,255,255,0.025)')
