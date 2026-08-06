@@ -49,6 +49,9 @@ public class ServicioEstaciones
             EmpresaId = _contextoEmpresa.EmpresaId,
             Nombre = request.Nombre,
             Ubicacion = request.Ubicacion,
+            EncargadoId = request.EncargadoId,
+            FirmwareVersion = request.FirmwareVersion,
+            DireccionIp = request.DireccionIp,
             ClientId = clientId,
             ClientSecretHash = _hashService.Hash(secretoPlano),
             RequiereIdentificacion = request.RequiereIdentificacion,
@@ -64,6 +67,10 @@ public class ServicioEstaciones
             Id = baseResponse.Id,
             Nombre = baseResponse.Nombre,
             Ubicacion = baseResponse.Ubicacion,
+            EncargadoId = baseResponse.EncargadoId,
+            EncargadoNombre = baseResponse.EncargadoNombre,
+            FirmwareVersion = baseResponse.FirmwareVersion,
+            DireccionIp = baseResponse.DireccionIp,
             ClientId = baseResponse.ClientId,
             RequiereIdentificacion = baseResponse.RequiereIdentificacion,
             RequiereAprobacion = baseResponse.RequiereAprobacion,
@@ -83,11 +90,15 @@ public class ServicioEstaciones
 
         estacion.Nombre = request.Nombre;
         estacion.Ubicacion = request.Ubicacion;
+        estacion.EncargadoId = request.EncargadoId;
+        estacion.FirmwareVersion = request.FirmwareVersion;
+        estacion.DireccionIp = request.DireccionIp;
         estacion.RequiereIdentificacion = request.RequiereIdentificacion;
         estacion.RequiereAprobacion = request.RequiereAprobacion;
         await _repository.SaveChangesAsync(ct);
 
-        return Result<EstacionResponse>.Exitoso(_mapper.Map<EstacionResponse>(estacion));
+        Estacion? estacionActualizada = await _repository.ObtenerPorIdAsync(id, ct);
+        return Result<EstacionResponse>.Exitoso(_mapper.Map<EstacionResponse>(estacionActualizada ?? estacion));
     }
 
     public async Task<Result<bool>> EliminarAsync(Guid id, CancellationToken ct)

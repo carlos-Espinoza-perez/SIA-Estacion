@@ -9,5 +9,6 @@ public interface IEventosRepository
     Task<bool> ExisteEventoAsync(Guid id, CancellationToken ct);
     Task<List<EventoAcceso>> ObtenerPresenciaActualAsync(DateTimeOffset inicioDia, CancellationToken ct);
     Task<List<EventoAcceso>> ObtenerHistorialAccesoAsync(DateTimeOffset desde, DateTimeOffset hasta, CancellationToken ct);
+    Task<List<AuditoriaCambio>> ObtenerAuditoriaAsync(DateTimeOffset? desde, DateTimeOffset? hasta, string? entidad, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

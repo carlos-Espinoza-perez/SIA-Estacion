@@ -1,5 +1,6 @@
 import {
   Item,
+  EstadoItem,
   TipoItem,
   CrearItemFormData,
   CrearTipoItemFormData,
@@ -162,10 +163,71 @@ export const MOCK_TIPOS_ITEM: TipoItem[] = [
 ];
 
 import { auditoriaService } from './auditoriaService';
+import { apiClient } from './apiClient';
+import { RespuestaEnvuelta } from '../types/api';
+
+interface ItemBackendDto {
+  id: string;
+  codigo: string;
+  nombre: string;
+  tipoItemId: string;
+  tipoItemNombre?: string;
+  estacionId?: string;
+  estacionNombre?: string;
+  estadoActual: string;
+  unidades?: number;
+  observaciones?: string;
+}
+
+interface TipoItemBackendDto {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  requiereAprobacion?: boolean;
+  estado: boolean;
+}
 
 export const itemService = {
   getItems: async (filtros?: FiltrosItem): Promise<Item[]> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<ItemBackendDto[]>>('/items');
+      if (response.data.datos && response.data.datos.length > 0) {
+        let lista: Item[] = response.data.datos.map((it) => ({
+          id: it.id,
+          codigo: it.codigo,
+          nombre: it.nombre,
+          tipo: it.tipoItemNombre || it.tipoItemId,
+          estacion: it.estacionNombre || 'Laboratorio A',
+          estado: (it.estadoActual as EstadoItem) || 'Disponible',
+          unidades: it.unidades || 1,
+          observaciones: it.observaciones,
+        }));
+
+        if (filtros) {
+          const q = filtros.busqueda.trim().toLowerCase();
+          if (q) {
+            lista = lista.filter(
+              (i) =>
+                i.nombre.toLowerCase().includes(q) ||
+                i.codigo.toLowerCase().includes(q)
+            );
+          }
+          if (filtros.tipo) {
+            lista = lista.filter((i) => i.tipo === filtros.tipo);
+          }
+          if (filtros.estacion) {
+            lista = lista.filter((i) => i.estacion === filtros.estacion);
+          }
+          if (filtros.estado) {
+            lista = lista.filter((i) => i.estado === filtros.estado);
+          }
+        }
+        return lista;
+      }
+    } catch {
+      // Fallback
+    }
+
     let lista = [...MOCK_ITEMS];
 
     if (filtros) {
@@ -192,7 +254,37 @@ export const itemService = {
   },
 
   getTiposItem: async (filtros?: FiltrosTipoItem): Promise<TipoItem[]> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<TipoItemBackendDto[]>>('/items/tipos');
+      if (response.data.datos && response.data.datos.length > 0) {
+        let lista: TipoItem[] = response.data.datos.map((t) => ({
+          id: t.id,
+          nombre: t.nombre,
+          descripcion: t.descripcion || 'Sin descripción',
+          itemsRegistrados: 0,
+          requiereAprobacion: t.requiereAprobacion ? 'Sí' : 'No',
+          estado: t.estado ? 'Activo' : 'Inactivo',
+        }));
+
+        if (filtros) {
+          const q = filtros.busqueda.trim().toLowerCase();
+          if (q) {
+            lista = lista.filter(
+              (t) =>
+                t.nombre.toLowerCase().includes(q) ||
+                t.descripcion.toLowerCase().includes(q)
+            );
+          }
+          if (filtros.estado) {
+            lista = lista.filter((t) => t.estado === filtros.estado);
+          }
+        }
+        return lista;
+      }
+    } catch {
+      // Fallback
+    }
+
     let lista = [...MOCK_TIPOS_ITEM];
 
     if (filtros) {
@@ -213,7 +305,34 @@ export const itemService = {
   },
 
   crearItem: async (data: CrearItemFormData): Promise<Item> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      const response = await apiClient.post<RespuestaEnvuelta<ItemBackendDto>>('/items', {
+        codigoInterno: data.codigo,
+        nombre: data.nombre,
+        descripcion: data.observaciones,
+        cantidadDisponible: data.unidades,
+        tipoItemId: '00000000-0000-0000-0000-000000000001',
+      });
+
+      if (response.data.datos) {
+        const itemBackend = response.data.datos;
+        const nuevo: Item = {
+          id: itemBackend.id,
+          codigo: itemBackend.codigo || data.codigo,
+          nombre: itemBackend.nombre,
+          tipo: itemBackend.tipoItemNombre || data.tipo,
+          estacion: itemBackend.estacionNombre || data.estacion,
+          estado: data.estadoInicial,
+          unidades: itemBackend.unidades || data.unidades,
+          observaciones: itemBackend.observaciones || data.observaciones,
+        };
+        MOCK_ITEMS.unshift(nuevo);
+        return nuevo;
+      }
+    } catch {
+      // Fallback local
+    }
+
     const nuevo: Item = {
       id: `it-${Date.now()}`,
       codigo: data.codigo,
@@ -243,7 +362,19 @@ export const itemService = {
   },
 
   actualizarItem: async (id: string, data: Partial<Item>): Promise<Item> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      if (data.nombre || data.codigo) {
+        await apiClient.put(`/items/${id}`, {
+          codigoInterno: data.codigo,
+          nombre: data.nombre,
+          descripcion: data.observaciones,
+          cantidadDisponible: data.unidades,
+        });
+      }
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_ITEMS.findIndex((i) => i.id === id);
     if (index === -1) throw new Error('Ítem no encontrado');
 
@@ -261,7 +392,6 @@ export const itemService = {
   },
 
   cambiarEstadoItem: async (id: string, estado: Item['estado']): Promise<Item> => {
-    await new Promise((r) => setTimeout(r, 80));
     const index = MOCK_ITEMS.findIndex((i) => i.id === id);
     if (index === -1) throw new Error('Ítem no encontrado');
 
@@ -279,7 +409,12 @@ export const itemService = {
   },
 
   eliminarItem: async (id: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      await apiClient.delete(`/items/${id}`);
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_ITEMS.findIndex((i) => i.id === id);
     if (index === -1) return false;
 
@@ -300,7 +435,31 @@ export const itemService = {
   },
 
   crearTipoItem: async (data: CrearTipoItemFormData): Promise<TipoItem> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      const response = await apiClient.post<RespuestaEnvuelta<TipoItemBackendDto>>('/tipos-items', {
+        nombre: data.nombre,
+        descripcion: data.descripcion,
+        requiereAprobacion: data.flujoPorDefecto === 'Requiere aprobación',
+      });
+
+      if (response.data.datos) {
+        const tBackend = response.data.datos;
+        const nuevo: TipoItem = {
+          id: tBackend.id,
+          nombre: tBackend.nombre,
+          descripcion: tBackend.descripcion || data.descripcion,
+          itemsRegistrados: 0,
+          requiereAprobacion: tBackend.requiereAprobacion ? 'Sí' : 'No',
+          estado: 'Activo',
+          estaciones: data.estaciones,
+        };
+        MOCK_TIPOS_ITEM.unshift(nuevo);
+        return nuevo;
+      }
+    } catch {
+      // Fallback
+    }
+
     const nuevo: TipoItem = {
       id: `tip-${Date.now()}`,
       nombre: data.nombre,
@@ -324,7 +483,18 @@ export const itemService = {
   },
 
   actualizarTipoItem: async (id: string, data: Partial<TipoItem>): Promise<TipoItem> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      if (data.nombre) {
+        await apiClient.put(`/tipos-items/${id}`, {
+          nombre: data.nombre,
+          descripcion: data.descripcion,
+          requiereAprobacion: data.requiereAprobacion === 'Sí',
+        });
+      }
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_TIPOS_ITEM.findIndex((t) => t.id === id);
     if (index === -1) throw new Error('Tipo no encontrado');
 
@@ -342,7 +512,12 @@ export const itemService = {
   },
 
   eliminarTipoItem: async (id: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      await apiClient.delete(`/tipos-items/${id}`);
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_TIPOS_ITEM.findIndex((t) => t.id === id);
     if (index === -1) return false;
 

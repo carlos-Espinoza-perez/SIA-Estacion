@@ -13,6 +13,7 @@ public class EventoAccesoConfiguracion : IEntityTypeConfiguration<EventoAcceso>
 
         builder.Property(e => e.CodigoEscaneado).HasMaxLength(500).IsRequired();
         builder.Property(e => e.MotivoDenegacion).HasMaxLength(200);
+        builder.Property(e => e.FotoEvidenciaUrl).HasMaxLength(500);
         builder.Property(e => e.Direccion)
             .HasConversion<string>()
             .HasMaxLength(50);

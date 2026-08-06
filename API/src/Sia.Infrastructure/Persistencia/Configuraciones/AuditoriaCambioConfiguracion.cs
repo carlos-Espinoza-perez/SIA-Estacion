@@ -13,6 +13,8 @@ public class AuditoriaCambioConfiguracion : IEntityTypeConfiguration<AuditoriaCa
 
         builder.Property(e => e.Entidad).HasMaxLength(200).IsRequired();
         builder.Property(e => e.Accion).HasMaxLength(50).IsRequired();
+        builder.Property(e => e.Descripcion).HasMaxLength(500);
+        builder.Property(e => e.Origen).HasMaxLength(50).IsRequired();
         builder.Property(e => e.UserId).HasMaxLength(450);
 
         builder.HasIndex(e => new { e.EmpresaId, e.Entidad, e.EntidadId });

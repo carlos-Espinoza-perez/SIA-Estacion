@@ -1,5 +1,7 @@
 import {
   Persona,
+  TipoPersona,
+  RolPersona,
   FichaPersonaDetalle,
   CrearPersonaFormData,
   FiltrosPersona,
@@ -184,11 +186,67 @@ const MOCK_OPERACIONES_ITEMS: OperacionItemHistorial[] = [
 ];
 
 import { auditoriaService } from './auditoriaService';
+import { apiClient } from './apiClient';
+import { RespuestaEnvuelta } from '../types/api';
+
+interface PersonaBackendDto {
+  id: string;
+  codigoEstudiantil: string;
+  nombres: string;
+  apellidos: string;
+  tipoPersona: string;
+  carreraOArea?: string;
+  correo?: string;
+  telefono?: string;
+  estado: boolean;
+  tieneFotoReferencia: boolean;
+  fechaRegistro: string;
+}
 
 export const personaService = {
   getPersonas: async (filtros?: FiltrosPersona): Promise<Persona[]> => {
-    // Simular delay mínimo de red
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<PersonaBackendDto[]>>('/personas');
+      if (response.data.datos && response.data.datos.length > 0) {
+        let lista: Persona[] = response.data.datos.map((p) => ({
+          id: p.id,
+          nombre: `${p.nombres} ${p.apellidos}`.trim(),
+          carnet: p.codigoEstudiantil,
+          tipo: (p.tipoPersona === 'Estudiante' ? 'Estudiante' : 'Personal') as TipoPersona,
+          rol: 'Estudiante' as RolPersona,
+          carreraOArea: p.carreraOArea,
+          correo: p.correo,
+          ultimaActividad: new Date(p.fechaRegistro).toLocaleDateString(),
+          estado: p.estado ? 'Activo' : 'Inactivo',
+          tieneFotoReferencia: p.tieneFotoReferencia,
+          fechaRegistro: new Date(p.fechaRegistro).toLocaleDateString(),
+        }));
+
+        if (filtros) {
+          const q = filtros.busqueda.trim().toLowerCase();
+          if (q) {
+            lista = lista.filter(
+              (p) =>
+                p.nombre.toLowerCase().includes(q) ||
+                p.carnet.toLowerCase().includes(q) ||
+                (p.correo && p.correo.toLowerCase().includes(q))
+            );
+          }
+          if (filtros.rol) {
+            lista = lista.filter((p) => p.rol === filtros.rol);
+          }
+          if (filtros.tipo) {
+            lista = lista.filter((p) => p.tipo === filtros.tipo);
+          }
+          if (filtros.estado) {
+            lista = lista.filter((p) => p.estado === filtros.estado);
+          }
+        }
+        return lista;
+      }
+    } catch {
+      // Fallback a MOCK_PERSONAS
+    }
 
     let lista = [...MOCK_PERSONAS];
 
@@ -217,7 +275,38 @@ export const personaService = {
   },
 
   getPersonaDetalle: async (id: string): Promise<FichaPersonaDetalle | null> => {
-    await new Promise((r) => setTimeout(r, 50));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<PersonaBackendDto>>(`/personas/${id}`);
+      if (response.data.datos) {
+        const p = response.data.datos;
+        return {
+          id: p.id,
+          nombre: `${p.nombres} ${p.apellidos}`.trim(),
+          carnet: p.codigoEstudiantil,
+          tipo: (p.tipoPersona === 'Estudiante' ? 'Estudiante' : 'Personal') as TipoPersona,
+          rol: 'Estudiante' as RolPersona,
+          carreraOArea: p.carreraOArea,
+          correo: p.correo,
+          ultimaActividad: new Date(p.fechaRegistro).toLocaleDateString(),
+          estado: p.estado ? 'Activo' : 'Inactivo',
+          tieneFotoReferencia: p.tieneFotoReferencia,
+          fechaRegistro: new Date(p.fechaRegistro).toLocaleDateString(),
+          fotoReferencia: p.tieneFotoReferencia
+            ? {
+                estado: 'Cifrada en reposo',
+                fechaCaptura: new Date(p.fechaRegistro).toLocaleDateString(),
+                fechaActualizacion: new Date().toLocaleDateString(),
+                retencion: 'Se elimina al pasar a inactivo',
+              }
+            : undefined,
+          historialAccesos: MOCK_HISTORIAL_ACCESOS,
+          operacionesItems: MOCK_OPERACIONES_ITEMS,
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
     const base = MOCK_PERSONAS.find((p) => p.id === id);
     if (!base) return null;
 
@@ -237,7 +326,55 @@ export const personaService = {
   },
 
   crearPersona: async (data: CrearPersonaFormData): Promise<Persona> => {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const parts = data.nombre.trim().split(' ');
+      const nombres = parts.slice(0, Math.ceil(parts.length / 2)).join(' ') || data.nombre;
+      const apellidos = parts.slice(Math.ceil(parts.length / 2)).join(' ') || '—';
+
+      const response = await apiClient.post<RespuestaEnvuelta<PersonaBackendDto>>('/personas', {
+        codigoEstudiantil: data.carnet,
+        nombres,
+        apellidos,
+        tipoPersona: data.tipo,
+        carreraOArea: data.carreraOArea,
+        correo: data.correo,
+      });
+
+      if (response.data.datos) {
+        const p = response.data.datos;
+        if (data.fotoArchivo) {
+          const formData = new FormData();
+          formData.append('foto', data.fotoArchivo);
+          try {
+            await apiClient.post(`/personas/${p.id}/foto`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          } catch {
+            // Ignorar error de subida de foto
+          }
+        }
+
+        const nueva: Persona = {
+          id: p.id,
+          nombre: `${p.nombres} ${p.apellidos}`.trim(),
+          carnet: p.codigoEstudiantil,
+          tipo: data.tipo,
+          rol: data.rol,
+          carreraOArea: data.carreraOArea,
+          correo: data.correo,
+          ultimaActividad: new Date().toLocaleDateString(),
+          estado: 'Activo',
+          fechaRegistro: new Date().toLocaleDateString(),
+          tieneFotoReferencia: !!data.fotoArchivo || !!data.fotoPreviewUrl,
+          avatarUrl: data.fotoPreviewUrl,
+        };
+        MOCK_PERSONAS.unshift(nueva);
+        return nueva;
+      }
+    } catch {
+      // Fallback
+    }
+
     const now = new Date();
     const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -258,7 +395,6 @@ export const personaService = {
 
     MOCK_PERSONAS.unshift(nueva);
 
-    // Registrar en auditoría
     await auditoriaService.registrarEvento({
       tipo: 'Configuración',
       actor: 'Administrador',
@@ -271,7 +407,25 @@ export const personaService = {
   },
 
   actualizarPersona: async (id: string, data: Partial<Persona>): Promise<Persona> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      if (data.nombre) {
+        const parts = data.nombre.trim().split(' ');
+        const nombres = parts.slice(0, Math.ceil(parts.length / 2)).join(' ') || data.nombre;
+        const apellidos = parts.slice(Math.ceil(parts.length / 2)).join(' ') || '—';
+
+        await apiClient.put(`/personas/${id}`, {
+          nombres,
+          apellidos,
+          tipoPersona: data.tipo || 'Estudiante',
+          carreraOArea: data.carreraOArea,
+          correo: data.correo,
+          estado: data.estado === 'Activo',
+        });
+      }
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_PERSONAS.findIndex((p) => p.id === id);
     if (index === -1) throw new Error('Persona no encontrada');
 
@@ -280,7 +434,6 @@ export const personaService = {
       ...data,
     };
 
-    // Registrar en auditoría
     await auditoriaService.registrarEvento({
       tipo: 'Configuración',
       actor: 'Administrador',
@@ -293,14 +446,29 @@ export const personaService = {
   },
 
   toggleEstadoPersona: async (id: string): Promise<Persona> => {
-    await new Promise((r) => setTimeout(r, 80));
     const index = MOCK_PERSONAS.findIndex((p) => p.id === id);
     if (index === -1) throw new Error('Persona no encontrada');
 
     const nuevoEstado = MOCK_PERSONAS[index].estado === 'Activo' ? 'Inactivo' : 'Activo';
     MOCK_PERSONAS[index].estado = nuevoEstado;
 
-    // Registrar en auditoría
+    try {
+      const parts = MOCK_PERSONAS[index].nombre.trim().split(' ');
+      const nombres = parts.slice(0, Math.ceil(parts.length / 2)).join(' ') || MOCK_PERSONAS[index].nombre;
+      const apellidos = parts.slice(Math.ceil(parts.length / 2)).join(' ') || '—';
+
+      await apiClient.put(`/personas/${id}`, {
+        nombres,
+        apellidos,
+        tipoPersona: MOCK_PERSONAS[index].tipo,
+        carreraOArea: MOCK_PERSONAS[index].carreraOArea,
+        correo: MOCK_PERSONAS[index].correo,
+        estado: nuevoEstado === 'Activo',
+      });
+    } catch {
+      // Fallback
+    }
+
     await auditoriaService.registrarEvento({
       tipo: 'Seguridad',
       actor: 'Administrador',
@@ -313,13 +481,17 @@ export const personaService = {
   },
 
   eliminarPersona: async (id: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      await apiClient.delete(`/personas/${id}`);
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_PERSONAS.findIndex((p) => p.id === id);
     if (index === -1) return false;
 
     const [eliminada] = MOCK_PERSONAS.splice(index, 1);
 
-    // Registrar en auditoría
     await auditoriaService.registrarEvento({
       tipo: 'Seguridad',
       actor: 'Administrador',

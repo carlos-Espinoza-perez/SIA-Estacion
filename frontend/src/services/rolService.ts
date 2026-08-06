@@ -152,11 +152,41 @@ export const MOCK_ROLES: Rol[] = [
   },
 ];
 
+import { apiClient } from './apiClient';
+import { RespuestaEnvuelta } from '../types/api';
 import { auditoriaService } from './auditoriaService';
+
+interface RolBackendDto {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  esSistema: boolean;
+  activo?: boolean;
+}
 
 export const rolService = {
   getRoles: async (): Promise<Rol[]> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
+      if (response.data.datos && response.data.datos.length > 0) {
+        return response.data.datos.map((r) => {
+          const matchMock = MOCK_ROLES.find(
+            (m) => m.id === r.id || m.nombre.toLowerCase() === r.nombre.toLowerCase()
+          );
+          return {
+            id: r.id,
+            nombre: r.nombre,
+            descripcion: r.descripcion || matchMock?.descripcion || '',
+            personasAsignadas: matchMock?.personasAsignadas || 0,
+            permisos: matchMock?.permisos || ['acceso.validar'],
+            activo: r.activo ?? true,
+            esSistema: r.esSistema,
+          };
+        });
+      }
+    } catch {
+      // Fallback
+    }
     return [...MOCK_ROLES];
   },
 
@@ -165,7 +195,30 @@ export const rolService = {
   },
 
   crearRol: async (formData: CrearRolFormData): Promise<Rol> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      const response = await apiClient.post<RespuestaEnvuelta<RolBackendDto>>('/roles', {
+        nombre: formData.nombre,
+        descripcion: formData.descripcion,
+      });
+
+      if (response.data.datos) {
+        const nuevoBackend = response.data.datos;
+        const nuevoRol: Rol = {
+          id: nuevoBackend.id,
+          nombre: nuevoBackend.nombre,
+          descripcion: nuevoBackend.descripcion || formData.descripcion,
+          personasAsignadas: 0,
+          permisos: formData.permisos,
+          activo: formData.activo,
+          esSistema: nuevoBackend.esSistema,
+        };
+        MOCK_ROLES.push(nuevoRol);
+        return nuevoRol;
+      }
+    } catch {
+      // Fallback local
+    }
+
     const nuevoRol: Rol = {
       id: `rol-${Date.now()}`,
       nombre: formData.nombre,
@@ -189,7 +242,17 @@ export const rolService = {
   },
 
   actualizarRol: async (rolId: string, data: Partial<Rol>): Promise<Rol> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      if (data.nombre) {
+        await apiClient.put(`/roles/${rolId}`, {
+          nombre: data.nombre,
+          descripcion: data.descripcion,
+        });
+      }
+    } catch {
+      // Fallback local
+    }
+
     const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
     if (index === -1) throw new Error('Rol no encontrado');
 
@@ -207,7 +270,18 @@ export const rolService = {
   },
 
   actualizarPermisosRol: async (rolId: string, permisos: string[]): Promise<Rol> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      // Formato matriz o privilegios
+      await apiClient.put(`/roles/${rolId}/privilegios`, {
+        privilegios: permisos.map((p) => ({
+          moduloCodigo: p.split('.')[0]?.toUpperCase() || 'ACC',
+          tipoPermiso: 'LecturaEscritura',
+        })),
+      });
+    } catch {
+      // Fallback local
+    }
+
     const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
     if (index !== -1) {
       MOCK_ROLES[index].permisos = permisos;
@@ -224,7 +298,6 @@ export const rolService = {
   },
 
   toggleEstadoRol: async (rolId: string): Promise<Rol> => {
-    await new Promise((r) => setTimeout(r, 60));
     const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
     if (index === -1) throw new Error('Rol no encontrado');
 
@@ -242,7 +315,12 @@ export const rolService = {
   },
 
   eliminarRol: async (rolId: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      await apiClient.delete(`/roles/${rolId}`);
+    } catch {
+      // Fallback local
+    }
+
     const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
     if (index === -1) return false;
     if (MOCK_ROLES[index].esSistema) {

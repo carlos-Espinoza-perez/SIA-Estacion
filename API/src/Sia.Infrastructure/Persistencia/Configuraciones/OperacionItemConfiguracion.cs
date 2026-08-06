@@ -11,6 +11,8 @@ public class OperacionItemConfiguracion : IEntityTypeConfiguration<OperacionItem
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
 
+        builder.Property(e => e.Folio).HasMaxLength(30).IsRequired();
+        builder.Property(e => e.Observaciones).HasMaxLength(1000);
         builder.Property(e => e.TipoOperacion)
             .HasConversion<string>()
             .HasMaxLength(50);
@@ -20,6 +22,7 @@ public class OperacionItemConfiguracion : IEntityTypeConfiguration<OperacionItem
         builder.Property(e => e.RowVersion)
             .IsRowVersion();
 
+        builder.HasIndex(e => new { e.EmpresaId, e.Folio }).IsUnique();
         builder.HasIndex(e => new { e.EmpresaId, e.PersonaId, e.EstadoActual });
         builder.HasIndex(e => new { e.EmpresaId, e.ItemEscaneadoId, e.EstadoActual });
 

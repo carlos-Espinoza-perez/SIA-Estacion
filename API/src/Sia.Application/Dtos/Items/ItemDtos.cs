@@ -4,6 +4,8 @@ public class TipoItemResponse
 {
     public Guid Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool RequiereAprobacion { get; set; }
     public bool PermiteAgrupacion { get; set; }
     public bool Estado { get; set; }
 }
@@ -11,6 +13,8 @@ public class TipoItemResponse
 public class CrearTipoItemRequest
 {
     public string Nombre { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool RequiereAprobacion { get; set; }
     public bool PermiteAgrupacion { get; set; }
 }
 
@@ -39,8 +43,11 @@ public class ItemResponse
     public Guid Id { get; set; }
     public Guid TipoItemId { get; set; }
     public string TipoItemNombre { get; set; } = string.Empty;
+    public Guid? EstacionId { get; set; }
+    public string? EstacionNombre { get; set; }
     public string CodigoQr { get; set; } = string.Empty;
     public string Nombre { get; set; } = string.Empty;
+    public string? Observaciones { get; set; }
     public bool EsAgrupador { get; set; }
     public string EstadoActual { get; set; } = string.Empty;
     public bool Estado { get; set; }
@@ -71,8 +78,10 @@ public class ComponenteResponse
 public class CrearItemRequest
 {
     public Guid TipoItemId { get; set; }
+    public Guid? EstacionId { get; set; }
     public string CodigoQr { get; set; } = string.Empty;
     public string Nombre { get; set; } = string.Empty;
+    public string? Observaciones { get; set; }
     public bool EsAgrupador { get; set; }
     public List<AtributoValorRequest> Atributos { get; set; } = [];
 }
@@ -86,6 +95,8 @@ public class AtributoValorRequest
 public class ActualizarItemRequest
 {
     public string Nombre { get; set; } = string.Empty;
+    public Guid? EstacionId { get; set; }
+    public string? Observaciones { get; set; }
     public string EstadoActual { get; set; } = string.Empty;
     public List<AtributoValorRequest> Atributos { get; set; } = [];
 }

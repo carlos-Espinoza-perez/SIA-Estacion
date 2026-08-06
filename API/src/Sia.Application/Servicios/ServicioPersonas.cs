@@ -72,7 +72,10 @@ public class ServicioPersonas
             CodigoEstudiantil = request.CodigoEstudiantil,
             Nombres = request.Nombres,
             Apellidos = request.Apellidos,
-            TipoPersona = tp
+            TipoPersona = tp,
+            CarreraOArea = request.CarreraOArea,
+            Correo = request.Correo,
+            Telefono = request.Telefono
         };
 
         await _repository.AgregarAsync(persona, ct);
@@ -93,6 +96,9 @@ public class ServicioPersonas
         persona.Nombres = request.Nombres;
         persona.Apellidos = request.Apellidos;
         persona.TipoPersona = tp;
+        persona.CarreraOArea = request.CarreraOArea;
+        persona.Correo = request.Correo;
+        persona.Telefono = request.Telefono;
         await _repository.SaveChangesAsync(ct);
 
         return Result<PersonaResponse>.Exitoso(_mapper.Map<PersonaResponse>(persona));

@@ -15,12 +15,18 @@ public class EstacionesRepository : IEstacionesRepository
 
     public async Task<List<Estacion>> ObtenerTodasAsync(CancellationToken ct)
     {
-        return await _db.Estaciones.Where(e => e.Estado).OrderBy(e => e.Nombre).ToListAsync(ct);
+        return await _db.Estaciones
+            .Include(e => e.Encargado)
+            .Where(e => e.Estado)
+            .OrderBy(e => e.Nombre)
+            .ToListAsync(ct);
     }
 
     public async Task<Estacion?> ObtenerPorIdAsync(Guid id, CancellationToken ct)
     {
-        return await _db.Estaciones.FirstOrDefaultAsync(e => e.Id == id, ct);
+        return await _db.Estaciones
+            .Include(e => e.Encargado)
+            .FirstOrDefaultAsync(e => e.Id == id, ct);
     }
 
     public async Task<Estacion?> ObtenerPorClientIdAsync(string clientId, CancellationToken ct)

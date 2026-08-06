@@ -25,6 +25,89 @@ public class ServicioOperaciones
         _contextoUsuario = contextoUsuario;
     }
 
+    public async Task<Result<List<OperacionResponse>>> ObtenerTodasAsync(string? busqueda, string? estado, Guid? estacionId, Guid? personaId, CancellationToken ct)
+    {
+        var operaciones = await _repository.ObtenerTodasAsync(busqueda, estado, estacionId, personaId, ct);
+        var responses = operaciones.Select(MapearOperacionResponse).ToList();
+        return Result<List<OperacionResponse>>.Exitoso(responses);
+    }
+
+    public async Task<Result<OperacionResponse>> AprobarAsync(Guid id, string? observacion, CancellationToken ct)
+    {
+        var operacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (operacion is null)
+            throw new EntidadNoEncontradaException(nameof(OperacionItem), id);
+
+        var estadoAnterior = operacion.EstadoActual;
+        if (!TransicionesOperacion.EsValida(estadoAnterior, EstadoOperacionItem.Aprobado))
+            return Result<OperacionResponse>.Fallido("TRANSICION_INVALIDA", $"No se puede aprobar una operación en estado {estadoAnterior}");
+
+        operacion.EstadoActual = EstadoOperacionItem.Aprobado;
+        await RegistrarMovimiento(operacion, estadoAnterior, EstadoOperacionItem.Aprobado, observacion ?? "Operación aprobada", ct);
+        await _repository.SaveChangesAsync(ct);
+
+        return Result<OperacionResponse>.Exitoso(MapearOperacionResponse(operacion));
+    }
+
+    public async Task<Result<OperacionResponse>> RechazarAsync(Guid id, string? observacion, CancellationToken ct)
+    {
+        var operacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (operacion is null)
+            throw new EntidadNoEncontradaException(nameof(OperacionItem), id);
+
+        var estadoAnterior = operacion.EstadoActual;
+        if (!TransicionesOperacion.EsValida(estadoAnterior, EstadoOperacionItem.Rechazado))
+            return Result<OperacionResponse>.Fallido("TRANSICION_INVALIDA", $"No se puede rechazar una operación en estado {estadoAnterior}");
+
+        operacion.EstadoActual = EstadoOperacionItem.Rechazado;
+        if (operacion.ItemEscaneado != null)
+        {
+            operacion.ItemEscaneado.EstadoActual = EstadoItem.Disponible;
+        }
+
+        await RegistrarMovimiento(operacion, estadoAnterior, EstadoOperacionItem.Rechazado, observacion ?? "Operación rechazada", ct);
+        await _repository.SaveChangesAsync(ct);
+
+        return Result<OperacionResponse>.Exitoso(MapearOperacionResponse(operacion));
+    }
+
+    public async Task<Result<OperacionResponse>> EntregarAsync(Guid id, string? observacion, CancellationToken ct)
+    {
+        var operacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (operacion is null)
+            throw new EntidadNoEncontradaException(nameof(OperacionItem), id);
+
+        var estadoAnterior = operacion.EstadoActual;
+        if (!TransicionesOperacion.EsValida(estadoAnterior, EstadoOperacionItem.Entregado))
+            return Result<OperacionResponse>.Fallido("TRANSICION_INVALIDA", $"No se puede entregar una operación en estado {estadoAnterior}");
+
+        operacion.EstadoActual = EstadoOperacionItem.Entregado;
+        await RegistrarMovimiento(operacion, estadoAnterior, EstadoOperacionItem.Entregado, observacion ?? "Ítem entregado al solicitante", ct);
+        await _repository.SaveChangesAsync(ct);
+
+        return Result<OperacionResponse>.Exitoso(MapearOperacionResponse(operacion));
+    }
+
+    private static OperacionResponse MapearOperacionResponse(OperacionItem o) => new()
+    {
+        Id = o.Id,
+        Folio = o.Folio,
+        ItemEscaneadoId = o.ItemEscaneadoId,
+        ItemNombre = o.ItemEscaneado?.Nombre ?? string.Empty,
+        PersonaId = o.PersonaId,
+        PersonaNombre = o.Persona != null ? $"{o.Persona.Nombres} {o.Persona.Apellidos}".Trim() : string.Empty,
+        CodigoEstudiantil = o.Persona?.CodigoEstudiantil ?? string.Empty,
+        EstacionId = o.EstacionId,
+        EstacionNombre = o.Estacion?.Nombre ?? "Estación principal",
+        TipoOperacion = o.TipoOperacion.ToString(),
+        EstadoActual = o.EstadoActual.ToString(),
+        Flujo = o.Estacion != null && o.Estacion.RequiereAprobacion ? "Aprobación" : "Directo",
+        Observaciones = o.Observaciones,
+        FechaSolicitud = o.FechaSolicitud,
+        FechaCompromisoDevolucion = o.FechaCompromisoDevolucion,
+        FechaDevolucion = o.FechaDevolucion
+    };
+
     public async Task<Result<OperacionDetalleResponse>> ObtenerPorIdAsync(Guid id, CancellationToken ct)
     {
         OperacionItem? operacion = await _repository.ObtenerPorIdAsync(id, ct);
@@ -34,12 +117,14 @@ public class ServicioOperaciones
         var response = new OperacionDetalleResponse
         {
             Id = operacion.Id,
+            Folio = operacion.Folio,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
             ItemNombre = operacion.ItemEscaneado.Nombre,
             PersonaId = operacion.PersonaId,
             PersonaNombre = $"{operacion.Persona.Nombres} {operacion.Persona.Apellidos}",
             TipoOperacion = operacion.TipoOperacion.ToString(),
             EstadoActual = operacion.EstadoActual.ToString(),
+            Observaciones = operacion.Observaciones,
             FechaSolicitud = operacion.FechaSolicitud,
             FechaCompromisoDevolucion = operacion.FechaCompromisoDevolucion,
             FechaDevolucion = operacion.FechaDevolucion,
@@ -75,15 +160,19 @@ public class ServicioOperaciones
         if (item.EstadoActual != EstadoItem.Disponible)
             return Result<OperacionResponse>.Fallido("ITEM_NO_DISPONIBLE", $"El ítem se encuentra en estado {item.EstadoActual}");
 
+        string folio = $"OP-{DateTimeOffset.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpperInvariant()}";
+
         var operacion = new OperacionItem
         {
             Id = Guid.NewGuid(),
             EmpresaId = _contextoEmpresa.EmpresaId,
+            Folio = folio,
             ItemEscaneadoId = item.Id,
             PersonaId = request.PersonaId,
             EstacionId = request.EstacionId,
             TipoOperacion = TipoOperacionItem.Prestamo,
             EstadoActual = EstadoOperacionItem.Aprobado, // Asumimos pre-aprobado para este flujo
+            Observaciones = request.Observaciones,
             FechaSolicitud = DateTimeOffset.UtcNow,
             FechaCompromisoDevolucion = request.FechaCompromisoDevolucion
         };
@@ -129,9 +218,15 @@ public class ServicioOperaciones
         return Result<OperacionResponse>.Exitoso(new OperacionResponse
         {
             Id = operacion.Id,
+            Folio = operacion.Folio,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
+            ItemNombre = item.Nombre,
             PersonaId = operacion.PersonaId,
-            EstadoActual = operacion.EstadoActual.ToString()
+            TipoOperacion = operacion.TipoOperacion.ToString(),
+            EstadoActual = operacion.EstadoActual.ToString(),
+            Observaciones = operacion.Observaciones,
+            FechaSolicitud = operacion.FechaSolicitud,
+            FechaCompromisoDevolucion = operacion.FechaCompromisoDevolucion
         });
     }
 
@@ -194,9 +289,17 @@ public class ServicioOperaciones
         return Result<OperacionResponse>.Exitoso(new OperacionResponse
         {
             Id = operacion.Id,
+            Folio = operacion.Folio,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
+            ItemNombre = operacion.ItemEscaneado?.Nombre ?? string.Empty,
             PersonaId = operacion.PersonaId,
-            EstadoActual = operacion.EstadoActual.ToString()
+            PersonaNombre = operacion.Persona != null ? $"{operacion.Persona.Nombres} {operacion.Persona.Apellidos}" : string.Empty,
+            TipoOperacion = operacion.TipoOperacion.ToString(),
+            EstadoActual = operacion.EstadoActual.ToString(),
+            Observaciones = operacion.Observaciones,
+            FechaSolicitud = operacion.FechaSolicitud,
+            FechaCompromisoDevolucion = operacion.FechaCompromisoDevolucion,
+            FechaDevolucion = operacion.FechaDevolucion
         });
     }
 

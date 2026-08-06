@@ -47,6 +47,8 @@ public class ServicioItems
             throw new EntidadNoEncontradaException(nameof(TipoItem), id);
 
         tipo.Nombre = request.Nombre;
+        tipo.Descripcion = request.Descripcion;
+        tipo.RequiereAprobacion = request.RequiereAprobacion;
         tipo.PermiteAgrupacion = request.PermiteAgrupacion;
         await _repository.SaveChangesAsync(ct);
         return Result<TipoItemResponse>.Exitoso(_mapper.Map<TipoItemResponse>(tipo));
@@ -173,8 +175,10 @@ public class ServicioItems
             Id = Guid.NewGuid(),
             EmpresaId = _contextoEmpresa.EmpresaId,
             TipoItemId = request.TipoItemId,
+            EstacionId = request.EstacionId,
             CodigoQr = request.CodigoQr,
             Nombre = request.Nombre,
+            Observaciones = request.Observaciones,
             EsAgrupador = request.EsAgrupador
         };
 
@@ -205,6 +209,8 @@ public class ServicioItems
             throw new EntidadNoEncontradaException(nameof(Item), id);
 
         item.Nombre = request.Nombre;
+        item.EstacionId = request.EstacionId;
+        item.Observaciones = request.Observaciones;
         if (!string.IsNullOrWhiteSpace(request.EstadoActual) && Enum.TryParse<EstadoItem>(request.EstadoActual, out EstadoItem ei))
             item.EstadoActual = ei;
 

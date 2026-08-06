@@ -12,6 +12,7 @@ public class TipoItemConfiguracion : IEntityTypeConfiguration<TipoItem>
         builder.Property(e => e.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
 
         builder.Property(e => e.Nombre).HasMaxLength(200).IsRequired();
+        builder.Property(e => e.Descripcion).HasMaxLength(500);
 
         builder.HasIndex(e => new { e.EmpresaId, e.Nombre }).IsUnique();
 

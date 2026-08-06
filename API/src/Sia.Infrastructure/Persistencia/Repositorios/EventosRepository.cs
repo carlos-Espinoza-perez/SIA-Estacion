@@ -52,6 +52,20 @@ public class EventosRepository : IEventosRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<AuditoriaCambio>> ObtenerAuditoriaAsync(DateTimeOffset? desde, DateTimeOffset? hasta, string? entidad, CancellationToken ct)
+    {
+        IQueryable<AuditoriaCambio> query = _db.AuditoriaCambios;
+
+        if (desde.HasValue)
+            query = query.Where(a => a.FechaHora >= desde.Value);
+        if (hasta.HasValue)
+            query = query.Where(a => a.FechaHora <= hasta.Value);
+        if (!string.IsNullOrWhiteSpace(entidad))
+            query = query.Where(a => a.Entidad == entidad);
+
+        return await query.OrderByDescending(a => a.FechaHora).Take(500).ToListAsync(ct);
+    }
+
     public async Task SaveChangesAsync(CancellationToken ct)
     {
         await _db.SaveChangesAsync(ct);

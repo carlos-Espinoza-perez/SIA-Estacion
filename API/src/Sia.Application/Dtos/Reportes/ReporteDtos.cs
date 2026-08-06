@@ -18,6 +18,7 @@ public class EventoReporteResponse
     public string ModoValidacion { get; set; } = string.Empty;
     public string Resultado { get; set; } = string.Empty;
     public string? MotivoDenegacion { get; set; }
+    public string? FotoEvidenciaUrl { get; set; }
     public DateTimeOffset FechaHoraLocal { get; set; }
 }
 
@@ -55,6 +56,9 @@ public class AuditoriaResponse
     public string Entidad { get; set; } = string.Empty;
     public Guid EntidadId { get; set; }
     public string Accion { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public string Origen { get; set; } = "Panel";
+    public Guid? EstacionId { get; set; }
     public string? UserId { get; set; }
     public DateTimeOffset FechaHora { get; set; }
 }

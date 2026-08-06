@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { DashboardLayoutTemplate } from '../../components/templates/DashboardLayoutTemplate/DashboardLayoutTemplate';
 import { Table, TableColumn } from '../../components/molecules/Table/Table';
 import { SearchInput } from '../../components/atoms/SearchInput/SearchInput';
@@ -6,36 +6,7 @@ import { Select, SelectOption } from '../../components/atoms/Select/Select';
 import { ResultadoBadge, ResultadoAcceso } from '../../components/atoms/ResultadoBadge/ResultadoBadge';
 import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
-
-// Tipos
-
-interface AccesoRow {
-  id: string;
-  fechaHora: string;
-  persona: string;
-  carnet: string;
-  estacion: string;
-  direccion: string;
-  validacion: string;
-  resultado: ResultadoAcceso;
-}
-
-// Datos de demostración iniciales
-
-const MOCK_DATA: AccesoRow[] = [
-  { id: '1',  fechaHora: '28/07/2026 08:12', persona: 'Ana Morales',    carnet: '22-A0200-0056', estacion: 'Entrada principal', direccion: 'Ingreso', validacion: 'QR + Facial', resultado: 'Concedido' },
-  { id: '2',  fechaHora: '28/07/2026 08:14', persona: 'Luis Herrera',   carnet: '21-A0134-0012', estacion: 'Entrada principal', direccion: 'Ingreso', validacion: 'QR + Facial', resultado: 'Concedido' },
-  { id: '3',  fechaHora: '28/07/2026 08:19', persona: 'María López',    carnet: '23-A0311-0087', estacion: 'Laboratorio A',    direccion: 'Ingreso', validacion: 'QR',           resultado: 'Concedido' },
-  { id: '4',  fechaHora: '28/07/2026 08:23', persona: 'Carlos Ruiz',    carnet: '22-A0200-0057', estacion: 'Entrada principal', direccion: 'Ingreso', validacion: 'QR + Facial', resultado: 'Denegado'  },
-  { id: '5',  fechaHora: '28/07/2026 08:31', persona: 'Sofía Méndez',   carnet: '20-A0098-0104', estacion: 'Biblioteca',       direccion: 'Ingreso', validacion: 'QR',           resultado: 'Concedido' },
-  { id: '6',  fechaHora: '28/07/2026 08:47', persona: 'Diego Vargas',   carnet: '23-A0311-0088', estacion: 'Taller',           direccion: 'Ingreso', validacion: 'QR + Facial', resultado: 'Concedido' },
-  { id: '7',  fechaHora: '28/07/2026 09:02', persona: 'Ana Morales',    carnet: '22-A0200-0056', estacion: 'Entrada principal', direccion: 'Egreso',  validacion: 'QR + Facial', resultado: 'Concedido' },
-  { id: '8',  fechaHora: '28/07/2026 09:15', persona: 'No identificado',carnet: '22-A0200-0061', estacion: 'Salida norte',     direccion: 'Ingreso', validacion: 'QR',           resultado: 'Denegado'  },
-  { id: '9',  fechaHora: '28/07/2026 09:28', persona: 'Luis Herrera',   carnet: '21-A0134-0012', estacion: 'Cafetería',        direccion: 'Ingreso', validacion: 'QR',           resultado: 'Offline'   },
-  { id: '10', fechaHora: '28/07/2026 09:33', persona: 'María López',    carnet: '23-A0311-0087', estacion: 'Cafetería',        direccion: 'Ingreso', validacion: 'QR',           resultado: 'Offline'   },
-  { id: '11', fechaHora: '28/07/2026 09:41', persona: 'Carlos Ruiz',    carnet: '22-A0200-0057', estacion: 'Biblioteca',       direccion: 'Egreso',  validacion: 'QR + Facial', resultado: 'Concedido' },
-  { id: '12', fechaHora: '28/07/2026 09:56', persona: 'Sofía Méndez',   carnet: '20-A0098-0104', estacion: 'Entrada principal', direccion: 'Egreso',  validacion: 'QR + Facial', resultado: 'Concedido' },
-];
+import { accesoService, AccesoRow, MOCK_ACCESOS } from '../../services/accesoService';
 
 // Opciones de filtros
 
@@ -137,11 +108,29 @@ const COLUMNS: TableColumn<AccesoRow>[] = [
 
 export const AccesosPage: React.FC = () => {
   const { showToast } = useToast();
-  const [accesos,   setAccesos]   = useState<AccesoRow[]>(MOCK_DATA);
+  const [accesos,   setAccesos]   = useState<AccesoRow[]>(MOCK_ACCESOS);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [resultado, setResultado] = useState('');
   const [fecha,     setFecha]     = useState('28/07');
+
+  const cargarAccesos = useCallback(async () => {
+    try {
+      const data = await accesoService.getAccesos({
+        busqueda: search,
+        estacion,
+        resultado,
+        fecha,
+      });
+      setAccesos(data);
+    } catch {
+      // fallback
+    }
+  }, [search, estacion, resultado, fecha]);
+
+  useEffect(() => {
+    cargarAccesos();
+  }, [cargarAccesos]);
 
   const filtered = useMemo(() => {
     return accesos.filter((row) => {

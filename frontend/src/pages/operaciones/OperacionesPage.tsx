@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { DashboardLayoutTemplate } from '../../components/templates/DashboardLayoutTemplate/DashboardLayoutTemplate';
 import { Table, TableColumn } from '../../components/molecules/Table/Table';
 import { SearchInput } from '../../components/atoms/SearchInput/SearchInput';
@@ -9,29 +9,15 @@ import {
 } from '../../components/organisms/Modal/ModalAprobacionPrestamo';
 import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
+import {
+  operacionService,
+  OperacionRow,
+  EstadoOperacion,
+  FlujoOperacion,
+  MOCK_OPERACIONES,
+} from '../../services/operacionService';
 
-// Tipos
-
-export type EstadoOperacion =
-  | 'Pendiente'
-  | 'Aprobada'
-  | 'Entregada'
-  | 'Devuelta'
-  | 'Cancelada'
-  | 'Offline';
-
-export type FlujoOperacion = 'Aprobación' | 'Directo';
-
-interface OperacionRow {
-  id: string;
-  folio: string;
-  fechaHora: string;
-  solicitante: string;
-  item: string;
-  estacion: string;
-  flujo: FlujoOperacion;
-  estado: EstadoOperacion;
-}
+export type { EstadoOperacion, FlujoOperacion };
 
 // Badge de estado
 
@@ -63,23 +49,6 @@ const EstadoBadge: React.FC<{ value: EstadoOperacion }> = ({ value }) => {
     </div>
   );
 };
-
-// Datos de demostración iniciales
-
-const MOCK_DATA: OperacionRow[] = [
-  { id: '1',  folio: 'OP-1042', fechaHora: '28/07/2026 08:20', solicitante: 'Ana Morales',    item: 'Multímetro digital UNI-T',    estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Pendiente' },
-  { id: '2',  folio: 'OP-1041', fechaHora: '28/07/2026 08:05', solicitante: 'Luis Herrera',   item: 'Kit Arduino UNO R3',          estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Aprobada'  },
-  { id: '3',  folio: 'OP-1040', fechaHora: '27/07/2026 16:44', solicitante: 'María López',    item: 'Osciloscopio Rigol DS1054Z',  estacion: 'Taller',        flujo: 'Aprobación', estado: 'Entregada' },
-  { id: '4',  folio: 'OP-1039', fechaHora: '27/07/2026 15:12', solicitante: 'Carlos Ruiz',    item: 'Redes de computadoras',       estacion: 'Biblioteca',    flujo: 'Directo',    estado: 'Entregada' },
-  { id: '5',  folio: 'OP-1038', fechaHora: '27/07/2026 14:50', solicitante: 'Sofía Méndez',   item: 'Fuente de poder regulable',   estacion: 'Taller',        flujo: 'Aprobación', estado: 'Offline'   },
-  { id: '6',  folio: 'OP-1037', fechaHora: '27/07/2026 13:30', solicitante: 'Diego Vargas',   item: 'Sensor ultrasónico HC-SR04',  estacion: 'Laboratorio A', flujo: 'Directo',    estado: 'Cancelada' },
-  { id: '7',  folio: 'OP-1036', fechaHora: '27/07/2026 11:18', solicitante: 'Ana Morales',    item: 'Raspberry Pi 4 Model B',      estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Offline'   },
-  { id: '8',  folio: 'OP-1035', fechaHora: '27/07/2026 10:45', solicitante: 'Luis Herrera',   item: 'Programación en C++',         estacion: 'Biblioteca',    flujo: 'Directo',    estado: 'Offline'   },
-  { id: '9',  folio: 'OP-1034', fechaHora: '27/07/2026 09:22', solicitante: 'María López',    item: 'Placa ESP32 DevKit',          estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Entregada' },
-  { id: '10', folio: 'OP-1033', fechaHora: '26/07/2026 17:05', solicitante: 'Carlos Ruiz',    item: 'Pinzas de punta fina',        estacion: 'Taller',        flujo: 'Directo',    estado: 'Offline'   },
-  { id: '11', folio: 'OP-1032', fechaHora: '26/07/2026 16:30', solicitante: 'Sofía Méndez',   item: 'Sistemas operativos',         estacion: 'Biblioteca',    flujo: 'Directo',    estado: 'Offline'   },
-  { id: '12', folio: 'OP-1031', fechaHora: '26/07/2026 15:00', solicitante: 'Diego Vargas',   item: 'Kit resistencias surtidas',   estacion: 'Laboratorio A', flujo: 'Aprobación', estado: 'Entregada' },
-];
 
 // Opciones de filtros
 
@@ -171,12 +140,30 @@ const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
 
 export const OperacionesPage: React.FC = () => {
   const { showToast } = useToast();
-  const [operaciones, setOperaciones] = useState<OperacionRow[]>(MOCK_DATA);
+  const [operaciones, setOperaciones] = useState<OperacionRow[]>(MOCK_OPERACIONES);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [estado,    setEstado]    = useState('');
   const [fecha,     setFecha]     = useState('28/07');
   const [modalData, setModalData] = useState<AprobacionPrestamoData | null>(null);
+
+  const cargarOperaciones = useCallback(async () => {
+    try {
+      const data = await operacionService.getOperaciones({
+        busqueda: search,
+        estacion,
+        estado,
+        fecha,
+      });
+      setOperaciones(data);
+    } catch {
+      // fallback
+    }
+  }, [search, estacion, estado, fecha]);
+
+  useEffect(() => {
+    cargarOperaciones();
+  }, [cargarOperaciones]);
 
   const handleFolioClick = (row: OperacionRow) => {
     if (row.estado !== 'Pendiente') return;
@@ -247,6 +234,7 @@ export const OperacionesPage: React.FC = () => {
 
   const handleAprobarOperacion = async (nota?: string, fechaLimite?: string, cantidad?: number) => {
     if (!modalData) return;
+    await operacionService.aprobarOperacion(modalData.folio, nota);
     setOperaciones((prev) =>
       prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Aprobada' } : op))
     );
@@ -273,6 +261,7 @@ export const OperacionesPage: React.FC = () => {
 
   const handleRechazarOperacion = async () => {
     if (!modalData) return;
+    await operacionService.rechazarOperacion(modalData.folio);
     setOperaciones((prev) =>
       prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Cancelada' } : op))
     );

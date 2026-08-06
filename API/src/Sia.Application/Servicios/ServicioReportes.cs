@@ -57,6 +57,7 @@ public class ServicioReportes
             ModoValidacion = e.ModoValidacion.ToString(),
             Resultado = e.Resultado.ToString(),
             MotivoDenegacion = e.MotivoDenegacion,
+            FotoEvidenciaUrl = e.FotoEvidenciaUrl,
             FechaHoraLocal = e.FechaHoraLocal
         }).ToList();
 
@@ -107,5 +108,25 @@ public class ServicioReportes
         };
 
         return Result<TrazabilidadItemResponse>.Exitoso(response);
+    }
+
+    public async Task<Result<List<AuditoriaResponse>>> ObtenerAuditoriaAsync(DateTimeOffset? desde, DateTimeOffset? hasta, string? entidad, CancellationToken ct)
+    {
+        List<AuditoriaCambio> registros = await _eventosRepository.ObtenerAuditoriaAsync(desde, hasta, entidad, ct);
+
+        var response = registros.Select(a => new AuditoriaResponse
+        {
+            Id = a.Id,
+            Entidad = a.Entidad,
+            EntidadId = a.EntidadId,
+            Accion = a.Accion,
+            Descripcion = a.Descripcion,
+            Origen = a.Origen,
+            EstacionId = a.EstacionId,
+            UserId = a.UserId,
+            FechaHora = a.FechaHora
+        }).ToList();
+
+        return Result<List<AuditoriaResponse>>.Exitoso(response);
     }
 }

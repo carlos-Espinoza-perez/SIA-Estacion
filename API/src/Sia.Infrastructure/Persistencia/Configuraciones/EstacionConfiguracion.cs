@@ -13,10 +13,17 @@ public class EstacionConfiguracion : IEntityTypeConfiguration<Estacion>
 
         builder.Property(e => e.Nombre).HasMaxLength(200).IsRequired();
         builder.Property(e => e.Ubicacion).HasMaxLength(500);
+        builder.Property(e => e.FirmwareVersion).HasMaxLength(50);
+        builder.Property(e => e.DireccionIp).HasMaxLength(50);
         builder.Property(e => e.ClientId).HasMaxLength(100).IsRequired();
         builder.Property(e => e.ClientSecretHash).HasMaxLength(500).IsRequired();
 
         builder.HasIndex(e => new { e.EmpresaId, e.ClientId }).IsUnique();
+
+        builder.HasOne(e => e.Encargado)
+            .WithMany()
+            .HasForeignKey(e => e.EncargadoId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Empresa)
             .WithMany(e => e.Estaciones)

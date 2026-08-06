@@ -15,6 +15,9 @@ public class PersonaConfiguracion : IEntityTypeConfiguration<Persona>
         builder.Property(e => e.CodigoEstudiantil).HasMaxLength(50).IsRequired();
         builder.Property(e => e.Nombres).HasMaxLength(200).IsRequired();
         builder.Property(e => e.Apellidos).HasMaxLength(200).IsRequired();
+        builder.Property(e => e.CarreraOArea).HasMaxLength(150);
+        builder.Property(e => e.Correo).HasMaxLength(200);
+        builder.Property(e => e.Telefono).HasMaxLength(30);
         builder.Property(e => e.UserId).HasMaxLength(450);
         builder.Property(e => e.TipoPersona)
             .HasConversion<string>()

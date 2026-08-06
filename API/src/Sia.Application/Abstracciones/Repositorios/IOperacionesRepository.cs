@@ -4,6 +4,7 @@ namespace Sia.Application.Abstracciones.Repositorios;
 
 public interface IOperacionesRepository
 {
+    Task<List<OperacionItem>> ObtenerTodasAsync(string? busqueda, string? estado, Guid? estacionId, Guid? personaId, CancellationToken ct);
     Task<OperacionItem?> ObtenerPorIdAsync(Guid id, CancellationToken ct);
     Task AgregarOperacionAsync(OperacionItem operacion, CancellationToken ct);
     Task AgregarOperacionDetalleAsync(OperacionItemDetalle detalle, CancellationToken ct);

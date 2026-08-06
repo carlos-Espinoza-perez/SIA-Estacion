@@ -12,6 +12,7 @@ public class EventoAcceso
     public ModoValidacion ModoValidacion { get; set; }
     public ResultadoAcceso Resultado { get; set; }
     public string? MotivoDenegacion { get; set; }
+    public string? FotoEvidenciaUrl { get; set; }
     public string CodigoEscaneado { get; set; } = string.Empty;
     public DateTimeOffset FechaHoraLocal { get; set; }
     public DateTimeOffset? FechaSincronizacion { get; set; }

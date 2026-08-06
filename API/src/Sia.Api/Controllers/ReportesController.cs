@@ -50,4 +50,16 @@ public class ReportesController : SiaControllerBase
         var resultado = await _servicio.ObtenerTrazabilidadItemAsync(itemId, ct);
         return HandleResult(resultado);
     }
+
+    [HttpGet("auditoria")]
+    [RequierePrivilegio("AUD", "L")]
+    public async Task<IActionResult> ObtenerAuditoria(
+        [FromQuery] DateTimeOffset? desde,
+        [FromQuery] DateTimeOffset? hasta,
+        [FromQuery] string? entidad,
+        CancellationToken ct)
+    {
+        var resultado = await _servicio.ObtenerAuditoriaAsync(desde, hasta, entidad, ct);
+        return HandleResult(resultado);
+    }
 }

@@ -84,13 +84,16 @@ public class AuditoriaInterceptor : SaveChangesInterceptor
             // Ignorar entidades globales (no tienen EmpresaId)
             if (empresaId is null || empresaId == Guid.Empty) continue;
 
+            string nombreEntidad = entry.Entity.GetType().Name;
             auditorias.Add(new AuditoriaCambio
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaId.Value,
-                Entidad = entry.Entity.GetType().Name,
+                Entidad = nombreEntidad,
                 EntidadId = entidadId,
                 Accion = accion,
+                Descripcion = $"{accion} de {nombreEntidad} #{entidadId}",
+                Origen = "Panel",
                 UserId = _contextoUsuario.UserId,
                 FechaHora = DateTimeOffset.UtcNow
             });

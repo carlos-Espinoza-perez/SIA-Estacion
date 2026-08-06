@@ -10,6 +10,9 @@ public class Persona
     public string Nombres { get; set; } = string.Empty;
     public string Apellidos { get; set; } = string.Empty;
     public TipoPersona TipoPersona { get; set; }
+    public string? CarreraOArea { get; set; }
+    public string? Correo { get; set; }
+    public string? Telefono { get; set; }
     public string? UserId { get; set; }
     public bool Estado { get; set; } = true;
     public DateTimeOffset FechaRegistro { get; set; } = DateTimeOffset.UtcNow;

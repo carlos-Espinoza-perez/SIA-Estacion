@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sia.Infrastructure.Persistencia;
 
@@ -11,9 +12,11 @@ using Sia.Infrastructure.Persistencia;
 namespace Sia.Infrastructure.Migrations
 {
     [DbContext(typeof(SiaDbContext))]
-    partial class SiaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806031228_AddCamposCorrelacionFrontend")]
+    partial class AddCamposCorrelacionFrontend
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

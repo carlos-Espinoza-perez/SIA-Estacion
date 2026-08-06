@@ -13,6 +13,7 @@ public class ItemConfiguracion : IEntityTypeConfiguration<Item>
 
         builder.Property(e => e.CodigoQr).HasMaxLength(200).IsRequired();
         builder.Property(e => e.Nombre).HasMaxLength(200).IsRequired();
+        builder.Property(e => e.Observaciones).HasMaxLength(500);
         builder.Property(e => e.EstadoActual)
             .HasConversion<string>()
             .HasMaxLength(50);
@@ -21,10 +22,16 @@ public class ItemConfiguracion : IEntityTypeConfiguration<Item>
 
         builder.HasIndex(e => new { e.EmpresaId, e.CodigoQr }).IsUnique();
         builder.HasIndex(e => new { e.EmpresaId, e.TipoItemId, e.EstadoActual });
+        builder.HasIndex(e => new { e.EmpresaId, e.EstacionId });
 
         builder.HasOne(e => e.TipoItem)
             .WithMany(e => e.Items)
             .HasForeignKey(e => e.TipoItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.Estacion)
+            .WithMany()
+            .HasForeignKey(e => e.EstacionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Empresa)

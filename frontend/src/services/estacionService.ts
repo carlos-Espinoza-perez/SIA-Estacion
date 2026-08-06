@@ -202,10 +202,74 @@ export const MOCK_ESTACIONES: Estacion[] = [
 ];
 
 import { auditoriaService } from './auditoriaService';
+import { apiClient } from './apiClient';
+import { RespuestaEnvuelta } from '../types/api';
+
+interface EstacionBackendDto {
+  id: string;
+  nombre: string;
+  ubicacion: string;
+  encargadoId?: string;
+  encargadoNombre?: string;
+  firmwareVersion?: string;
+  direccionIp?: string;
+  clientId: string;
+  requiereIdentificacion: boolean;
+  requiereAprobacion: boolean;
+  estado: boolean;
+  ultimaSincronizacion?: string;
+}
 
 export const estacionService = {
   getEstaciones: async (filtros?: FiltrosEstacion): Promise<Estacion[]> => {
-    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto[]>>('/estaciones');
+      if (response.data.datos && response.data.datos.length > 0) {
+        let lista: Estacion[] = response.data.datos.map((e) => ({
+          id: e.id,
+          nombre: e.nombre,
+          ubicacion: e.ubicacion,
+          tipoRecurso: 'Control de acceso',
+          flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
+          ultimaSincronizacion: e.ultimaSincronizacion
+            ? new Date(e.ultimaSincronizacion).toLocaleString()
+            : '—',
+          estado: e.estado ? 'En línea' : 'Offline',
+          encargado: e.encargadoNombre || 'Sin asignar',
+          identificadorDispositivo: e.clientId,
+          modoOffline: true,
+          firmware: e.firmwareVersion || 'v1.0.3',
+          accesosHoy: 0,
+          operacionesHoy: 0,
+          latenciaQrPromedio: '—',
+          latenciaFacialPromedio: '—',
+          actividadReciente: [],
+        }));
+
+        if (filtros) {
+          const q = filtros.busqueda.trim().toLowerCase();
+          if (q) {
+            lista = lista.filter(
+              (e) =>
+                e.nombre.toLowerCase().includes(q) ||
+                e.ubicacion.toLowerCase().includes(q) ||
+                (e.identificadorDispositivo &&
+                  e.identificadorDispositivo.toLowerCase().includes(q))
+            );
+          }
+          if (filtros.tipoRecurso) {
+            lista = lista.filter((e) => e.tipoRecurso === filtros.tipoRecurso);
+          }
+          if (filtros.estado) {
+            lista = lista.filter((e) => e.estado === filtros.estado);
+          }
+        }
+        return lista;
+      }
+    } catch {
+      // Fallback
+    }
+
     let lista = [...MOCK_ESTACIONES];
 
     if (filtros) {
@@ -230,12 +294,74 @@ export const estacionService = {
   },
 
   getEstacionById: async (id: string): Promise<Estacion | undefined> => {
-    await new Promise((r) => setTimeout(r, 40));
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}`);
+      if (response.data.datos) {
+        const e = response.data.datos;
+        return {
+          id: e.id,
+          nombre: e.nombre,
+          ubicacion: e.ubicacion,
+          tipoRecurso: 'Control de acceso',
+          flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
+          ultimaSincronizacion: e.ultimaSincronizacion
+            ? new Date(e.ultimaSincronizacion).toLocaleString()
+            : '—',
+          estado: e.estado ? 'En línea' : 'Offline',
+          encargado: e.encargadoNombre || 'Sin asignar',
+          identificadorDispositivo: e.clientId,
+          modoOffline: true,
+          firmware: e.firmwareVersion || 'v1.0.3',
+          accesosHoy: 0,
+          operacionesHoy: 0,
+          latenciaQrPromedio: '—',
+          latenciaFacialPromedio: '—',
+          actividadReciente: [],
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
     return MOCK_ESTACIONES.find((e) => e.id === id);
   },
 
   crearEstacion: async (data: CrearEstacionFormData): Promise<Estacion> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      const response = await apiClient.post<RespuestaEnvuelta<EstacionBackendDto>>('/estaciones', {
+        nombre: data.nombre,
+        ubicacion: data.ubicacion,
+        requiereIdentificacion: true,
+        requiereAprobacion: data.flujo === 'Aprobación',
+      });
+
+      if (response.data.datos) {
+        const eb = response.data.datos;
+        const nueva: Estacion = {
+          id: eb.id,
+          nombre: eb.nombre,
+          ubicacion: eb.ubicacion,
+          tipoRecurso: data.tipoRecurso,
+          flujo: eb.requiereAprobacion ? 'Aprobación' : 'Directo',
+          ultimaSincronizacion: 'Ahora',
+          estado: 'En línea',
+          encargado: data.encargado,
+          identificadorDispositivo: eb.clientId || data.identificadorDispositivo,
+          modoOffline: data.modoOffline,
+          firmware: 'v1.0.3',
+          accesosHoy: 0,
+          operacionesHoy: 0,
+          latenciaQrPromedio: '—',
+          latenciaFacialPromedio: '—',
+          actividadReciente: [],
+        };
+        MOCK_ESTACIONES.unshift(nueva);
+        return nueva;
+      }
+    } catch {
+      // Fallback
+    }
+
     const nueva: Estacion = {
       id: `est-${Date.now()}`,
       nombre: data.nombre,
@@ -268,7 +394,19 @@ export const estacionService = {
   },
 
   actualizarEstacion: async (id: string, data: Partial<Estacion>): Promise<Estacion> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      if (data.nombre || data.ubicacion) {
+        await apiClient.put(`/estaciones/${id}`, {
+          nombre: data.nombre,
+          ubicacion: data.ubicacion,
+          requiereAprobacion: data.flujo === 'Aprobación',
+          estado: data.estado === 'En línea',
+        });
+      }
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_ESTACIONES.findIndex((e) => e.id === id);
     if (index === -1) throw new Error('Estación no encontrada');
 
@@ -286,12 +424,21 @@ export const estacionService = {
   },
 
   toggleEstadoEstacion: async (id: string): Promise<Estacion> => {
-    await new Promise((r) => setTimeout(r, 80));
     const index = MOCK_ESTACIONES.findIndex((e) => e.id === id);
     if (index === -1) throw new Error('Estación no encontrada');
 
     const nuevoEstado = MOCK_ESTACIONES[index].estado === 'En línea' ? 'Offline' : 'En línea';
     MOCK_ESTACIONES[index].estado = nuevoEstado;
+
+    try {
+      await apiClient.put(`/estaciones/${id}`, {
+        nombre: MOCK_ESTACIONES[index].nombre,
+        ubicacion: MOCK_ESTACIONES[index].ubicacion,
+        estado: nuevoEstado === 'En línea',
+      });
+    } catch {
+      // Fallback
+    }
 
     await auditoriaService.registrarEvento({
       tipo: 'Seguridad',
@@ -305,7 +452,12 @@ export const estacionService = {
   },
 
   eliminarEstacion: async (id: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 80));
+    try {
+      await apiClient.delete(`/estaciones/${id}`);
+    } catch {
+      // Fallback
+    }
+
     const index = MOCK_ESTACIONES.findIndex((e) => e.id === id);
     if (index === -1) return false;
 

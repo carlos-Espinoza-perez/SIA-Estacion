@@ -51,7 +51,10 @@ public class ItemsRepository : IItemsRepository
 
     public async Task<List<Item>> ObtenerItemsAsync(string? busqueda, Guid? tipoItemId, EstadoItem? estadoActual, CancellationToken ct)
     {
-        IQueryable<Item> query = _db.Items.Include(i => i.TipoItem).Where(i => i.Estado);
+        IQueryable<Item> query = _db.Items
+            .Include(i => i.TipoItem)
+            .Include(i => i.Estacion)
+            .Where(i => i.Estado);
 
         if (!string.IsNullOrWhiteSpace(busqueda))
             query = query.Where(i => i.Nombre.Contains(busqueda) || i.CodigoQr.Contains(busqueda));
@@ -67,6 +70,7 @@ public class ItemsRepository : IItemsRepository
     {
         return await _db.Items
             .Include(i => i.TipoItem)
+            .Include(i => i.Estacion)
             .Include(i => i.AtributoValores).ThenInclude(av => av.AtributoDefinicion)
             .Include(i => i.ComponentesDe).ThenInclude(c => c.ItemComponente)
             .FirstOrDefaultAsync(i => i.Id == id, ct);
@@ -74,13 +78,17 @@ public class ItemsRepository : IItemsRepository
 
     public async Task<Item?> ObtenerItemPorIdAsync(Guid id, CancellationToken ct)
     {
-        return await _db.Items.Include(i => i.TipoItem).FirstOrDefaultAsync(i => i.Id == id, ct);
+        return await _db.Items
+            .Include(i => i.TipoItem)
+            .Include(i => i.Estacion)
+            .FirstOrDefaultAsync(i => i.Id == id, ct);
     }
 
     public async Task<Item?> ObtenerItemPorQrAsync(string codigo, CancellationToken ct)
     {
         return await _db.Items
             .Include(i => i.TipoItem)
+            .Include(i => i.Estacion)
             .FirstOrDefaultAsync(i => i.CodigoQr == codigo, ct);
     }
 

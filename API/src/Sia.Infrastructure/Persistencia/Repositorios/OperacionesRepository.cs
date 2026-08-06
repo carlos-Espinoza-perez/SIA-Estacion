@@ -13,11 +13,49 @@ public class OperacionesRepository : IOperacionesRepository
         _db = db;
     }
 
+    public async Task<List<OperacionItem>> ObtenerTodasAsync(string? busqueda, string? estado, Guid? estacionId, Guid? personaId, CancellationToken ct)
+    {
+        var query = _db.OperacionesItem
+            .Include(o => o.ItemEscaneado)
+            .Include(o => o.Persona)
+            .Include(o => o.Estacion)
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(busqueda))
+        {
+            busqueda = busqueda.Trim().ToLower();
+            query = query.Where(o => (o.Folio != null && o.Folio.ToLower().Contains(busqueda))
+                                  || o.ItemEscaneado.Nombre.ToLower().Contains(busqueda)
+                                  || o.Persona.Nombres.ToLower().Contains(busqueda)
+                                  || o.Persona.Apellidos.ToLower().Contains(busqueda)
+                                  || o.Persona.CodigoEstudiantil.ToLower().Contains(busqueda));
+        }
+
+        if (!string.IsNullOrWhiteSpace(estado) && Enum.TryParse<Sia.Domain.Enums.EstadoOperacionItem>(estado, true, out var estadoEnum))
+        {
+            query = query.Where(o => o.EstadoActual == estadoEnum);
+        }
+
+        if (estacionId.HasValue)
+        {
+            query = query.Where(o => o.EstacionId == estacionId.Value);
+        }
+
+        if (personaId.HasValue)
+        {
+            query = query.Where(o => o.PersonaId == personaId.Value);
+        }
+
+        return await query.OrderByDescending(o => o.FechaSolicitud).ToListAsync(ct);
+    }
+
     public async Task<OperacionItem?> ObtenerPorIdAsync(Guid id, CancellationToken ct)
     {
         return await _db.OperacionesItem
             .Include(o => o.ItemEscaneado)
             .Include(o => o.Persona)
+            .Include(o => o.Estacion)
             .Include(o => o.Detalles).ThenInclude(d => d.Item)
             .Include(o => o.Movimientos).ThenInclude(m => m.RegistradoPorPersona)
             .FirstOrDefaultAsync(o => o.Id == id, ct);

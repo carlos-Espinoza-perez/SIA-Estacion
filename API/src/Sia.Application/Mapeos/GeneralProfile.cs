@@ -32,9 +32,11 @@ public class GeneralProfile : Profile
 
         CreateMap<Item, ItemResponse>()
             .ForMember(d => d.TipoItemNombre, o => o.MapFrom(s => s.TipoItem.Nombre))
+            .ForMember(d => d.EstacionNombre, o => o.MapFrom(s => s.Estacion != null ? s.Estacion.Nombre : null))
             .ForMember(d => d.EstadoActual, o => o.MapFrom(s => s.EstadoActual.ToString()));
 
-        CreateMap<Estacion, EstacionResponse>();
+        CreateMap<Estacion, EstacionResponse>()
+            .ForMember(d => d.EncargadoNombre, o => o.MapFrom(s => s.Encargado != null ? $"{s.Encargado.Nombres} {s.Encargado.Apellidos}".Trim() : null));
         CreateMap<CrearEstacionRequest, Estacion>();
     }
 }

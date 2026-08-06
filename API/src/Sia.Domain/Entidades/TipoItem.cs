@@ -5,6 +5,8 @@ public class TipoItem
     public Guid Id { get; set; }
     public Guid EmpresaId { get; set; }
     public string Nombre { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool RequiereAprobacion { get; set; }
     public bool PermiteAgrupacion { get; set; }
     public bool Estado { get; set; } = true;
 

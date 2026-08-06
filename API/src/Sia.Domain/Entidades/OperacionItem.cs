@@ -6,11 +6,13 @@ public class OperacionItem
 {
     public Guid Id { get; set; }
     public Guid EmpresaId { get; set; }
+    public string Folio { get; set; } = string.Empty;
     public Guid ItemEscaneadoId { get; set; }
     public Guid PersonaId { get; set; }
     public Guid EstacionId { get; set; }
     public TipoOperacionItem TipoOperacion { get; set; }
     public EstadoOperacionItem EstadoActual { get; set; }
+    public string? Observaciones { get; set; }
     public bool Estado { get; set; } = true;
     public DateTimeOffset FechaSolicitud { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? FechaCompromisoDevolucion { get; set; }
