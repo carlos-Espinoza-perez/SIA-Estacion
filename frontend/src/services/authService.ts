@@ -21,6 +21,18 @@ export const authService = {
     return response.data.datos;
   },
 
+  async loginGoogle(token: string): Promise<TokenResponse> {
+    const response = await apiClient.post<RespuestaEnvuelta<TokenResponse>>(
+      '/auth/google-login',
+      { token }
+    );
+    if (!response.data.datos) {
+      const errorMsg = response.data.errores?.[0]?.mensaje || 'Error al iniciar sesión con Google';
+      throw new Error(errorMsg);
+    }
+    return response.data.datos;
+  },
+
   async loginQr(request: LoginQrRequest): Promise<TokenResponse> {
     const response = await apiClient.post<RespuestaEnvuelta<TokenResponse>>(
       '/auth/login-qr',

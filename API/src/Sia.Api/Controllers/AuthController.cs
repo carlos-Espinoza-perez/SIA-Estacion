@@ -27,6 +27,14 @@ public class AuthController : SiaControllerBase
         return HandleResult(resultado);
     }
 
+    [HttpPost("google-login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request, CancellationToken ct)
+    {
+        Result<TokenResponse> resultado = await _servicio.GoogleLoginAsync(request, ct);
+        return HandleResult(resultado);
+    }
+
     [HttpPost("login-qr")]
     [AllowAnonymous]
     public async Task<IActionResult> LoginQr([FromBody] LoginQrRequest request, CancellationToken ct)

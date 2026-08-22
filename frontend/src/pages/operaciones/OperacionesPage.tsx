@@ -14,7 +14,6 @@ import {
   OperacionRow,
   EstadoOperacion,
   FlujoOperacion,
-  MOCK_OPERACIONES,
 } from '../../services/operacionService';
 
 export type { EstadoOperacion, FlujoOperacion };
@@ -140,7 +139,7 @@ const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
 
 export const OperacionesPage: React.FC = () => {
   const { showToast } = useToast();
-  const [operaciones, setOperaciones] = useState<OperacionRow[]>(MOCK_OPERACIONES);
+  const [operaciones, setOperaciones] = useState<OperacionRow[]>([]);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [estado,    setEstado]    = useState('');

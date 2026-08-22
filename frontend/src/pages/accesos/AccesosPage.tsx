@@ -6,7 +6,7 @@ import { Select, SelectOption } from '../../components/atoms/Select/Select';
 import { ResultadoBadge, ResultadoAcceso } from '../../components/atoms/ResultadoBadge/ResultadoBadge';
 import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
-import { accesoService, AccesoRow, MOCK_ACCESOS } from '../../services/accesoService';
+import { accesoService, AccesoRow } from '../../services/accesoService';
 
 // Opciones de filtros
 
@@ -108,7 +108,7 @@ const COLUMNS: TableColumn<AccesoRow>[] = [
 
 export const AccesosPage: React.FC = () => {
   const { showToast } = useToast();
-  const [accesos,   setAccesos]   = useState<AccesoRow[]>(MOCK_ACCESOS);
+  const [accesos,   setAccesos]   = useState<AccesoRow[]>([]);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [resultado, setResultado] = useState('');

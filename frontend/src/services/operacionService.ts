@@ -116,7 +116,7 @@ export const operacionService = {
         `/operaciones?${params.toString()}`
       );
 
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         return response.data.datos.map((o) => ({
           id: o.id,
           folio: o.folio,
@@ -131,7 +131,7 @@ export const operacionService = {
           carnet: o.codigoEstudiantil,
           item: o.itemNombre,
           itemId: o.itemEscaneadoId,
-          estacion: o.estacionNombre || 'Laboratorio A',
+          estacion: o.estacionNombre || 'General',
           estacionId: o.estacionId,
           flujo: (o.flujo === 'Aprobación' ? 'Aprobación' : 'Directo') as FlujoOperacion,
           estado: mapEstado(o.estadoActual),
@@ -139,7 +139,7 @@ export const operacionService = {
         }));
       }
     } catch {
-      // Fallback a MOCK_OPERACIONES
+      // Fallback solo si la API no está disponible
     }
 
     let resultado = [...MOCK_OPERACIONES];

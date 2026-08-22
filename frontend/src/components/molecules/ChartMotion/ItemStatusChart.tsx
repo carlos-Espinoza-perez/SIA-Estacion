@@ -10,14 +10,17 @@ import {
   Cell,
 } from 'recharts';
 
-const statusData = [
-  { label: 'Disponible', count: 120, color: '#A0BCE8' },
-  { label: 'Prestado',   count: 85,  color: '#6BE6D3' },
-  { label: 'Mant.',      count: 42,  color: '#ADADFB' },
-  { label: 'Perdido',    count: 18,  color: '#7DBBFF' },
-  { label: 'Kit',        count: 12,  color: '#B899EB' },
-  { label: 'Otro',       count: 64,  color: '#71DD8C' },
+const emptyStatusData = [
+  { label: 'Disponible', count: 0, color: '#A0BCE8' },
+  { label: 'Prestado',   count: 0, color: '#6BE6D3' },
+  { label: 'Mant.',      count: 0, color: '#ADADFB' },
+  { label: 'Perdido',    count: 0, color: '#7DBBFF' },
+  { label: 'Baja',       count: 0, color: '#B899EB' },
 ];
+
+export interface ItemStatusChartProps {
+  data?: Array<{ label: string; count: number; color: string }>;
+}
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -51,8 +54,11 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
   return null;
 };
 
-export const ItemStatusChart: React.FC = () => {
+export const ItemStatusChart: React.FC<ItemStatusChartProps> = ({ data }) => {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const chartData = data && data.length > 0 ? data : emptyStatusData;
+  const maxCount = Math.max(...chartData.map((d) => d.count), 5);
+  const topDomain = Math.ceil(maxCount * 1.25);
 
   return (
     <div
@@ -82,7 +88,7 @@ export const ItemStatusChart: React.FC = () => {
       <div style={{ width: '100%', height: '170px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={statusData}
+            data={chartData}
             margin={{ top: 10, right: 4, left: -28, bottom: 0 }}
             onMouseLeave={() => setActiveIdx(null)}
           >
@@ -101,8 +107,7 @@ export const ItemStatusChart: React.FC = () => {
               tickLine={false}
               axisLine={false}
               tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'Inter, sans-serif' }}
-              domain={[0, 140]}
-              ticks={[0, 35, 70, 105, 140]}
+              domain={[0, topDomain]}
             />
             <Tooltip content={<CustomTooltip />} cursor={false} />
             <Bar
@@ -111,7 +116,7 @@ export const ItemStatusChart: React.FC = () => {
               maxBarSize={32}
               onMouseEnter={(_, idx) => setActiveIdx(idx)}
             >
-              {statusData.map((entry, index) => (
+              {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}

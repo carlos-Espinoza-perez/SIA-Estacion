@@ -191,20 +191,20 @@ export const itemService = {
   getItems: async (filtros?: FiltrosItem): Promise<Item[]> => {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<ItemBackendDto[]>>('/items');
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         let lista: Item[] = response.data.datos.map((it) => ({
           id: it.id,
           codigo: it.codigo,
           nombre: it.nombre,
           tipo: it.tipoItemNombre || it.tipoItemId,
-          estacion: it.estacionNombre || 'Laboratorio A',
+          estacion: it.estacionNombre || 'General',
           estado: (it.estadoActual as EstadoItem) || 'Disponible',
           unidades: it.unidades || 1,
           observaciones: it.observaciones,
         }));
 
         if (filtros) {
-          const q = filtros.busqueda.trim().toLowerCase();
+          const q = filtros.busqueda?.trim().toLowerCase() || '';
           if (q) {
             lista = lista.filter(
               (i) =>
@@ -225,7 +225,7 @@ export const itemService = {
         return lista;
       }
     } catch {
-      // Fallback
+      // Fallback solo si la API no está disponible
     }
 
     let lista = [...MOCK_ITEMS];
@@ -256,7 +256,7 @@ export const itemService = {
   getTiposItem: async (filtros?: FiltrosTipoItem): Promise<TipoItem[]> => {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<TipoItemBackendDto[]>>('/items/tipos');
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         let lista: TipoItem[] = response.data.datos.map((t) => ({
           id: t.id,
           nombre: t.nombre,
@@ -267,12 +267,12 @@ export const itemService = {
         }));
 
         if (filtros) {
-          const q = filtros.busqueda.trim().toLowerCase();
+          const q = filtros.busqueda?.trim().toLowerCase() || '';
           if (q) {
             lista = lista.filter(
               (t) =>
                 t.nombre.toLowerCase().includes(q) ||
-                t.descripcion.toLowerCase().includes(q)
+                (t.descripcion && t.descripcion.toLowerCase().includes(q))
             );
           }
           if (filtros.estado) {

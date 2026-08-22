@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Google.Apis.Auth;
 using Sia.Application.Abstracciones;
 using Sia.Application.Abstracciones.Repositorios;
 using Sia.Application.Dtos.Seguridad;
@@ -17,6 +19,7 @@ public class ServicioAuth
     private readonly ISeguridadRepository _seguridadRepository;
     private readonly IPersonasRepository _personasRepository;
     private readonly IEstacionesRepository _estacionesRepository;
+    private readonly IConfiguration _configuration;
 
     public ServicioAuth(
         UserManager<IdentityUser> userManager,
@@ -24,7 +27,8 @@ public class ServicioAuth
         IServicioJwt servicioJwt,
         ISeguridadRepository seguridadRepository,
         IPersonasRepository personasRepository,
-        IEstacionesRepository estacionesRepository)
+        IEstacionesRepository estacionesRepository,
+        IConfiguration configuration)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -32,6 +36,7 @@ public class ServicioAuth
         _seguridadRepository = seguridadRepository;
         _personasRepository = personasRepository;
         _estacionesRepository = estacionesRepository;
+        _configuration = configuration;
     }
 
     public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -54,6 +59,48 @@ public class ServicioAuth
             RefreshToken = refreshToken,
             ExpiresInMinutes = 30
         });
+    }
+
+    public async Task<Result<TokenResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var clientId = _configuration["Google:ClientId"];
+            var settings = new GoogleJsonWebSignature.ValidationSettings();
+            
+            if (!string.IsNullOrEmpty(clientId) && clientId != "YOUR_GOOGLE_CLIENT_ID")
+            {
+                settings.Audience = new[] { clientId };
+            }
+
+            var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
+
+            if (payload == null)
+                return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "Token de Google inválido.");
+
+            IdentityUser? usuario = await _userManager.FindByEmailAsync(payload.Email);
+            if (usuario is null)
+                return Result<TokenResponse>.Fallido("USUARIO_NO_ENCONTRADO", "El usuario no está registrado en el sistema. Solicite acceso.");
+
+            List<Claim> claims = await ConstruirClaimsUsuarioAsync(usuario, ct);
+            string accessToken = _servicioJwt.GenerarTokenAcceso(claims);
+            string refreshToken = _servicioJwt.GenerarRefreshToken();
+
+            return Result<TokenResponse>.Exitoso(new TokenResponse
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                ExpiresInMinutes = 30
+            });
+        }
+        catch (InvalidJwtException)
+        {
+            return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "Token de Google inválido o expirado.");
+        }
+        catch (Exception)
+        {
+            return Result<TokenResponse>.Fallido("ERROR_GOOGLE_LOGIN", "Ocurrió un error al procesar el inicio de sesión con Google.");
+        }
     }
 
     public async Task<Result<TokenResponse>> RefreshAsync(RefreshRequest request, CancellationToken ct)

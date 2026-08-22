@@ -15,49 +15,19 @@ interface DataPoint {
   previousYear: number;
 }
 
-const accessData: DataPoint[] = [
-  { month: 'Ene', currentYear: 14, previousYear: 10 },
-  { month: 'Feb', currentYear: 18, previousYear: 12 },
-  { month: 'Mar', currentYear: 22, previousYear: 15 },
-  { month: 'Abr', currentYear: 26, previousYear: 19 },
-  { month: 'May', currentYear: 20, previousYear: 16 },
-  { month: 'Jun', currentYear: 28, previousYear: 21 },
-  { month: 'Jul', currentYear: 24, previousYear: 18 },
-  { month: 'Ago', currentYear: 29, previousYear: 22 },
-  { month: 'Sep', currentYear: 23, previousYear: 17 },
-  { month: 'Oct', currentYear: 27, previousYear: 20 },
-  { month: 'Nov', currentYear: 25, previousYear: 19 },
-  { month: 'Dic', currentYear: 30, previousYear: 24 },
-];
-
-const operationsData: DataPoint[] = [
-  { month: 'Ene', currentYear: 8, previousYear: 6 },
-  { month: 'Feb', currentYear: 12, previousYear: 9 },
-  { month: 'Mar', currentYear: 15, previousYear: 11 },
-  { month: 'Abr', currentYear: 19, previousYear: 14 },
-  { month: 'May', currentYear: 14, previousYear: 12 },
-  { month: 'Jun', currentYear: 22, previousYear: 16 },
-  { month: 'Jul', currentYear: 18, previousYear: 13 },
-  { month: 'Ago', currentYear: 21, previousYear: 15 },
-  { month: 'Sep', currentYear: 17, previousYear: 13 },
-  { month: 'Oct', currentYear: 23, previousYear: 16 },
-  { month: 'Nov', currentYear: 19, previousYear: 14 },
-  { month: 'Dic', currentYear: 26, previousYear: 18 },
-];
-
-const stationsData: DataPoint[] = [
-  { month: 'Ene', currentYear: 5, previousYear: 4 },
-  { month: 'Feb', currentYear: 7, previousYear: 5 },
-  { month: 'Mar', currentYear: 9, previousYear: 6 },
-  { month: 'Abr', currentYear: 12, previousYear: 8 },
-  { month: 'May', currentYear: 10, previousYear: 7 },
-  { month: 'Jun', currentYear: 14, previousYear: 9 },
-  { month: 'Jul', currentYear: 11, previousYear: 8 },
-  { month: 'Ago', currentYear: 13, previousYear: 10 },
-  { month: 'Sep', currentYear: 12, previousYear: 9 },
-  { month: 'Oct', currentYear: 15, previousYear: 11 },
-  { month: 'Nov', currentYear: 13, previousYear: 10 },
-  { month: 'Dic', currentYear: 16, previousYear: 12 },
+const emptyTrend: DataPoint[] = [
+  { month: 'Ene', currentYear: 0, previousYear: 0 },
+  { month: 'Feb', currentYear: 0, previousYear: 0 },
+  { month: 'Mar', currentYear: 0, previousYear: 0 },
+  { month: 'Abr', currentYear: 0, previousYear: 0 },
+  { month: 'May', currentYear: 0, previousYear: 0 },
+  { month: 'Jun', currentYear: 0, previousYear: 0 },
+  { month: 'Jul', currentYear: 0, previousYear: 0 },
+  { month: 'Ago', currentYear: 0, previousYear: 0 },
+  { month: 'Sep', currentYear: 0, previousYear: 0 },
+  { month: 'Oct', currentYear: 0, previousYear: 0 },
+  { month: 'Nov', currentYear: 0, previousYear: 0 },
+  { month: 'Dic', currentYear: 0, previousYear: 0 },
 ];
 
 interface CustomTooltipProps {
@@ -111,7 +81,7 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
               />
               <span>{entry.name}:</span>
             </div>
-            <span style={{ fontWeight: 600, color: '#FFFFFF' }}>{entry.value}M</span>
+            <span style={{ fontWeight: 600, color: '#FFFFFF' }}>{entry.value}</span>
           </div>
         ))}
       </div>
@@ -120,17 +90,27 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
   return null;
 };
 
-export const AccessChart: React.FC = () => {
+export interface AccessChartProps {
+  tendenciaAccesos?: DataPoint[];
+  tendenciaOperaciones?: DataPoint[];
+  tendenciaEstaciones?: DataPoint[];
+}
+
+export const AccessChart: React.FC<AccessChartProps> = ({
+  tendenciaAccesos,
+  tendenciaOperaciones,
+  tendenciaEstaciones,
+}) => {
   const [activeTab, setActiveTab] = useState<'Accesos' | 'Operaciones' | 'Estaciones'>('Accesos');
 
   const getData = () => {
     switch (activeTab) {
       case 'Operaciones':
-        return operationsData;
+        return tendenciaOperaciones && tendenciaOperaciones.length > 0 ? tendenciaOperaciones : emptyTrend;
       case 'Estaciones':
-        return stationsData;
+        return tendenciaEstaciones && tendenciaEstaciones.length > 0 ? tendenciaEstaciones : emptyTrend;
       default:
-        return accessData;
+        return tendenciaAccesos && tendenciaAccesos.length > 0 ? tendenciaAccesos : emptyTrend;
     }
   };
 
@@ -247,9 +227,9 @@ export const AccessChart: React.FC = () => {
               tickLine={false}
               axisLine={false}
               tick={{ fill: 'rgba(255, 255, 255, 0.4)', fontSize: 12, fontFamily: 'Inter, sans-serif' }}
-              tickFormatter={(v) => `${v}M`}
-              domain={[0, 35]}
-              ticks={[0, 10, 20, 30]}
+              tickFormatter={(v) => `${v}`}
+              domain={[0, 'auto']}
+              allowDecimals={false}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area

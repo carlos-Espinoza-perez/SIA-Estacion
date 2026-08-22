@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
-import { loginUser, clearError } from '../../../store/slices/authSlice';
+import { loginUser, loginWithGoogle, clearError } from '../../../store/slices/authSlice';
 import { AlertBanner } from '../../molecules/AlertBanner/AlertBanner';
 import { Spinner } from '../../atoms/Spinner/Spinner';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export const LoginForm: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -37,10 +38,15 @@ export const LoginForm: React.FC = () => {
     );
   };
 
-  const handleGoogleLogin = () => {
-    // Redirigir al endpoint de OAuth o mostrar aviso del dominio institucional
-    window.location.href = '/api/auth/google';
-  };
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      dispatch(clearError());
+      dispatch(loginWithGoogle(tokenResponse.access_token));
+    },
+    onError: () => {
+      setValidationError('Falló el inicio de sesión con Google.');
+    },
+  });
 
   const errorMessage = validationError || error;
 

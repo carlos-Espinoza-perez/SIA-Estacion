@@ -224,7 +224,7 @@ export const estacionService = {
   getEstaciones: async (filtros?: FiltrosEstacion): Promise<Estacion[]> => {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto[]>>('/estaciones');
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         let lista: Estacion[] = response.data.datos.map((e) => ({
           id: e.id,
           nombre: e.nombre,
@@ -247,7 +247,7 @@ export const estacionService = {
         }));
 
         if (filtros) {
-          const q = filtros.busqueda.trim().toLowerCase();
+          const q = filtros.busqueda?.trim().toLowerCase() || '';
           if (q) {
             lista = lista.filter(
               (e) =>
@@ -267,7 +267,7 @@ export const estacionService = {
         return lista;
       }
     } catch {
-      // Fallback
+      // Fallback solo ante error de red
     }
 
     let lista = [...MOCK_ESTACIONES];

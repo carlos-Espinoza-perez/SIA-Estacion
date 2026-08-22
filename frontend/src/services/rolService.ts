@@ -168,7 +168,7 @@ export const rolService = {
   getRoles: async (): Promise<Rol[]> => {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         return response.data.datos.map((r) => {
           const matchMock = MOCK_ROLES.find(
             (m) => m.id === r.id || m.nombre.toLowerCase() === r.nombre.toLowerCase()
@@ -185,7 +185,7 @@ export const rolService = {
         });
       }
     } catch {
-      // Fallback
+      // Fallback solo si la API no está disponible
     }
     return [...MOCK_ROLES];
   },

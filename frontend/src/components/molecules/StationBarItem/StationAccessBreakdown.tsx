@@ -1,26 +1,18 @@
 import React from 'react';
 
-interface StationMetric {
-  name: string;
-  percentage: number;
-}
-
-const stations: StationMetric[] = [
-  { name: 'Entrada principal', percentage: 88 },
-  { name: 'Laboratorio A',     percentage: 62 },
-  { name: 'Biblioteca',        percentage: 74 },
-  { name: 'Taller',            percentage: 46 },
-  { name: 'Cafetería',         percentage: 92 },
-  { name: 'Salida norte',      percentage: 58 },
-];
-
 const getBarColor = (pct: number): string => {
   if (pct >= 80) return '#ADADFB';
   if (pct >= 60) return '#7DBBFF';
   return '#A0BCE8';
 };
 
-export const StationAccessBreakdown: React.FC = () => {
+export interface StationAccessBreakdownProps {
+  data?: Array<{ nombre: string; porcentaje: number }>;
+}
+
+export const StationAccessBreakdown: React.FC<StationAccessBreakdownProps> = ({ data }) => {
+  const stationList = data || [];
+
   return (
     <div
       style={{
@@ -45,54 +37,60 @@ export const StationAccessBreakdown: React.FC = () => {
       </span>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, justifyContent: 'center' }}>
-        {stations.map((st) => (
-          <div key={st.name} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                color: 'rgba(255, 255, 255, 0.75)',
-                fontFamily: 'Inter, sans-serif',
-                minWidth: '108px',
-                flexShrink: 0,
-              }}
-            >
-              {st.name}
-            </span>
+        {stationList.length === 0 ? (
+          <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
+            No hay actividad de accesos en estaciones hoy
+          </div>
+        ) : (
+          stationList.map((st) => (
+            <div key={st.nombre} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.75)',
+                  fontFamily: 'Inter, sans-serif',
+                  minWidth: '108px',
+                  flexShrink: 0,
+                }}
+              >
+                {st.nombre}
+              </span>
 
-            {/* Progress bar */}
-            <div
-              style={{
-                flex: 1,
-                height: '6px',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderRadius: '80px',
-                overflow: 'hidden',
-              }}
-            >
+              {/* Progress bar */}
               <div
                 style={{
-                  width: `${st.percentage}%`,
-                  height: '100%',
-                  backgroundColor: getBarColor(st.percentage),
+                  flex: 1,
+                  height: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
                   borderRadius: '80px',
-                  transition: 'width 0.4s ease',
+                  overflow: 'hidden',
                 }}
-              />
-            </div>
+              >
+                <div
+                  style={{
+                    width: `${st.porcentaje}%`,
+                    height: '100%',
+                    backgroundColor: getBarColor(st.porcentaje),
+                    borderRadius: '80px',
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
 
-            <span
-              style={{
-                fontSize: '12px',
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontFamily: 'Inter, sans-serif',
-                minWidth: '30px',
-                textAlign: 'right',
-              }}
-            >
-              {st.percentage}%
-            </span>
-          </div>
-        ))}
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontFamily: 'Inter, sans-serif',
+                  minWidth: '30px',
+                  textAlign: 'right',
+                }}
+              >
+                {st.porcentaje}%
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

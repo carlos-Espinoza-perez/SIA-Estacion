@@ -32,6 +32,23 @@ export const loginUser = createAsyncThunk<
   }
 });
 
+export const loginWithGoogle = createAsyncThunk<
+  TokenResponse,
+  string,
+  { rejectValue: string }
+>('auth/loginWithGoogle', async (token, { rejectWithValue, dispatch }) => {
+  try {
+    const tokens = await authService.loginGoogle(token);
+    localStorage.setItem('token', tokens.accessToken);
+    localStorage.setItem('refreshToken', tokens.refreshToken);
+    dispatch(fetchUserProfile());
+    return tokens;
+  } catch (error: any) {
+    const msg = error.response?.data?.errores?.[0]?.mensaje || error.message || 'Error al iniciar sesión con Google';
+    return rejectWithValue(msg);
+  }
+});
+
 export const loginQrUser = createAsyncThunk<
   TokenResponse,
   LoginQrRequest,
@@ -110,6 +127,23 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload || 'Fallo de autenticación';
+      });
+
+    // Login con Google
+    builder
+      .addCase(loginWithGoogle.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithGoogle.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+      })
+      .addCase(loginWithGoogle.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Fallo de autenticación con Google';
       });
 
     // Login con QR

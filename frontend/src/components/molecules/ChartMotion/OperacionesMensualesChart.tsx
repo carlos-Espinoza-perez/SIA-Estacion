@@ -10,20 +10,7 @@ import {
   Cell,
 } from 'recharts';
 
-const monthlyData = [
-  { month: 'Ene', value: 42, color: '#A0BCE8' },
-  { month: 'Feb', value: 58, color: '#7DBBFF' },
-  { month: 'Mar', value: 71, color: '#ADADFB' },
-  { month: 'Abr', value: 85, color: '#ADADFB' },
-  { month: 'May', value: 63, color: '#7DBBFF' },
-  { month: 'Jun', value: 92, color: '#ADADFB' },
-  { month: 'Jul', value: 78, color: '#7DBBFF' },
-  { month: 'Ago', value: 95, color: '#6BE6D3' },
-  { month: 'Sep', value: 69, color: '#A0BCE8' },
-  { month: 'Oct', value: 88, color: '#ADADFB' },
-  { month: 'Nov', value: 74, color: '#7DBBFF' },
-  { month: 'Dic', value: 101, color: '#6BE6D3' },
-];
+
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -56,8 +43,36 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
   return null;
 };
 
-export const OperacionesMensualesChart: React.FC = () => {
+export interface MonthlyOpData {
+  month: string;
+  value: number;
+  color: string;
+}
+
+export interface OperacionesMensualesChartProps {
+  data?: MonthlyOpData[];
+}
+
+export const OperacionesMensualesChart: React.FC<OperacionesMensualesChartProps> = ({ data }) => {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  const chartData = data && data.length > 0 ? data : [
+    { month: 'Ene', value: 0, color: '#A0BCE8' },
+    { month: 'Feb', value: 0, color: '#7DBBFF' },
+    { month: 'Mar', value: 0, color: '#ADADFB' },
+    { month: 'Abr', value: 0, color: '#ADADFB' },
+    { month: 'May', value: 0, color: '#7DBBFF' },
+    { month: 'Jun', value: 0, color: '#ADADFB' },
+    { month: 'Jul', value: 0, color: '#7DBBFF' },
+    { month: 'Ago', value: 0, color: '#6BE6D3' },
+    { month: 'Sep', value: 0, color: '#A0BCE8' },
+    { month: 'Oct', value: 0, color: '#ADADFB' },
+    { month: 'Nov', value: 0, color: '#7DBBFF' },
+    { month: 'Dic', value: 0, color: '#6BE6D3' },
+  ];
+
+  const maxValue = Math.max(...chartData.map((d) => d.value), 5);
+  const topDomain = Math.ceil(maxValue * 1.25);
 
   return (
     <div
@@ -87,7 +102,7 @@ export const OperacionesMensualesChart: React.FC = () => {
       <div style={{ width: '100%', height: '200px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={monthlyData}
+            data={chartData}
             margin={{ top: 10, right: 4, left: -20, bottom: 0 }}
             onMouseLeave={() => setActiveIdx(null)}
           >
@@ -106,8 +121,8 @@ export const OperacionesMensualesChart: React.FC = () => {
               tickLine={false}
               axisLine={false}
               tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter, sans-serif' }}
-              domain={[0, 120]}
-              ticks={[0, 30, 60, 90, 120]}
+              domain={[0, topDomain]}
+              allowDecimals={false}
             />
             <Tooltip content={<CustomTooltip />} cursor={false} />
             <Bar
@@ -116,7 +131,7 @@ export const OperacionesMensualesChart: React.FC = () => {
               maxBarSize={44}
               onMouseEnter={(_, idx) => setActiveIdx(idx)}
             >
-              {monthlyData.map((entry, index) => (
+              {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}

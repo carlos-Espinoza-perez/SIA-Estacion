@@ -1,13 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
-const donutData = [
-  { name: 'Concedido', value: 52.1, color: '#ADADFB' },
-  { name: 'Denegado',  value: 22.8, color: '#7DBBFF' },
-  { name: 'Offline',   value: 13.9, color: '#A0BCE8' },
-  { name: 'Otro',      value: 11.2, color: '#6BE6D3' },
-];
-
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ name: string; value: number; payload: { color: string } }>;
@@ -40,7 +33,27 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
   return null;
 };
 
-export const AccesosResultChart: React.FC = () => {
+export interface AccesosResultChartProps {
+  data?: {
+    concedido: number;
+    denegado: number;
+    offline: number;
+    otro: number;
+  };
+}
+
+export const AccesosResultChart: React.FC<AccesosResultChartProps> = ({ data }) => {
+  const hasData = data && (data.concedido > 0 || data.denegado > 0 || data.offline > 0 || data.otro > 0);
+  const chartData = hasData
+    ? [
+        { name: 'Concedido', value: data.concedido, color: '#ADADFB' },
+        { name: 'Denegado',  value: data.denegado,  color: '#7DBBFF' },
+        { name: 'Offline',   value: data.offline,   color: '#A0BCE8' },
+        { name: 'Otro',      value: data.otro,      color: '#6BE6D3' },
+      ]
+    : [
+        { name: 'Sin accesos', value: 100, color: 'rgba(255, 255, 255, 0.1)' },
+      ];
   return (
     <div
       style={{
@@ -81,7 +94,7 @@ export const AccesosResultChart: React.FC = () => {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={donutData}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={36}
@@ -90,7 +103,7 @@ export const AccesosResultChart: React.FC = () => {
                 dataKey="value"
                 stroke="none"
               >
-                {donutData.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -108,7 +121,7 @@ export const AccesosResultChart: React.FC = () => {
             flex: 1,
           }}
         >
-          {donutData.map((entry) => (
+          {chartData.map((entry) => (
             <div
               key={entry.name}
               style={{

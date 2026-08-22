@@ -207,7 +207,7 @@ export const personaService = {
   getPersonas: async (filtros?: FiltrosPersona): Promise<Persona[]> => {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<PersonaBackendDto[]>>('/personas');
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         let lista: Persona[] = response.data.datos.map((p) => ({
           id: p.id,
           nombre: `${p.nombres} ${p.apellidos}`.trim(),
@@ -216,14 +216,14 @@ export const personaService = {
           rol: 'Estudiante' as RolPersona,
           carreraOArea: p.carreraOArea,
           correo: p.correo,
-          ultimaActividad: new Date(p.fechaRegistro).toLocaleDateString(),
+          ultimaActividad: p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString() : 'Hoy',
           estado: p.estado ? 'Activo' : 'Inactivo',
           tieneFotoReferencia: p.tieneFotoReferencia,
-          fechaRegistro: new Date(p.fechaRegistro).toLocaleDateString(),
+          fechaRegistro: p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString() : 'Hoy',
         }));
 
         if (filtros) {
-          const q = filtros.busqueda.trim().toLowerCase();
+          const q = filtros.busqueda?.trim().toLowerCase() || '';
           if (q) {
             lista = lista.filter(
               (p) =>
@@ -245,7 +245,7 @@ export const personaService = {
         return lista;
       }
     } catch {
-      // Fallback a MOCK_PERSONAS
+      // Fallback a MOCK_PERSONAS solo ante error de red
     }
 
     let lista = [...MOCK_PERSONAS];

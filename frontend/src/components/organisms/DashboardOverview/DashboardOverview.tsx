@@ -1,12 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatCard } from '../../atoms/StatCard/StatCard';
 import { AccessChart } from '../../molecules/ChartMotion/AccessChart';
 import { StationAccessBreakdown } from '../../molecules/StationBarItem/StationAccessBreakdown';
 import { ItemStatusChart } from '../../molecules/ChartMotion/ItemStatusChart';
 import { AccesosResultChart } from '../../molecules/ChartMotion/AccesosResultChart';
 import { OperacionesMensualesChart } from '../../molecules/ChartMotion/OperacionesMensualesChart';
+import { dashboardService, DashboardMetrics } from '../../../services/dashboardService';
 
 export const DashboardOverview: React.FC = () => {
+  const [metricas, setMetricas] = useState<DashboardMetrics | null>(null);
+
+  useEffect(() => {
+    let montado = true;
+    dashboardService.getMetricas().then((data) => {
+      if (montado) setMetricas(data);
+    });
+    return () => {
+      montado = false;
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -69,10 +82,34 @@ export const DashboardOverview: React.FC = () => {
           width: '100%',
         }}
       >
-        <StatCard title="Accesos hoy"  value="7,265" trend="+11.01%" isPositive={true}  bgColor="#E6F1FD" />
-        <StatCard title="Operaciones"  value="3,671" trend="-0.03%"  isPositive={false} bgColor="#EDEEFC" />
-        <StatCard title="Personas"     value="256"   trend="+15.03%" isPositive={true}  bgColor="#E6F1FD" />
-        <StatCard title="Estaciones"   value="2,318" trend="+6.08%"  isPositive={true}  bgColor="#EDEEFC" />
+        <StatCard
+          title="Accesos hoy"
+          value={metricas ? metricas.totalAccesosHoy.toLocaleString() : '—'}
+          trend={metricas ? (metricas.totalAccesosHoy > 0 ? '+100%' : '0%') : '—'}
+          isPositive={true}
+          bgColor="#E6F1FD"
+        />
+        <StatCard
+          title="Operaciones"
+          value={metricas ? metricas.totalOperaciones.toLocaleString() : '—'}
+          trend={metricas ? (metricas.totalOperaciones > 0 ? '+100%' : '0%') : '—'}
+          isPositive={true}
+          bgColor="#EDEEFC"
+        />
+        <StatCard
+          title="Personas"
+          value={metricas ? metricas.totalPersonas.toLocaleString() : '—'}
+          trend={metricas ? (metricas.totalPersonas > 0 ? '+100%' : '0%') : '—'}
+          isPositive={true}
+          bgColor="#E6F1FD"
+        />
+        <StatCard
+          title="Estaciones"
+          value={metricas ? metricas.totalEstaciones.toLocaleString() : '—'}
+          trend={metricas ? (metricas.totalEstaciones > 0 ? '+100%' : '0%') : '—'}
+          isPositive={true}
+          bgColor="#EDEEFC"
+        />
       </div>
 
       {/* Gráfico Accesos y Desglose por Estación */}
@@ -85,8 +122,12 @@ export const DashboardOverview: React.FC = () => {
           alignItems: 'stretch',
         }}
       >
-        <AccessChart />
-        <StationAccessBreakdown />
+        <AccessChart
+          tendenciaAccesos={metricas?.tendenciaAccesos}
+          tendenciaOperaciones={metricas?.tendenciaOperaciones}
+          tendenciaEstaciones={metricas?.tendenciaEstaciones}
+        />
+        <StationAccessBreakdown data={metricas?.accesosPorEstacion} />
       </div>
 
       {/* Distribución de Ítems y Resultados */}
@@ -99,12 +140,12 @@ export const DashboardOverview: React.FC = () => {
           alignItems: 'stretch',
         }}
       >
-        <ItemStatusChart />
-        <AccesosResultChart />
+        <ItemStatusChart data={metricas?.itemsPorEstado} />
+        <AccesosResultChart data={metricas?.resultadosAcceso} />
       </div>
 
       {/* Operaciones Mensuales */}
-      <OperacionesMensualesChart />
+      <OperacionesMensualesChart data={metricas?.operacionesMensuales} />
     </div>
   );
 };

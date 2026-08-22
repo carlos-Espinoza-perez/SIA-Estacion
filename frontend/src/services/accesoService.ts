@@ -80,7 +80,7 @@ export const accesoService = {
         `/reportes/accesos?${params.toString()}`
       );
 
-      if (response.data.datos && response.data.datos.length > 0) {
+      if (response.data && Array.isArray(response.data.datos)) {
         return response.data.datos.map((a, idx) => ({
           id: `acc-${idx}-${new Date(a.fechaHora).getTime()}`,
           fechaHora: new Date(a.fechaHora).toLocaleString('es-NI', {
@@ -100,7 +100,7 @@ export const accesoService = {
         }));
       }
     } catch {
-      // Fallback local a MOCK_ACCESOS
+      // Fallback solo si la API no está disponible
     }
 
     let resultado = [...MOCK_ACCESOS];
