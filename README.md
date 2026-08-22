@@ -16,6 +16,7 @@ Plataforma integral para el control de accesos, gestión de inventario/préstamo
    - [Configuración del Frontend (React + Vite)](#configuración-del-frontend-react--vite)
 7. [Endpoints Principales de la API](#endpoints-principales-de-la-api)
 8. [Seguridad y Control de Acceso](#seguridad-y-control-de-acceso)
+9. [Modelo de Datos (ER)](#modelo-de-datos-er)
 
 ---
 
@@ -249,3 +250,252 @@ El proyecto sigue una arquitectura desacoplada y modular:
 - **Protección de Endpoints:** Autenticación obligatoria mediante Bearer JWT con roles y niveles de permiso granulares.
 - **Trazabilidad:** Registro inmutable de cada solicitud en el módulo de auditoría.
 - **Biometría Segura:** Los vectores de características faciales (*embeddings*) y las imágenes de referencia se procesan y almacenan bajo políticas de acceso controlado.
+
+---
+
+## Modelo de Datos (ER)
+
+A continuación se presenta el diagrama Entidad-Relación basado en los modelos del dominio de la aplicación (`Sia.Domain/Entidades`).
+
+```mermaid
+erDiagram
+    Empresa {
+        Guid Id PK
+        string Nombre
+        string Codigo
+        bool Estado
+        DateTimeOffset FechaRegistro
+    }
+
+    Persona {
+        Guid Id PK
+        Guid EmpresaId FK
+        string CodigoEstudiantil
+        string Nombres
+        string Apellidos
+        TipoPersona TipoPersona
+        string CarreraOArea
+        string Correo
+        string Telefono
+        string UserId
+        bool Estado
+        DateTimeOffset FechaRegistro
+    }
+
+    TipoItem {
+        Guid Id PK
+        Guid EmpresaId FK
+        string Nombre
+        string Descripcion
+        bool RequiereAprobacion
+        bool PermiteAgrupacion
+        bool Estado
+    }
+
+    Item {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid TipoItemId FK
+        Guid EstacionId FK "nullable"
+        string CodigoQr
+        string Nombre
+        string Observaciones
+        bool EsAgrupador
+        EstadoItem EstadoActual
+        bool Estado
+        byte[] RowVersion
+    }
+
+    Estacion {
+        Guid Id PK
+        Guid EmpresaId FK
+        string Nombre
+        string Ubicacion
+        Guid EncargadoId FK "nullable"
+        string FirmwareVersion
+        string DireccionIp
+        string ClientId
+        string ClientSecretHash
+        bool RequiereIdentificacion
+        bool RequiereAprobacion
+        bool Estado
+        DateTimeOffset UltimaSincronizacion
+    }
+
+    EstacionTipoItem {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid EstacionId FK
+        Guid TipoItemId FK
+        bool Estado
+    }
+
+    AtributoDefinicion {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid TipoItemId FK
+        string Clave
+        string Etiqueta
+        TipoDatoAtributo TipoDato
+        bool Requerido
+        int Orden
+        bool Estado
+    }
+
+    ItemAtributoValor {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid ItemId FK
+        Guid AtributoDefinicionId FK
+        string Valor
+    }
+
+    ItemComposicion {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid ItemAgrupadorId FK
+        Guid ItemComponenteId FK
+    }
+
+    AuditoriaCambio {
+        Guid Id PK
+        Guid EmpresaId FK
+        string Entidad
+        Guid EntidadId
+        string Accion
+        string Descripcion
+        string Origen
+        Guid EstacionId FK "nullable"
+        string ValoresAnteriores
+        string ValoresNuevos
+        string UserId
+        DateTimeOffset FechaHora
+    }
+
+    EventoAcceso {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid PersonaId FK "nullable"
+        Guid EstacionId FK
+        DireccionAcceso Direccion
+        ModoValidacion ModoValidacion
+        ResultadoAcceso Resultado
+        string MotivoDenegacion
+        string FotoEvidenciaUrl
+        string CodigoEscaneado
+        DateTimeOffset FechaHoraLocal
+        DateTimeOffset FechaSincronizacion
+    }
+
+    FotoReferencia {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid PersonaId FK
+        string Url
+        string HashContenido
+        bool Estado
+        DateTimeOffset FechaCarga
+        DateTimeOffset FechaEliminacion
+    }
+
+    OperacionItem {
+        Guid Id PK
+        Guid EmpresaId FK
+        string Folio
+        Guid ItemEscaneadoId FK
+        Guid PersonaId FK
+        Guid EstacionId FK
+        TipoOperacionItem TipoOperacion
+        EstadoOperacionItem EstadoActual
+        string Observaciones
+        bool Estado
+        DateTimeOffset FechaSolicitud
+        DateTimeOffset FechaCompromisoDevolucion
+        DateTimeOffset FechaDevolucion
+        Guid AprobadoPorPersonaId FK "nullable"
+        byte[] RowVersion
+    }
+
+    OperacionItemDetalle {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid OperacionItemId FK
+        Guid ItemId FK
+        CondicionDevolucion CondicionDevolucion
+        DateTimeOffset FechaDevolucion
+        string Observacion
+    }
+
+    OperacionMovimiento {
+        Guid Id PK
+        Guid EmpresaId FK
+        Guid OperacionItemId FK
+        EstadoOperacionItem EstadoAnterior
+        EstadoOperacionItem EstadoNuevo
+        Guid RegistradoPorPersonaId FK "nullable"
+        Guid EstacionId FK "nullable"
+        DateTimeOffset FechaHora
+        string Observacion
+    }
+
+    Privilegio {
+        Guid Id PK
+        string Codigo
+        string Nombre
+        string Modulo
+        bool Estado
+    }
+
+    NivelPermiso {
+        Guid Id PK
+        string Codigo
+        string Nombre
+        int Orden
+        bool Estado
+    }
+
+    RolPrivilegio {
+        Guid Id PK
+        string RoleId
+        Guid PrivilegioId FK
+        Guid NivelPermisoId FK
+        bool Estado
+        DateTimeOffset FechaAsignacion
+    }
+
+    %% Relaciones
+
+    Empresa ||--o{ Persona : "tiene"
+    Empresa ||--o{ TipoItem : "configura"
+    Empresa ||--o{ Item : "posee"
+    Empresa ||--o{ Estacion : "administra"
+
+    Persona ||--o{ FotoReferencia : "tiene fotos"
+    Persona ||--o{ EventoAcceso : "registra accesos"
+    Persona ||--o{ OperacionItem : "realiza/aprueba"
+    Persona ||--o{ OperacionMovimiento : "registra movimientos"
+    
+    TipoItem ||--o{ AtributoDefinicion : "define atributos"
+    TipoItem ||--o{ Item : "clasifica"
+    TipoItem ||--o{ EstacionTipoItem : "habilitado en"
+
+    Item ||--o{ ItemAtributoValor : "tiene valores"
+    Item ||--o{ ItemComposicion : "es componente/agrupador"
+    Item ||--o{ OperacionItem : "es operado"
+    Item ||--o{ OperacionItemDetalle : "está en detalle"
+
+    Estacion ||--o{ EstacionTipoItem : "habilita"
+    Estacion ||--o{ EventoAcceso : "registra"
+    Estacion ||--o{ OperacionItem : "gestiona operaciones"
+    Estacion ||--o{ OperacionMovimiento : "registra movimientos"
+    Persona ||--o{ Estacion : "es encargado (opcional)"
+    Item }o--o| Estacion : "ubicado en (opcional)"
+
+    AtributoDefinicion ||--o{ ItemAtributoValor : "define valor de"
+
+    OperacionItem ||--o{ OperacionItemDetalle : "contiene detalles"
+    OperacionItem ||--o{ OperacionMovimiento : "tiene historial"
+
+    Privilegio ||--o{ RolPrivilegio : "asignado en"
+    NivelPermiso ||--o{ RolPrivilegio : "define nivel de"
+```
