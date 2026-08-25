@@ -26,6 +26,10 @@ export interface TableProps<T> {
   emptyMessage?: string;
   /** Callback al hacer clic en una fila */
   onRowClick?: (row: T) => void;
+  /** Propiedades de paginación (opcional) */
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 const FONT: React.CSSProperties = {
@@ -61,6 +65,9 @@ export function Table<T>({
   footerText,
   emptyMessage = 'Sin resultados',
   onRowClick,
+  currentPage,
+  totalPages,
+  onPageChange,
 }: TableProps<T>) {
   return (
     <div
@@ -168,19 +175,52 @@ export function Table<T>({
         </tbody>
       </table>
 
-      {/* Footer */}
-      {footerText && (
-        <div
-          style={{
-            marginTop: '20px',
-            fontSize: '12px',
-            color: 'rgba(255, 255, 255, 0.4)',
-            fontFamily: 'Inter, sans-serif',
-          }}
-        >
+      {/* Footer / Paginación */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+        <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.4)', fontFamily: 'Inter, sans-serif' }}>
           {footerText}
         </div>
-      )}
+        
+        {currentPage !== undefined && totalPages !== undefined && onPageChange && totalPages > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage <= 1}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                color: currentPage <= 1 ? 'rgba(255, 255, 255, 0.2)' : 'white',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '12px',
+              }}
+            >
+              Anterior
+            </button>
+            <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', fontFamily: 'Inter, sans-serif' }}>
+              Página {currentPage} de {totalPages}
+            </span>
+            <button
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                color: currentPage >= totalPages ? 'rgba(255, 255, 255, 0.2)' : 'white',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '12px',
+              }}
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

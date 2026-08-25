@@ -45,7 +45,7 @@ public class ManejadorExcepcionesMiddleware
             await EscribirProblemDetails(
                 contexto,
                 "Error interno",
-                $"Ocurrió un error inesperado. Referencia: {correlacionId}",
+                $"Ocurrió un error inesperado. Referencia: {correlacionId} Detalles: {ex.Message} {ex.StackTrace}",
                 StatusCodes.Status500InternalServerError);
         }
     }

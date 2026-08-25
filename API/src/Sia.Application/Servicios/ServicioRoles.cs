@@ -10,11 +10,11 @@ namespace Sia.Application.Servicios;
 
 public class ServicioRoles
 {
-    private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ISeguridadRepository _repository;
     private readonly IContextoEmpresa _contextoEmpresa;
 
-    public ServicioRoles(RoleManager<IdentityRole> roleManager, ISeguridadRepository repository, IContextoEmpresa contextoEmpresa)
+    public ServicioRoles(RoleManager<ApplicationRole> roleManager, ISeguridadRepository repository, IContextoEmpresa contextoEmpresa)
     {
         _roleManager = roleManager;
         _repository = repository;
@@ -23,37 +23,74 @@ public class ServicioRoles
 
     public async Task<Result<List<RolResponse>>> ObtenerTodosAsync(CancellationToken ct)
     {
-        List<IdentityRole> roles = _roleManager.Roles.ToList();
-        var response = roles.Select(r => new RolResponse { Id = r.Id, Nombre = r.Name ?? string.Empty }).ToList();
+        List<ApplicationRole> roles = _roleManager.Roles.ToList();
+        var conteos = await _repository.ObtenerConteoUsuariosPorRolAsync(ct);
+        var todosPrivilegios = await _repository.ObtenerTodosPrivilegiosRolesAsync(ct);
+
+        var response = roles.Select(r => new RolResponse 
+        { 
+            Id = r.Id, 
+            Nombre = r.Name ?? string.Empty,
+            Descripcion = r.Descripcion,
+            Activo = r.Activo,
+            EsSistema = r.EsSistema,
+            PersonasAsignadas = conteos.ContainsKey(r.Id) ? conteos[r.Id] : 0,
+            Permisos = todosPrivilegios.Where(p => p.RoleId == r.Id).Select(p => p.Privilegio.Codigo).Distinct().ToList()
+        }).ToList();
+        
         return Result<List<RolResponse>>.Exitoso(response);
     }
 
     public async Task<Result<RolResponse>> CrearAsync(CrearRolRequest request, CancellationToken ct)
     {
-        var role = new IdentityRole(request.Nombre);
+        var role = new ApplicationRole(request.Nombre);
         IdentityResult resultado = await _roleManager.CreateAsync(role);
 
         if (!resultado.Succeeded)
             return Result<RolResponse>.Fallido("ROL_CREACION_FALLIDA", string.Join("; ", resultado.Errors.Select(e => e.Description)));
 
-        return Result<RolResponse>.Exitoso(new RolResponse { Id = role.Id, Nombre = role.Name ?? string.Empty });
+        return Result<RolResponse>.Exitoso(new RolResponse 
+        { 
+            Id = role.Id, 
+            Nombre = role.Name ?? string.Empty,
+            Descripcion = role.Descripcion,
+            EsSistema = role.EsSistema,
+            Activo = role.Activo,
+            PersonasAsignadas = 0,
+            Permisos = new List<string>()
+        });
     }
 
     public async Task<Result<RolResponse>> ActualizarAsync(string id, CrearRolRequest request, CancellationToken ct)
     {
-        IdentityRole? role = await _roleManager.FindByIdAsync(id);
+        ApplicationRole? role = await _roleManager.FindByIdAsync(id);
         if (role is null)
             throw new EntidadNoEncontradaException("Rol", id);
 
         role.Name = request.Nombre;
+        role.Descripcion = request.Descripcion;
+        role.Activo = request.Activo;
+        
         await _roleManager.UpdateAsync(role);
 
-        return Result<RolResponse>.Exitoso(new RolResponse { Id = role.Id, Nombre = role.Name ?? string.Empty });
+        var conteos = await _repository.ObtenerConteoUsuariosPorRolAsync(ct);
+        var privilegios = await _repository.ObtenerPrivilegiosRolAsync(id, ct);
+
+        return Result<RolResponse>.Exitoso(new RolResponse 
+        { 
+            Id = role.Id, 
+            Nombre = role.Name ?? string.Empty,
+            Descripcion = role.Descripcion,
+            EsSistema = role.EsSistema,
+            Activo = role.Activo,
+            PersonasAsignadas = conteos.ContainsKey(role.Id) ? conteos[role.Id] : 0,
+            Permisos = privilegios.Select(p => p.Privilegio.Codigo).Distinct().ToList()
+        });
     }
 
     public async Task<Result<bool>> EliminarAsync(string id, CancellationToken ct)
     {
-        IdentityRole? role = await _roleManager.FindByIdAsync(id);
+        ApplicationRole? role = await _roleManager.FindByIdAsync(id);
         if (role is null)
             throw new EntidadNoEncontradaException("Rol", id);
 
@@ -81,7 +118,7 @@ public class ServicioRoles
 
     public async Task<Result<bool>> ReemplazarMatrizAsync(string roleId, MatrizPrivilegiosRequest request, CancellationToken ct)
     {
-        IdentityRole? role = await _roleManager.FindByIdAsync(roleId);
+        ApplicationRole? role = await _roleManager.FindByIdAsync(roleId);
         if (role is null)
             throw new EntidadNoEncontradaException("Rol", roleId);
 

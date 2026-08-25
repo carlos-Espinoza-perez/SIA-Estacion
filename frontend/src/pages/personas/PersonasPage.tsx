@@ -9,16 +9,9 @@ import { personaService } from '../../services/personaService';
 import { ModalCrearPersona } from '../../components/organisms/ModalCrearPersona/ModalCrearPersona';
 import { FichaPersonaDrawer } from '../../components/organisms/FichaPersonaDrawer/FichaPersonaDrawer';
 import { useToast } from '../../context/ToastContext';
+import { rolService } from '../../services/rolService';
 
 // Opciones de Filtros
-
-const ROL_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Rol: Todos' },
-  { value: 'Estudiante', label: 'Estudiante' },
-  { value: 'Encargado de recurso', label: 'Encargado de recurso' },
-  { value: 'Administrador', label: 'Administrador' },
-  { value: 'Guardia', label: 'Guardia' },
-];
 
 const TIPO_OPTIONS: SelectOption[] = [
   { value: '', label: 'Tipo: Todos' },
@@ -35,6 +28,12 @@ const ESTADO_OPTIONS: SelectOption[] = [
 export const PersonasPage: React.FC = () => {
   const { showToast } = useToast();
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [rolesOptions, setRolesOptions] = useState<SelectOption[]>([
+    { value: '', label: 'Rol: Todos' },
+  ]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   // Estados de filtros
   const [busqueda, setBusqueda] = useState('');
@@ -54,15 +53,38 @@ export const PersonasPage: React.FC = () => {
       rol: rolFiltro,
       tipo: tipoFiltro,
       estado: estadoFiltro,
+      pagina: currentPage,
+      limite: 10,
     };
-    personaService.getPersonas(filtros).then((data) => {
-      setPersonas(data);
+    personaService.getPersonas(filtros).then((result) => {
+      setPersonas(result.data);
+      if (result.paginacion) {
+        setTotalPages(result.paginacion.totalPaginas);
+        setTotalRegistros(result.paginacion.totalRegistros);
+      } else {
+        setTotalPages(1);
+        setTotalRegistros(result.data.length);
+      }
     });
   };
 
   useEffect(() => {
-    cargarPersonas();
+    setCurrentPage(1);
   }, [busqueda, rolFiltro, tipoFiltro, estadoFiltro]);
+
+  useEffect(() => {
+    rolService.getRoles().then((roles) => {
+      const options: SelectOption[] = [
+        { value: '', label: 'Rol: Todos' },
+        ...roles.map((r) => ({ value: r.nombre, label: r.nombre })),
+      ];
+      setRolesOptions(options);
+    });
+  }, []);
+
+  useEffect(() => {
+    cargarPersonas();
+  }, [busqueda, rolFiltro, tipoFiltro, estadoFiltro, currentPage]);
 
   const handleCrearPersona = async (formData: CrearPersonaFormData) => {
     await personaService.crearPersona(formData);
@@ -252,7 +274,7 @@ export const PersonasPage: React.FC = () => {
             />
 
             <Select
-              options={ROL_OPTIONS}
+              options={rolesOptions}
               value={rolFiltro}
               onChange={setRolFiltro}
               placeholder="Rol: Todos"
@@ -313,8 +335,11 @@ export const PersonasPage: React.FC = () => {
           columns={COLUMNS}
           data={personas}
           rowKey={(row) => row.id}
-          footerText={`Mostrando ${personas.length} de 256 personas`}
+          footerText={`Mostrando ${personas.length} de ${totalRegistros} personas`}
           emptyMessage="No se encontraron personas con los filtros seleccionados."
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
         />
 
         {/* Modal Crear Persona */}

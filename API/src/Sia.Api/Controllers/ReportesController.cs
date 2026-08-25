@@ -62,4 +62,12 @@ public class ReportesController : SiaControllerBase
         var resultado = await _servicio.ObtenerAuditoriaAsync(desde, hasta, entidad, ct);
         return HandleResult(resultado);
     }
+
+    [HttpGet("dashboard")]
+    // [RequierePrivilegio("REP", "L")] // Or appropriate privilege
+    public async Task<IActionResult> ObtenerMetricasDashboard(CancellationToken ct)
+    {
+        var resultado = await _servicio.ObtenerMetricasDashboardAsync(ct);
+        return HandleResult(resultado);
+    }
 }

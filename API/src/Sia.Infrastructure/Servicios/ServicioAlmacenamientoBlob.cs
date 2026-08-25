@@ -18,7 +18,14 @@ public class ServicioAlmacenamientoBlob : IServicioAlmacenamiento
         _opciones = opciones.Value;
         _blobServiceClient = new BlobServiceClient(_opciones.ConnectionString);
         _containerClient = _blobServiceClient.GetBlobContainerClient(_opciones.Contenedor);
-        _containerClient.CreateIfNotExists(PublicAccessType.None);
+        try
+        {
+            _containerClient.CreateIfNotExists(PublicAccessType.None);
+        }
+        catch
+        {
+            // Ignore in dev if azurite is not running
+        }
     }
 
     public async Task<string> SubirArchivoAsync(Stream contenido, string nombreArchivo, string contentType, CancellationToken cancellationToken = default)

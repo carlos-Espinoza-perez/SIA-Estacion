@@ -62,4 +62,6 @@ export interface FiltrosPersona {
   rol: string;
   tipo: string;
   estado: string;
+  pagina?: number;
+  limite?: number;
 }

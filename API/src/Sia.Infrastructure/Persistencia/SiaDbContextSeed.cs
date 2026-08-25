@@ -10,7 +10,7 @@ public static class SiaDbContextSeed
     public static async Task SeedAsync(
         SiaDbContext context,
         UserManager<IdentityUser> userManager,
-        RoleManager<IdentityRole> roleManager)
+        RoleManager<ApplicationRole> roleManager)
     {
         // Empresa inicial
         var empresa = await context.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Codigo == "123456789");
@@ -31,7 +31,7 @@ public static class SiaDbContextSeed
         const string rolAdmin = "Administrador Global";
         if (!await roleManager.RoleExistsAsync(rolAdmin))
         {
-            await roleManager.CreateAsync(new IdentityRole(rolAdmin));
+            await roleManager.CreateAsync(new ApplicationRole(rolAdmin) { Descripcion = "Administrador completo del sistema", EsSistema = true, Activo = true });
         }
 
         // Usuario Administrador
@@ -47,6 +47,13 @@ public static class SiaDbContextSeed
 
             var result = await userManager.CreateAsync(user, "Admin123!");
             if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(user, rolAdmin);
+            }
+        }
+        else
+        {
+            if (!await userManager.IsInRoleAsync(user, rolAdmin))
             {
                 await userManager.AddToRoleAsync(user, rolAdmin);
             }
@@ -77,7 +84,7 @@ public static class SiaDbContextSeed
         {
             if (!await roleManager.RoleExistsAsync(rol))
             {
-                await roleManager.CreateAsync(new IdentityRole(rol));
+                await roleManager.CreateAsync(new ApplicationRole(rol) { EsSistema = true, Activo = true });
             }
         }
 

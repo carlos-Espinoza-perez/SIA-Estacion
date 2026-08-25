@@ -25,16 +25,39 @@ public class ServicioPersonas
         _contextoEmpresa = contextoEmpresa;
     }
 
-    public async Task<Result<List<PersonaResponse>>> ObtenerTodasAsync(string? busqueda, string? tipo, CancellationToken ct)
+    public async Task<Result<List<PersonaResponse>>> ObtenerTodasAsync(string? busqueda, string? tipo, string? rol, string? estadoStr, int pagina, int limite, CancellationToken ct)
     {
         TipoPersona? tp = null;
-        if (!string.IsNullOrWhiteSpace(tipo) && Enum.TryParse<TipoPersona>(tipo, out TipoPersona parsedTp))
+        bool isPersonal = false;
+        if (!string.IsNullOrWhiteSpace(tipo))
         {
-            tp = parsedTp;
+            if (tipo.Equals("Estudiante", StringComparison.OrdinalIgnoreCase))
+                tp = TipoPersona.Estudiante;
+            else if (tipo.Equals("Personal", StringComparison.OrdinalIgnoreCase))
+                isPersonal = true;
         }
 
-        List<Persona> personas = await _repository.ObtenerTodasAsync(busqueda, tp, ct);
-        return Result<List<PersonaResponse>>.Exitoso(_mapper.Map<List<PersonaResponse>>(personas));
+        bool? estado = null;
+        if (!string.IsNullOrWhiteSpace(estadoStr))
+        {
+            if (estadoStr.Equals("Activo", StringComparison.OrdinalIgnoreCase))
+                estado = true;
+            else if (estadoStr.Equals("Inactivo", StringComparison.OrdinalIgnoreCase))
+                estado = false;
+        }
+
+        int totalRegistros = await _repository.ContarPersonasAsync(busqueda, tp, isPersonal, rol, estado, ct);
+        List<Persona> personas = await _repository.ObtenerTodasAsync(busqueda, tp, isPersonal, rol, estado, pagina, limite, ct);
+        
+        var paginacion = new Sia.Application.Dtos.Comunes.PaginacionMetadata
+        {
+            PaginaActual = pagina,
+            TamanoPagina = limite,
+            TotalRegistros = totalRegistros,
+            TotalPaginas = (int)Math.Ceiling(totalRegistros / (double)limite)
+        };
+
+        return Result<List<PersonaResponse>>.ExitosoConPaginacion(_mapper.Map<List<PersonaResponse>>(personas), paginacion);
     }
 
     public async Task<Result<PersonaDetalleResponse>> ObtenerPorIdAsync(Guid id, CancellationToken ct)

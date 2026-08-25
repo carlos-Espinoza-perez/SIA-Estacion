@@ -20,5 +20,8 @@ public interface ISeguridadRepository
     Task EliminarPrivilegiosRolAsync(IEnumerable<RolPrivilegio> asignaciones, CancellationToken ct);
     Task AgregarPrivilegiosRolesAsync(IEnumerable<RolPrivilegio> asignaciones, CancellationToken ct);
 
+    Task<Dictionary<string, int>> ObtenerConteoUsuariosPorRolAsync(CancellationToken ct);
+    Task<List<RolPrivilegio>> ObtenerTodosPrivilegiosRolesAsync(CancellationToken ct);
+
     Task SaveChangesAsync(CancellationToken ct);
 }

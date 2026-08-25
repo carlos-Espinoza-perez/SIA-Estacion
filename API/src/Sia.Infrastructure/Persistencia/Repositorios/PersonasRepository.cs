@@ -14,7 +14,7 @@ public class PersonasRepository : IPersonasRepository
         _db = db;
     }
 
-    public async Task<List<Persona>> ObtenerTodasAsync(string? busqueda, TipoPersona? tipo, CancellationToken ct)
+    public async Task<List<Persona>> ObtenerTodasAsync(string? busqueda, TipoPersona? tipo, bool isPersonal, string? rol, bool? estado, int pagina, int limite, CancellationToken ct)
     {
         IQueryable<Persona> query = _db.Personas.Include(p => p.FotosReferencia);
 
@@ -23,8 +23,55 @@ public class PersonasRepository : IPersonasRepository
 
         if (tipo.HasValue)
             query = query.Where(p => p.TipoPersona == tipo.Value);
+        else if (isPersonal)
+            query = query.Where(p => p.TipoPersona != TipoPersona.Estudiante);
 
-        return await query.Where(p => p.Estado).OrderBy(p => p.Apellidos).ToListAsync(ct);
+        if (estado.HasValue)
+            query = query.Where(p => p.Estado == estado.Value);
+
+        if (!string.IsNullOrWhiteSpace(rol))
+        {
+            var userIdsConRol = _db.UserRoles
+                .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+                .Where(x => x.Name == rol)
+                .Select(x => x.UserId);
+            
+            query = query.Where(p => userIdsConRol.Contains(p.UserId));
+        }
+
+        return await query
+            .OrderBy(p => p.Apellidos)
+            .Skip((pagina - 1) * limite)
+            .Take(limite)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> ContarPersonasAsync(string? busqueda, TipoPersona? tipo, bool isPersonal, string? rol, bool? estado, CancellationToken ct)
+    {
+        IQueryable<Persona> query = _db.Personas;
+
+        if (!string.IsNullOrWhiteSpace(busqueda))
+            query = query.Where(p => p.Nombres.Contains(busqueda) || p.Apellidos.Contains(busqueda) || p.CodigoEstudiantil.Contains(busqueda));
+
+        if (tipo.HasValue)
+            query = query.Where(p => p.TipoPersona == tipo.Value);
+        else if (isPersonal)
+            query = query.Where(p => p.TipoPersona != TipoPersona.Estudiante);
+
+        if (estado.HasValue)
+            query = query.Where(p => p.Estado == estado.Value);
+
+        if (!string.IsNullOrWhiteSpace(rol))
+        {
+            var userIdsConRol = _db.UserRoles
+                .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+                .Where(x => x.Name == rol)
+                .Select(x => x.UserId);
+            
+            query = query.Where(p => userIdsConRol.Contains(p.UserId));
+        }
+
+        return await query.CountAsync(ct);
     }
 
     public async Task<Persona?> ObtenerPorIdAsync(Guid id, CancellationToken ct)
@@ -78,5 +125,12 @@ public class PersonasRepository : IPersonasRepository
     public async Task SaveChangesAsync(CancellationToken ct)
     {
         await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<int> ContarPersonasRegistradasGlobalAsync(CancellationToken ct)
+    {
+        return await _db.Personas
+            .IgnoreQueryFilters()
+            .CountAsync(p => p.Estado, ct);
     }
 }

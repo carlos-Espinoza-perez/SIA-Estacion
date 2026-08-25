@@ -9,8 +9,8 @@ export const LoginForm: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector((state) => state.auth);
 
-  const [email, setEmail] = useState('carlos.espinoza.04@est.ulsa.edu.ni');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@sia.com');
+  const [password, setPassword] = useState('Admin123!');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -110,7 +110,6 @@ export const LoginForm: React.FC = () => {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="carlos.espinoza.04@est.ulsa.edu.ni"
             required
             style={{
               width: '100%',
@@ -326,7 +325,7 @@ export const LoginForm: React.FC = () => {
       {/* Botón: Continuar con Google */}
       <button
         type="button"
-        onClick={handleGoogleLogin}
+        onClick={() => handleGoogleLogin()}
         style={{
           height: '48px',
           width: '100%',

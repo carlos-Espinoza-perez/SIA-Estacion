@@ -6,7 +6,7 @@ using Sia.Domain.Entidades;
 
 namespace Sia.Infrastructure.Persistencia;
 
-public class SiaDbContext : IdentityDbContext<IdentityUser>
+public class SiaDbContext : IdentityDbContext<IdentityUser, ApplicationRole, string>
 {
     private readonly IContextoEmpresa _contextoEmpresa;
 

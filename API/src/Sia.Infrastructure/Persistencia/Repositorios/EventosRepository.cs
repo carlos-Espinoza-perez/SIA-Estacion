@@ -70,4 +70,11 @@ public class EventosRepository : IEventosRepository
     {
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task<int> ContarAccesosHoyGlobalAsync(DateTimeOffset hoy, CancellationToken ct)
+    {
+        return await _db.EventosAcceso
+            .IgnoreQueryFilters()
+            .CountAsync(e => e.FechaHoraLocal >= hoy, ct);
+    }
 }

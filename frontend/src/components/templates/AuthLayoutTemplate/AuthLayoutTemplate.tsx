@@ -1,10 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiClient } from '../../../services/apiClient';
 
 export interface AuthLayoutTemplateProps {
   children: React.ReactNode;
 }
 
 export const AuthLayoutTemplate: React.FC<AuthLayoutTemplateProps> = ({ children }) => {
+  const [stats, setStats] = useState({
+    estacionesActivas: 5,
+    accesosHoy: 1284,
+    personasRegistradas: 256
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await apiClient.get('/stats/public');
+        if (response.data) {
+          setStats({
+            estacionesActivas: response.data.estacionesActivas || 0,
+            accesosHoy: response.data.accesosHoy || 0,
+            personasRegistradas: response.data.personasRegistradas || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error al obtener estadísticas del sistema:', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
   return (
     <div
       style={{
@@ -207,7 +232,7 @@ export const AuthLayoutTemplate: React.FC<AuthLayoutTemplateProps> = ({ children
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <div>
               <div style={{ fontSize: '24px', fontWeight: 600, color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
-                5
+                {stats.estacionesActivas.toLocaleString()}
               </div>
               <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.4)', marginTop: '4px', fontFamily: 'Inter, sans-serif' }}>
                 Estaciones activas
@@ -216,7 +241,7 @@ export const AuthLayoutTemplate: React.FC<AuthLayoutTemplateProps> = ({ children
 
             <div>
               <div style={{ fontSize: '24px', fontWeight: 600, color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
-                1,284
+                {stats.accesosHoy.toLocaleString()}
               </div>
               <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.4)', marginTop: '4px', fontFamily: 'Inter, sans-serif' }}>
                 Accesos hoy
@@ -225,7 +250,7 @@ export const AuthLayoutTemplate: React.FC<AuthLayoutTemplateProps> = ({ children
 
             <div>
               <div style={{ fontSize: '24px', fontWeight: 600, color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
-                256
+                {stats.personasRegistradas.toLocaleString()}
               </div>
               <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.4)', marginTop: '4px', fontFamily: 'Inter, sans-serif' }}>
                 Personas registradas

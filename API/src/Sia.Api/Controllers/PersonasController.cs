@@ -21,9 +21,9 @@ public class PersonasController : SiaControllerBase
 
     [HttpGet]
     [RequierePrivilegio("PER", "L")]
-    public async Task<IActionResult> ObtenerTodas([FromQuery] string? busqueda, [FromQuery] string? tipo, CancellationToken ct)
+    public async Task<IActionResult> ObtenerTodas([FromQuery] string? busqueda, [FromQuery] string? tipo, [FromQuery] string? rol, [FromQuery] string? estado, [FromQuery] int pagina = 1, [FromQuery] int limite = 10, CancellationToken ct = default)
     {
-        var resultado = await _servicio.ObtenerTodasAsync(busqueda, tipo, ct);
+        var resultado = await _servicio.ObtenerTodasAsync(busqueda, tipo, rol, estado, pagina, limite, ct);
         return HandleResult(resultado);
     }
 

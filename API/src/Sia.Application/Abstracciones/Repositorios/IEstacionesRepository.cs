@@ -13,5 +13,6 @@ public interface IEstacionesRepository
     Task EliminarAsignacionesTiposItemAsync(IEnumerable<EstacionTipoItem> asignaciones, CancellationToken ct);
     Task AgregarAsignacionTipoItemAsync(EstacionTipoItem asignacion, CancellationToken ct);
     
+    Task<int> ContarEstacionesActivasGlobalAsync(CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

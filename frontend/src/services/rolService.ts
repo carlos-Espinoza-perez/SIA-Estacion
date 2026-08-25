@@ -90,68 +90,7 @@ export const PERMISOS_SISTEMA: PermisoDef[] = [
   },
 ];
 
-export const MOCK_ROLES: Rol[] = [
-  {
-    id: 'rol-1',
-    nombre: 'Estudiante',
-    descripcion: 'Solicita préstamos y accede al recinto',
-    personasAsignadas: 248,
-    permisos: ['acceso.validar', 'item.solicitar'],
-    activo: true,
-    esSistema: true,
-  },
-  {
-    id: 'rol-2',
-    nombre: 'Encargado de recurso',
-    descripcion: 'Aprueba y entrega ítems de su Estación',
-    personasAsignadas: 5,
-    permisos: [
-      'acceso.validar',
-      'acceso.consultar',
-      'item.solicitar',
-      'item.aprobar',
-      'item.entregar',
-      'item.registrar',
-      'auditoria.consultar',
-      'reporte.ver',
-    ],
-    activo: true,
-    esSistema: true,
-  },
-  {
-    id: 'rol-3',
-    nombre: 'Guardia',
-    descripcion: 'Consulta accesos en el punto de ingreso',
-    personasAsignadas: 2,
-    permisos: ['acceso.validar', 'acceso.consultar', 'auditoria.consultar'],
-    activo: true,
-    esSistema: true,
-  },
-  {
-    id: 'rol-4',
-    nombre: 'Administrador',
-    descripcion: 'Configura Estaciones, roles y catálogos',
-    personasAsignadas: 1,
-    permisos: [
-      'acceso.validar',
-      'acceso.consultar',
-      'item.solicitar',
-      'item.aprobar',
-      'item.entregar',
-      'item.registrar',
-      'tipoitem.gestionar',
-      'estacion.configurar',
-      'persona.gestionar',
-      'rol.gestionar',
-      'foto.administrar',
-      'auditoria.consultar',
-      'reporte.ver',
-    ],
-    activo: true,
-    esSistema: true,
-  },
-];
-
+// Mocks eliminados; Los datos ahora provienen exclusivamente del backend.
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta } from '../types/api';
 import { auditoriaService } from './auditoriaService';
@@ -161,7 +100,9 @@ interface RolBackendDto {
   nombre: string;
   descripcion?: string;
   esSistema: boolean;
-  activo?: boolean;
+  activo: boolean;
+  personasAsignadas: number;
+  permisos: string[];
 }
 
 export const rolService = {
@@ -169,25 +110,20 @@ export const rolService = {
     try {
       const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
       if (response.data && Array.isArray(response.data.datos)) {
-        return response.data.datos.map((r) => {
-          const matchMock = MOCK_ROLES.find(
-            (m) => m.id === r.id || m.nombre.toLowerCase() === r.nombre.toLowerCase()
-          );
-          return {
-            id: r.id,
-            nombre: r.nombre,
-            descripcion: r.descripcion || matchMock?.descripcion || '',
-            personasAsignadas: matchMock?.personasAsignadas || 0,
-            permisos: matchMock?.permisos || ['acceso.validar'],
-            activo: r.activo ?? true,
-            esSistema: r.esSistema,
-          };
-        });
+        return response.data.datos.map((r) => ({
+          id: r.id,
+          nombre: r.nombre,
+          descripcion: r.descripcion || '',
+          personasAsignadas: r.personasAsignadas,
+          permisos: r.permisos,
+          activo: r.activo,
+          esSistema: r.esSistema,
+        }));
       }
-    } catch {
-      // Fallback solo si la API no está disponible
+    } catch (error) {
+      console.error('Error fetching roles:', error);
     }
-    return [...MOCK_ROLES];
+    return [];
   },
 
   getPermisos: async (): Promise<PermisoDef[]> => {
@@ -195,148 +131,128 @@ export const rolService = {
   },
 
   crearRol: async (formData: CrearRolFormData): Promise<Rol> => {
-    try {
-      const response = await apiClient.post<RespuestaEnvuelta<RolBackendDto>>('/roles', {
-        nombre: formData.nombre,
-        descripcion: formData.descripcion,
-      });
-
-      if (response.data.datos) {
-        const nuevoBackend = response.data.datos;
-        const nuevoRol: Rol = {
-          id: nuevoBackend.id,
-          nombre: nuevoBackend.nombre,
-          descripcion: nuevoBackend.descripcion || formData.descripcion,
-          personasAsignadas: 0,
-          permisos: formData.permisos,
-          activo: formData.activo,
-          esSistema: nuevoBackend.esSistema,
-        };
-        MOCK_ROLES.push(nuevoRol);
-        return nuevoRol;
-      }
-    } catch {
-      // Fallback local
-    }
-
-    const nuevoRol: Rol = {
-      id: `rol-${Date.now()}`,
+    const response = await apiClient.post<RespuestaEnvuelta<RolBackendDto>>('/roles', {
       nombre: formData.nombre,
       descripcion: formData.descripcion,
-      personasAsignadas: 0,
-      permisos: formData.permisos,
       activo: formData.activo,
       esSistema: false,
-    };
-    MOCK_ROLES.push(nuevoRol);
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Configuración',
-      actor: 'Administrador',
-      descripcion: `Creación de nuevo rol "${nuevoRol.nombre}" con ${nuevoRol.permisos.length} permisos`,
-      origen: 'Panel',
-      estacion: '—',
     });
 
-    return nuevoRol;
-  },
-
-  actualizarRol: async (rolId: string, data: Partial<Rol>): Promise<Rol> => {
-    try {
-      if (data.nombre) {
-        await apiClient.put(`/roles/${rolId}`, {
-          nombre: data.nombre,
-          descripcion: data.descripcion,
-        });
-      }
-    } catch {
-      // Fallback local
-    }
-
-    const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
-    if (index === -1) throw new Error('Rol no encontrado');
-
-    MOCK_ROLES[index] = { ...MOCK_ROLES[index], ...data };
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Configuración',
-      actor: 'Administrador',
-      descripcion: `Actualización del rol "${MOCK_ROLES[index].nombre}"`,
-      origen: 'Panel',
-      estacion: '—',
-    });
-
-    return MOCK_ROLES[index];
-  },
-
-  actualizarPermisosRol: async (rolId: string, permisos: string[]): Promise<Rol> => {
-    try {
-      // Formato matriz o privilegios
-      await apiClient.put(`/roles/${rolId}/privilegios`, {
-        privilegios: permisos.map((p) => ({
-          moduloCodigo: p.split('.')[0]?.toUpperCase() || 'ACC',
-          tipoPermiso: 'LecturaEscritura',
-        })),
-      });
-    } catch {
-      // Fallback local
-    }
-
-    const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
-    if (index !== -1) {
-      MOCK_ROLES[index].permisos = permisos;
+    if (response.data?.datos) {
+      const nuevoBackend = response.data.datos;
+      
       await auditoriaService.registrarEvento({
-        tipo: 'Seguridad',
+        tipo: 'Configuración',
         actor: 'Administrador',
-        descripcion: `Permisos del rol "${MOCK_ROLES[index].nombre}" actualizados (${permisos.length} permisos)`,
+        descripcion: `Creación de nuevo rol "${nuevoBackend.nombre}"`,
         origen: 'Panel',
         estacion: '—',
       });
-      return MOCK_ROLES[index];
+
+      return {
+        id: nuevoBackend.id,
+        nombre: nuevoBackend.nombre,
+        descripcion: nuevoBackend.descripcion || '',
+        personasAsignadas: nuevoBackend.personasAsignadas,
+        permisos: nuevoBackend.permisos,
+        activo: nuevoBackend.activo,
+        esSistema: nuevoBackend.esSistema,
+      };
     }
-    throw new Error('Rol no encontrado');
+    throw new Error('No se pudo crear el rol');
+  },
+
+  actualizarRol: async (rolId: string, data: Partial<Rol>): Promise<Rol> => {
+    const response = await apiClient.put<RespuestaEnvuelta<RolBackendDto>>(`/roles/${rolId}`, {
+      nombre: data.nombre,
+      descripcion: data.descripcion,
+      activo: data.activo,
+    });
+
+    if (response.data?.datos) {
+      const actBackend = response.data.datos;
+
+      await auditoriaService.registrarEvento({
+        tipo: 'Configuración',
+        actor: 'Administrador',
+        descripcion: `Actualización del rol "${actBackend.nombre}"`,
+        origen: 'Panel',
+        estacion: '—',
+      });
+
+      return {
+        id: actBackend.id,
+        nombre: actBackend.nombre,
+        descripcion: actBackend.descripcion || '',
+        personasAsignadas: actBackend.personasAsignadas,
+        permisos: actBackend.permisos,
+        activo: actBackend.activo,
+        esSistema: actBackend.esSistema,
+      };
+    }
+    throw new Error('No se pudo actualizar el rol');
+  },
+
+  actualizarPermisosRol: async (rolId: string, permisos: string[]): Promise<Rol> => {
+    // Obtenemos los permisos (mock o transformamos la lista de ids)
+    // El backend espera una matriz de asignaciones. Asumiendo formato actual:
+    const response = await apiClient.put<RespuestaEnvuelta<boolean>>(`/roles/${rolId}/privilegios`, {
+      asignaciones: permisos.map((p) => ({
+        privilegioId: p, 
+        nivelPermisoId: '00000000-0000-0000-0000-000000000000'
+      })),
+    });
+
+    if (response.data?.exitoso) {
+      await auditoriaService.registrarEvento({
+        tipo: 'Seguridad',
+        actor: 'Administrador',
+        descripcion: `Permisos del rol actualizado (${permisos.length} permisos)`,
+        origen: 'Panel',
+        estacion: '—',
+      });
+      // Devolver los roles recargados
+      const roles = await rolService.getRoles();
+      return roles.find(r => r.id === rolId)!;
+    }
+    throw new Error('No se pudo actualizar los permisos');
   },
 
   toggleEstadoRol: async (rolId: string): Promise<Rol> => {
-    const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
-    if (index === -1) throw new Error('Rol no encontrado');
+    // Primero obtenemos el rol actual
+    const roles = await rolService.getRoles();
+    const rolActual = roles.find(r => r.id === rolId);
+    if (!rolActual) throw new Error('Rol no encontrado');
 
-    MOCK_ROLES[index].activo = !MOCK_ROLES[index].activo;
+    const response = await rolService.actualizarRol(rolId, {
+      ...rolActual,
+      activo: !rolActual.activo
+    });
 
     await auditoriaService.registrarEvento({
       tipo: 'Seguridad',
       actor: 'Administrador',
-      descripcion: `Rol "${MOCK_ROLES[index].nombre}" ${MOCK_ROLES[index].activo ? 'activado' : 'desactivado'}`,
+      descripcion: `Rol "${response.nombre}" ${response.activo ? 'activado' : 'desactivado'}`,
       origen: 'Panel',
       estacion: '—',
     });
 
-    return MOCK_ROLES[index];
+    return response;
   },
 
   eliminarRol: async (rolId: string): Promise<boolean> => {
-    try {
-      await apiClient.delete(`/roles/${rolId}`);
-    } catch {
-      // Fallback local
+    const response = await apiClient.delete<RespuestaEnvuelta<boolean>>(`/roles/${rolId}`);
+    
+    if (response.data?.exitoso) {
+      await auditoriaService.registrarEvento({
+        tipo: 'Seguridad',
+        actor: 'Administrador',
+        descripcion: `Eliminación de un rol`,
+        origen: 'Panel',
+        estacion: '—',
+      });
+      return true;
     }
-
-    const index = MOCK_ROLES.findIndex((r) => r.id === rolId);
-    if (index === -1) return false;
-    if (MOCK_ROLES[index].esSistema) {
-      throw new Error('No se pueden eliminar roles protegidos del sistema');
-    }
-
-    const [eliminado] = MOCK_ROLES.splice(index, 1);
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Seguridad',
-      actor: 'Administrador',
-      descripcion: `Eliminación del rol personalizado "${eliminado.nombre}"`,
-      origen: 'Panel',
-      estacion: '—',
-    });
-
-    return true;
+    return false;
   },
 };

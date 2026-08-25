@@ -16,6 +16,9 @@ public abstract class SiaControllerBase : ControllerBase
             if (typeof(T) == typeof(bool))
                 return NoContent();
                 
+            if (result.Paginacion != null)
+                return Ok(RespuestaEnvuelta<T>.ConPaginacion(result.Valor!, result.Paginacion));
+
             return Ok(RespuestaEnvuelta<T>.Exitosa(result.Valor!));
         }
             

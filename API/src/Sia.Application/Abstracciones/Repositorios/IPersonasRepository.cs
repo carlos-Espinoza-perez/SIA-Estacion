@@ -5,7 +5,8 @@ namespace Sia.Application.Abstracciones.Repositorios;
 
 public interface IPersonasRepository
 {
-    Task<List<Persona>> ObtenerTodasAsync(string? busqueda, TipoPersona? tipo, CancellationToken ct);
+    Task<List<Persona>> ObtenerTodasAsync(string? busqueda, TipoPersona? tipo, bool isPersonal, string? rol, bool? estado, int pagina, int limite, CancellationToken ct);
+    Task<int> ContarPersonasAsync(string? busqueda, TipoPersona? tipo, bool isPersonal, string? rol, bool? estado, CancellationToken ct);
     Task<Persona?> ObtenerPorIdAsync(Guid id, CancellationToken ct);
     Task<Persona?> ObtenerPorCodigoAsync(string codigo, CancellationToken ct);
     Task<Persona?> ObtenerPorUserIdAsync(string userId, CancellationToken ct);
@@ -15,5 +16,6 @@ public interface IPersonasRepository
     Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, CancellationToken ct);
     Task AgregarFotoAsync(FotoReferencia foto, CancellationToken ct);
     
+    Task<int> ContarPersonasRegistradasGlobalAsync(CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

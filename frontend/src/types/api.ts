@@ -6,10 +6,10 @@ export interface ErrorDto {
 export interface PaginacionMetadata {
   paginaActual: number;
   tamanoPagina: number;
-  totalElementos: number;
+  totalRegistros: number;
   totalPaginas: number;
-  tienePaginaAnterior: boolean;
-  tienePaginaSiguiente: boolean;
+  tieneAnterior: boolean;
+  tieneSiguiente: boolean;
 }
 
 export interface RespuestaEnvuelta<T> {

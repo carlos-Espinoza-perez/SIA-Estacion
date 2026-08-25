@@ -55,7 +55,7 @@ builder.Services.AddDbContext<SiaDbContext>((sp, options) =>
     options.AddInterceptors(sp.GetRequiredService<AuditoriaInterceptor>());
 });
 
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+builder.Services.AddIdentity<IdentityUser, Sia.Domain.Entidades.ApplicationRole>()
     .AddEntityFrameworkStores<SiaDbContext>()
     .AddDefaultTokenProviders();
 
@@ -177,7 +177,7 @@ _ = Task.Run(async () =>
     {
         var context = services.GetRequiredService<SiaDbContext>();
         var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
-        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        var roleManager = services.GetRequiredService<RoleManager<Sia.Domain.Entidades.ApplicationRole>>();
         
         await context.Database.MigrateAsync();
         await SiaDbContextSeed.SeedAsync(context, userManager, roleManager);

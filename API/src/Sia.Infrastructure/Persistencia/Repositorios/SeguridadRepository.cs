@@ -83,10 +83,24 @@ public class SeguridadRepository : ISeguridadRepository
         return Task.CompletedTask;
     }
 
-    public Task AgregarPrivilegiosRolesAsync(IEnumerable<RolPrivilegio> asignaciones, CancellationToken ct)
+    public async Task AgregarPrivilegiosRolesAsync(IEnumerable<RolPrivilegio> asignaciones, CancellationToken ct)
     {
-        _db.RolPrivilegios.AddRange(asignaciones);
-        return Task.CompletedTask;
+        await _db.RolPrivilegios.AddRangeAsync(asignaciones, ct);
+    }
+
+    public async Task<Dictionary<string, int>> ObtenerConteoUsuariosPorRolAsync(CancellationToken ct)
+    {
+        return await _db.UserRoles
+            .GroupBy(ur => ur.RoleId)
+            .Select(g => new { RoleId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.RoleId, x => x.Count, ct);
+    }
+
+    public async Task<List<RolPrivilegio>> ObtenerTodosPrivilegiosRolesAsync(CancellationToken ct)
+    {
+        return await _db.RolPrivilegios
+            .Include(rp => rp.Privilegio)
+            .ToListAsync(ct);
     }
 
     public async Task SaveChangesAsync(CancellationToken ct)

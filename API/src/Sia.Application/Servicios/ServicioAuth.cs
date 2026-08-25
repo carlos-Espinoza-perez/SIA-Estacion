@@ -65,20 +65,22 @@ public class ServicioAuth
     {
         try
         {
-            var clientId = _configuration["Google:ClientId"];
-            var settings = new GoogleJsonWebSignature.ValidationSettings();
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.Token);
             
-            if (!string.IsNullOrEmpty(clientId) && clientId != "YOUR_GOOGLE_CLIENT_ID")
-            {
-                settings.Audience = new[] { clientId };
-            }
+            var response = await httpClient.GetAsync("https://www.googleapis.com/oauth2/v3/userinfo", ct);
+            if (!response.IsSuccessStatusCode)
+                return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "Token de Google inválido o expirado.");
 
-            var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
+            var content = await response.Content.ReadAsStringAsync(ct);
+            using var document = System.Text.Json.JsonDocument.Parse(content);
+            
+            if (!document.RootElement.TryGetProperty("email", out var emailElement))
+                return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "No se pudo obtener el correo de Google.");
 
-            if (payload == null)
-                return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "Token de Google inválido.");
+            string email = emailElement.GetString() ?? string.Empty;
 
-            IdentityUser? usuario = await _userManager.FindByEmailAsync(payload.Email);
+            IdentityUser? usuario = await _userManager.FindByEmailAsync(email);
             if (usuario is null)
                 return Result<TokenResponse>.Fallido("USUARIO_NO_ENCONTRADO", "El usuario no está registrado en el sistema. Solicite acceso.");
 
@@ -92,10 +94,6 @@ public class ServicioAuth
                 RefreshToken = refreshToken,
                 ExpiresInMinutes = 30
             });
-        }
-        catch (InvalidJwtException)
-        {
-            return Result<TokenResponse>.Fallido(CodigosError.CredencialesInvalidas, "Token de Google inválido o expirado.");
         }
         catch (Exception)
         {

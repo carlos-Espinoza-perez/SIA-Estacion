@@ -68,9 +68,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen = true }) => 
       }
     }).catch(() => {});
 
-    personaService.getPersonas().then((personas) => {
-      if (montado && personas) {
-        const liveCons = personas.slice(0, 6).map((p) => ({
+    personaService.getPersonas().then((result) => {
+      if (montado && result.data) {
+        const liveCons = result.data.slice(0, 6).map((p: any) => ({
           id: p.id,
           name: p.nombre,
         }));

@@ -66,4 +66,11 @@ public class EstacionesRepository : IEstacionesRepository
     {
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task<int> ContarEstacionesActivasGlobalAsync(CancellationToken ct)
+    {
+        return await _db.Estaciones
+            .IgnoreQueryFilters()
+            .CountAsync(e => e.Estado, ct);
+    }
 }

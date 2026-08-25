@@ -124,13 +124,15 @@ export const ModalBusquedaGlobal: React.FC<ModalBusquedaGlobalProps> = ({
     let isMounted = true;
     const cargarDatos = async () => {
       try {
-        const [personas, items, estaciones] = await Promise.all([
+        const [personasResult, items, estaciones] = await Promise.all([
           personaService.getPersonas(),
           itemService.getItems(),
           estacionService.getEstaciones(),
         ]);
 
         if (!isMounted) return;
+
+        const personas = personasResult.data;
 
         const personasMapeadas: ResultadoBusqueda[] = personas.map((p) => ({
           id: `p-${p.id}`,
