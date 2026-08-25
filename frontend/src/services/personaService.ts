@@ -10,6 +10,12 @@ import {
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta, PaginacionMetadata } from '../types/api';
 
+interface FotoReferenciaBackendDto {
+  id: string;
+  url: string;
+  fechaCarga: string;
+}
+
 interface PersonaBackendDto {
   id: string;
   codigoEstudiantil: string;
@@ -22,6 +28,8 @@ interface PersonaBackendDto {
   estado: boolean;
   tieneFotoReferencia: boolean;
   fechaRegistro: string;
+  fotoReferencia?: FotoReferenciaBackendDto | null;
+  fotosReferencia?: FotoReferenciaBackendDto[];
 }
 
 export const personaService = {
@@ -60,6 +68,10 @@ export const personaService = {
     const p = response.data?.datos;
     if (!p) return null;
 
+    const fotosReferencia = p.fotosReferencia ?? (p.fotoReferencia ? [p.fotoReferencia] : []);
+    const fotoPrincipal = fotosReferencia[0];
+    const fechaFoto = fotoPrincipal ? new Date(fotoPrincipal.fechaCarga).toLocaleDateString() : '';
+
     return {
       id: p.id,
       nombre: `${p.nombres} ${p.apellidos}`.trim(),
@@ -72,14 +84,22 @@ export const personaService = {
       estado: p.estado ? 'Activo' : 'Inactivo',
       tieneFotoReferencia: p.tieneFotoReferencia,
       fechaRegistro: new Date(p.fechaRegistro).toLocaleDateString(),
-      fotoReferencia: p.tieneFotoReferencia
+      avatarUrl: fotoPrincipal?.url,
+      fotoReferencia: fotoPrincipal
         ? {
+            id: fotoPrincipal.id,
+            url: fotoPrincipal.url,
             estado: 'Cifrada en reposo',
-            fechaCaptura: new Date(p.fechaRegistro).toLocaleDateString(),
-            fechaActualizacion: new Date().toLocaleDateString(),
+            fechaCaptura: fechaFoto,
+            fechaActualizacion: fechaFoto,
             retencion: 'Se elimina al pasar a inactivo',
           }
         : undefined,
+      fotosReferencia: fotosReferencia.map((foto) => ({
+        id: foto.id,
+        url: foto.url,
+        fechaCarga: new Date(foto.fechaCarga).toLocaleDateString(),
+      })),
       historialAccesos: [],
       operacionesItems: [],
     };
@@ -197,6 +217,16 @@ export const personaService = {
       tieneFotoReferencia: p.tieneFotoReferencia,
       fechaRegistro: new Date(p.fechaRegistro).toLocaleDateString(),
     };
+  },
+
+
+  subirFotoPersona: async (id: string, archivo: File | File[]): Promise<void> => {
+    const formData = new FormData();
+    const archivos = Array.isArray(archivo) ? archivo : [archivo];
+    archivos.forEach((foto) => formData.append(archivos.length === 1 ? 'foto' : 'fotos', foto));
+    await apiClient.post(`/personas/${id}/foto`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 
   eliminarPersona: async (id: string): Promise<boolean> => {

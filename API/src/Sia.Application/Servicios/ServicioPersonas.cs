@@ -67,9 +67,18 @@ public class ServicioPersonas
             throw new EntidadNoEncontradaException(nameof(Persona), id);
 
         PersonaDetalleResponse response = _mapper.Map<PersonaDetalleResponse>(persona);
-        FotoReferencia? fotoActiva = persona.FotosReferencia.FirstOrDefault(f => f.Estado);
-        if (fotoActiva is not null)
-            response.FotoReferencia = _mapper.Map<FotoReferenciaResponse>(fotoActiva);
+        List<FotoReferencia> fotosActivas = persona.FotosReferencia
+            .Where(f => f.Estado)
+            .OrderByDescending(f => f.FechaCarga)
+            .ToList();
+
+        response.FotosReferencia = [];
+        foreach (FotoReferencia foto in fotosActivas)
+        {
+            response.FotosReferencia.Add(await MapearFotoConUrlFirmadaAsync(foto, ct));
+        }
+
+        response.FotoReferencia = response.FotosReferencia.FirstOrDefault();
 
         return Result<PersonaDetalleResponse>.Exitoso(response);
     }
@@ -144,13 +153,6 @@ public class ServicioPersonas
         if (persona is null)
             throw new EntidadNoEncontradaException(nameof(Persona), personaId);
 
-        FotoReferencia? fotoAnterior = await _repository.ObtenerFotoActivaAsync(personaId, ct);
-        if (fotoAnterior is not null)
-        {
-            fotoAnterior.Estado = false;
-            fotoAnterior.FechaEliminacion = DateTimeOffset.UtcNow;
-        }
-
         using var hashStream = new MemoryStream();
         await contenido.CopyToAsync(hashStream, ct);
         hashStream.Position = 0;
@@ -173,7 +175,25 @@ public class ServicioPersonas
         await _repository.AgregarFotoAsync(foto, ct);
         await _repository.SaveChangesAsync(ct);
 
-        return Result<FotoReferenciaResponse>.Exitoso(_mapper.Map<FotoReferenciaResponse>(foto));
+        return Result<FotoReferenciaResponse>.Exitoso(await MapearFotoConUrlFirmadaAsync(foto, ct));
+    }
+
+    public async Task<Result<List<FotoReferenciaResponse>>> SubirFotosAsync(Guid personaId, IReadOnlyCollection<ArchivoFotoReferencia> archivos, CancellationToken ct)
+    {
+        if (archivos.Count == 0)
+            return Result<List<FotoReferenciaResponse>>.Fallido("FOTO_REQUERIDA", "Se requiere al menos un archivo de foto.");
+
+        var fotos = new List<FotoReferenciaResponse>();
+        foreach (ArchivoFotoReferencia archivo in archivos)
+        {
+            Result<FotoReferenciaResponse> resultado = await SubirFotoAsync(personaId, archivo.Contenido, archivo.ContentType, ct);
+            if (!resultado.EsExitoso)
+                return Result<List<FotoReferenciaResponse>>.Fallido(resultado.Error!.Codigo, resultado.Error.Mensaje);
+
+            fotos.Add(resultado.Valor!);
+        }
+
+        return Result<List<FotoReferenciaResponse>>.Exitoso(fotos);
     }
 
     public async Task<Result<string>> ObtenerUrlFotoAsync(Guid personaId, CancellationToken ct)
@@ -207,4 +227,13 @@ public class ServicioPersonas
         "image/webp" => ".webp",
         _ => ".bin"
     };
+
+    private async Task<FotoReferenciaResponse> MapearFotoConUrlFirmadaAsync(FotoReferencia foto, CancellationToken ct)
+    {
+        FotoReferenciaResponse response = _mapper.Map<FotoReferenciaResponse>(foto);
+        response.Url = await _almacenamiento.ObtenerUrlFirmadaAsync(foto.Url, ct);
+        return response;
+    }
 }
+
+public sealed record ArchivoFotoReferencia(Stream Contenido, string ContentType);

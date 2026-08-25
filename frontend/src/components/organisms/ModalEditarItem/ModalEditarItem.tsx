@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal/Modal';
+import { Button } from '../../atoms/Button/Button';
 import { Item, TipoItem } from '../../../types/item';
 
 export interface ModalEditarItemProps {
@@ -54,61 +55,30 @@ export const ModalEditarItem: React.FC<ModalEditarItemProps> = ({
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
       {onDelete && (
-        <button
+        <Button
           type="button"
+          variant="danger"
+          size="sm"
           onClick={() => onDelete(item.id)}
-          style={{
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            backgroundColor: 'rgba(239, 68, 68, 0.12)',
-            color: '#EF4444',
-            fontSize: '13px',
-            fontFamily: 'Inter, sans-serif',
-            cursor: 'pointer',
-          }}
         >
           Eliminar ítem
-        </button>
+        </Button>
       )}
 
       <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isSaving}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            backgroundColor: 'transparent',
-            color: '#FFFFFF',
-            fontSize: '13px',
-            fontFamily: 'Inter, sans-serif',
-            cursor: 'pointer',
-          }}
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
           Cancelar
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="primary"
+          size="sm"
           onClick={handleSubmit}
-          disabled={isSaving}
-          style={{
-            padding: '8px 20px',
-            borderRadius: '8px',
-            border: 'none',
-            backgroundColor: '#FFFFFF',
-            color: '#1C1C1C',
-            fontSize: '13px',
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
-            cursor: isSaving ? 'not-allowed' : 'pointer',
-          }}
+          isLoading={isSaving}
         >
-          {isSaving ? 'Guardando...' : 'Guardar cambios'}
-        </button>
+          Guardar cambios
+        </Button>
       </div>
     </div>
   );

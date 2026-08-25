@@ -19,6 +19,7 @@ public class PersonaDetalleResponse : PersonaResponse
 {
     public string? UserId { get; set; }
     public FotoReferenciaResponse? FotoReferencia { get; set; }
+    public List<FotoReferenciaResponse> FotosReferencia { get; set; } = [];
 }
 
 public class FotoReferenciaResponse

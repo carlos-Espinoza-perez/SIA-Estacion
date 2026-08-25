@@ -14,6 +14,7 @@ export interface PaginacionMetadata {
 
 export interface RespuestaEnvuelta<T> {
   datos?: T;
+  exitoso?: boolean;
   errores?: ErrorDto[];
   paginacion?: PaginacionMetadata;
 }

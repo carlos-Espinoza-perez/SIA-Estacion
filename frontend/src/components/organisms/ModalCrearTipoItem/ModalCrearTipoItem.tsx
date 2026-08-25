@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal/Modal';
+import { Button } from '../../atoms/Button/Button';
 import { CrearTipoItemFormData, FlujoTipoItem } from '../../../types/item';
 
 export interface ModalCrearTipoItemProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearTipoItemFormData) => void;
+  onSubmit: (data: CrearTipoItemFormData) => void | Promise<void>;
 }
 
 const AVAILABLE_STATIONS = [
@@ -25,6 +26,7 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
   const [flujo, setFlujo] = useState<FlujoTipoItem>('Requiere aprobación');
   const [estaciones, setEstaciones] = useState<string[]>(['Laboratorio A']);
   const [activo, setActivo] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggleEstacion = (est: string) => {
     setEstaciones((prev) =>
@@ -32,73 +34,48 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) return;
 
-    onSubmit({
-      nombre: nombre.trim(),
-      descripcion: descripcion.trim(),
-      flujoPorDefecto: flujo,
-      estaciones,
-      activo,
-    });
+    setIsSaving(true);
+    try {
+      await onSubmit({
+        nombre: nombre.trim(),
+        descripcion: descripcion.trim(),
+        flujoPorDefecto: flujo,
+        estaciones,
+        activo,
+      });
 
-    setNombre('');
-    setDescripcion('');
-    setFlujo('Requiere aprobación');
-    setEstaciones(['Laboratorio A']);
-    setActivo(true);
-    onClose();
+      setNombre('');
+      setDescripcion('');
+      setFlujo('Requiere aprobación');
+      setEstaciones(['Laboratorio A']);
+      setActivo(true);
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const footer = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          background: 'transparent',
-          color: '#FFFFFF',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-      >
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
         Cancelar
-      </button>
-
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="primary"
+        size="sm"
         onClick={handleSubmit}
         disabled={!nombre.trim()}
-        style={{
-          padding: '8px 20px',
-          borderRadius: '8px',
-          border: 'none',
-          backgroundColor: '#FFFFFF',
-          color: '#1C1C1C',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          cursor: !nombre.trim() ? 'not-allowed' : 'pointer',
-          opacity: !nombre.trim() ? 0.4 : 1,
-        }}
-        onMouseOver={(e) => {
-          if (nombre.trim()) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-        }}
-        onMouseOut={(e) => {
-          if (nombre.trim()) e.currentTarget.style.backgroundColor = '#FFFFFF';
-        }}
+        isLoading={isSaving}
       >
         Crear tipo
-      </button>
+      </Button>
     </>
   );
 
@@ -175,42 +152,24 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
               gap: '4px',
             }}
           >
-            <button
+            <Button
               type="button"
+              variant={flujo === 'Requiere aprobación' ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setFlujo('Requiere aprobación')}
-              style={{
-                flex: 1,
-                height: '32px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: flujo === 'Requiere aprobación' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                color: flujo === 'Requiere aprobación' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: flujo === 'Requiere aprobación' ? 500 : 400,
-                cursor: 'pointer',
-              }}
+              style={{ flex: 1, height: '32px' }}
             >
               Requiere aprobación
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant={flujo === 'Retiro directo' ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setFlujo('Retiro directo')}
-              style={{
-                flex: 1,
-                height: '32px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: flujo === 'Retiro directo' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                color: flujo === 'Retiro directo' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: flujo === 'Retiro directo' ? 500 : 400,
-                cursor: 'pointer',
-              }}
+              style={{ flex: 1, height: '32px' }}
             >
               Retiro directo
-            </button>
+            </Button>
           </div>
         </div>
 

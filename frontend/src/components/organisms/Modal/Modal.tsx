@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { Button } from '../../atoms/Button/Button';
 
 export interface ModalProps {
   /** Controla visibilidad */
@@ -138,33 +139,15 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
 
             {/* Botón X */}
-            <button
+            <Button
               onClick={onClose}
               aria-label="Cerrar"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.4)',
-                cursor: 'pointer',
-                fontSize: '18px',
-                lineHeight: 1,
-                padding: '2px 6px',
-                borderRadius: '6px',
-                flexShrink: 0,
-                fontFamily: 'Inter, sans-serif',
-                transition: 'color 0.15s ease, background 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.color = '#FFFFFF';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
-                e.currentTarget.style.background = 'none';
-              }}
+              variant="ghost"
+              size="sm"
+              style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0, padding: '2px 6px', height: 'auto', minHeight: '28px' }}
             >
               ✕
-            </button>
+            </Button>
           </div>
 
           {/* Divider */}

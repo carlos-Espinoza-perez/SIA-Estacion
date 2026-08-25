@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Modal } from '../Modal/Modal';
-import { CrearPersonaFormData, TipoPersona, RolPersona } from '../../../types/persona';
+import { Button } from '../../atoms/Button/Button';
+import { CrearPersonaFormData, TipoPersona } from '../../../types/persona';
 
 export interface ModalCrearPersonaProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearPersonaFormData) => void;
+  onSubmit: (data: CrearPersonaFormData) => void | Promise<void>;
 }
 
 export const ModalCrearPersona: React.FC<ModalCrearPersonaProps> = ({
@@ -16,21 +17,14 @@ export const ModalCrearPersona: React.FC<ModalCrearPersonaProps> = ({
   const [nombre, setNombre] = useState('');
   const [carnet, setCarnet] = useState('');
   const [tipo, setTipo] = useState<TipoPersona>('Estudiante');
-  const [rol, setRol] = useState<RolPersona>('Estudiante');
-  const [carreraOArea, setCarreraOArea] = useState('');
-  const [correo, setCorreo] = useState('');
   const [fotoArchivo, setFotoArchivo] = useState<File | null>(null);
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTipoChange = (newTipo: TipoPersona) => {
     setTipo(newTipo);
-    if (newTipo === 'Estudiante') {
-      setRol('Estudiante');
-    } else if (rol === 'Estudiante') {
-      setRol('Encargado de recurso');
-    }
   };
 
   const handleFile = (file: File) => {
@@ -49,82 +43,53 @@ export const ModalCrearPersona: React.FC<ModalCrearPersonaProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !carnet.trim()) return;
 
-    onSubmit({
-      nombre: nombre.trim(),
-      carnet: carnet.trim(),
-      tipo,
-      rol,
-      carreraOArea: carreraOArea.trim() || (tipo === 'Estudiante' ? 'Ing. en Sistemas' : 'Personal General'),
-      correo: correo.trim() || `${carnet.toLowerCase()}@est.ulsa.edu.ni`,
-      fotoArchivo,
-      fotoPreviewUrl,
-    });
+    setIsSaving(true);
+    try {
+      await onSubmit({
+        nombre: nombre.trim(),
+        carnet: carnet.trim(),
+        tipo,
+        rol: 'Estudiante',
+        carreraOArea: '',
+        correo: '',
+        fotoArchivo,
+        fotoPreviewUrl,
+      });
 
-    // Resetear formulario
-    setNombre('');
-    setCarnet('');
-    setTipo('Estudiante');
-    setRol('Estudiante');
-    setCarreraOArea('');
-    setCorreo('');
-    setFotoArchivo(null);
-    setFotoPreviewUrl('');
-    onClose();
+      // Resetear formulario
+      setNombre('');
+      setCarnet('');
+      setTipo('Estudiante');
+      setFotoArchivo(null);
+      setFotoPreviewUrl('');
+      onClose();
+    } catch (error) {
+      console.error('Error al crear persona:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const footer = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          background: 'transparent',
-          color: '#FFFFFF',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-      >
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
         Cancelar
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="primary"
+        size="sm"
         onClick={handleSubmit}
         disabled={!nombre.trim() || !carnet.trim()}
-        style={{
-          padding: '8px 20px',
-          borderRadius: '8px',
-          border: 'none',
-          backgroundColor: '#FFFFFF',
-          color: '#1C1C1C',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          cursor: !nombre.trim() || !carnet.trim() ? 'not-allowed' : 'pointer',
-          opacity: !nombre.trim() || !carnet.trim() ? 0.4 : 1,
-          transition: 'all 0.15s ease',
-        }}
-        onMouseOver={(e) => {
-          if (nombre.trim() && carnet.trim()) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-        }}
-        onMouseOut={(e) => {
-          if (nombre.trim() && carnet.trim()) e.currentTarget.style.backgroundColor = '#FFFFFF';
-        }}
+        isLoading={isSaving}
       >
         Crear persona
-      </button>
+      </Button>
     </>
   );
 
@@ -248,86 +213,6 @@ export const ModalCrearPersona: React.FC<ModalCrearPersonaProps> = ({
           </div>
         </div>
 
-        {/* Rol asignado */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Rol asignado
-          </label>
-          <select
-            value={rol}
-            onChange={(e) => setRol(e.target.value as RolPersona)}
-            style={{
-              height: '38px',
-              backgroundColor: '#333333',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {tipo === 'Estudiante' ? (
-              <option value="Estudiante">Estudiante</option>
-            ) : (
-              <>
-                <option value="Encargado de recurso">Encargado de recurso</option>
-                <option value="Administrador">Administrador</option>
-                <option value="Guardia">Guardia</option>
-              </>
-            )}
-          </select>
-        </div>
-
-        {/* Carrera o área */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Carrera o área
-          </label>
-          <input
-            type="text"
-            placeholder={tipo === 'Estudiante' ? 'Ej. Ing. en Sistemas' : 'Ej. Dirección Académica / Laboratorio'}
-            value={carreraOArea}
-            onChange={(e) => setCarreraOArea(e.target.value)}
-            style={{
-              height: '38px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-            }}
-          />
-        </div>
-
-        {/* Correo institucional */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Correo institucional
-          </label>
-          <input
-            type="email"
-            placeholder={tipo === 'Estudiante' ? 'nombre@est.ulsa.edu.ni' : 'nombre@ulsa.edu.ni'}
-            value={correo}
-            onChange={(e) => setCorreo(e.target.value)}
-            style={{
-              height: '38px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-            }}
-          />
-        </div>
 
         {/* Fotografía de referencia */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

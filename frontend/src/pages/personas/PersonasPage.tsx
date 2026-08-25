@@ -10,6 +10,7 @@ import { ModalCrearPersona } from '../../components/organisms/ModalCrearPersona/
 import { FichaPersonaDrawer } from '../../components/organisms/FichaPersonaDrawer/FichaPersonaDrawer';
 import { useToast } from '../../context/ToastContext';
 import { rolService } from '../../services/rolService';
+import { Button } from '../../components/atoms/Button/Button';
 
 // Opciones de Filtros
 
@@ -299,35 +300,20 @@ export const PersonasPage: React.FC = () => {
           </div>
 
           {/* Botón Nueva persona */}
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => setIsCrearModalOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              height: '36px',
-              backgroundColor: '#FFFFFF',
-              color: '#1C1C1C',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 600,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              transition: 'all 0.15s ease',
-              flexShrink: 0,
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+            leftIcon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            }
+            style={{ flexShrink: 0 }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
             Nueva persona
-          </button>
+          </Button>
         </div>
 
         {/* Tabla de Personas */}

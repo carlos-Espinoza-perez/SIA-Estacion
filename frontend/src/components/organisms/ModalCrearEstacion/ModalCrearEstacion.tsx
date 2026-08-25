@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal/Modal';
+import { Button } from '../../atoms/Button/Button';
 import { CrearEstacionFormData, FlujoEstacion } from '../../../types/estacion';
 
 export interface ModalCrearEstacionProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearEstacionFormData) => void;
+  onSubmit: (data: CrearEstacionFormData) => void | Promise<void>;
 }
 
 const TIPO_RECURSO_OPTIONS = [
@@ -34,74 +35,50 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
   const [encargado, setEncargado] = useState('Weslin Rodríguez');
   const [identificadorDispositivo, setIdentificadorDispositivo] = useState('EST-LAB-C-01');
   const [modoOffline, setModoOffline] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !ubicacion.trim()) return;
 
-    onSubmit({
-      nombre: nombre.trim(),
-      ubicacion: ubicacion.trim(),
-      tipoRecurso,
-      flujo: tipoRecurso === 'Control de acceso' ? '—' : flujo,
-      encargado,
-      identificadorDispositivo: identificadorDispositivo.trim(),
-      modoOffline,
-    });
+    setIsSaving(true);
+    try {
+      await onSubmit({
+        nombre: nombre.trim(),
+        ubicacion: ubicacion.trim(),
+        tipoRecurso,
+        flujo: tipoRecurso === 'Control de acceso' ? '—' : flujo,
+        encargado,
+        identificadorDispositivo: identificadorDispositivo.trim(),
+        modoOffline,
+      });
 
-    setNombre('');
-    setUbicacion('');
-    setIdentificadorDispositivo(`EST-PUNTO-0${Math.floor(1 + Math.random() * 9)}`);
-    onClose();
+      setNombre('');
+      setUbicacion('');
+      setIdentificadorDispositivo(`EST-PUNTO-0${Math.floor(1 + Math.random() * 9)}`);
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const footer = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          background: 'transparent',
-          color: '#FFFFFF',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-      >
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
         Cancelar
-      </button>
-
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="primary"
+        size="sm"
         onClick={handleSubmit}
         disabled={!nombre.trim() || !ubicacion.trim()}
-        style={{
-          padding: '8px 20px',
-          borderRadius: '8px',
-          border: 'none',
-          backgroundColor: '#FFFFFF',
-          color: '#1C1C1C',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          cursor: !nombre.trim() || !ubicacion.trim() ? 'not-allowed' : 'pointer',
-          opacity: !nombre.trim() || !ubicacion.trim() ? 0.4 : 1,
-        }}
-        onMouseOver={(e) => {
-          if (nombre.trim() && ubicacion.trim()) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-        }}
-        onMouseOut={(e) => {
-          if (nombre.trim() && ubicacion.trim()) e.currentTarget.style.backgroundColor = '#FFFFFF';
-        }}
+        isLoading={isSaving}
       >
         Crear Estación
-      </button>
+      </Button>
     </>
   );
 
@@ -205,42 +182,24 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
                 gap: '4px',
               }}
             >
-              <button
+              <Button
                 type="button"
+                variant={flujo === 'Aprobación' ? 'secondary' : 'ghost'}
+                size="sm"
                 onClick={() => setFlujo('Aprobación')}
-                style={{
-                  flex: 1,
-                  height: '32px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: flujo === 'Aprobación' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  color: flujo === 'Aprobación' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '13px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: flujo === 'Aprobación' ? 500 : 400,
-                  cursor: 'pointer',
-                }}
+                style={{ flex: 1, height: '32px' }}
               >
                 Aprobación
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={flujo === 'Directo' ? 'secondary' : 'ghost'}
+                size="sm"
                 onClick={() => setFlujo('Directo')}
-                style={{
-                  flex: 1,
-                  height: '32px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: flujo === 'Directo' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  color: flujo === 'Directo' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '13px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: flujo === 'Directo' ? 500 : 400,
-                  cursor: 'pointer',
-                }}
+                style={{ flex: 1, height: '32px' }}
               >
                 Directo
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -310,42 +269,24 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
               gap: '4px',
             }}
           >
-            <button
+            <Button
               type="button"
+              variant={modoOffline ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setModoOffline(true)}
-              style={{
-                flex: 1,
-                height: '32px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: modoOffline ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                color: modoOffline ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: modoOffline ? 500 : 400,
-                cursor: 'pointer',
-              }}
+              style={{ flex: 1, height: '32px' }}
             >
               Habilitado
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant={!modoOffline ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setModoOffline(false)}
-              style={{
-                flex: 1,
-                height: '32px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: !modoOffline ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                color: !modoOffline ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: !modoOffline ? 500 : 400,
-                cursor: 'pointer',
-              }}
+              style={{ flex: 1, height: '32px' }}
             >
               Deshabilitado
-            </button>
+            </Button>
           </div>
         </div>
       </form>

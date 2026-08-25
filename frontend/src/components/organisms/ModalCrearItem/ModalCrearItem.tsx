@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Modal } from '../Modal/Modal';
+import { Button } from '../../atoms/Button/Button';
 import { CrearItemFormData, EstadoItem } from '../../../types/item';
 
 export interface ModalCrearItemProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearItemFormData) => void;
+  onSubmit: (data: CrearItemFormData) => void | Promise<void>;
 }
 
 const TIPO_OPTIONS = [
@@ -35,80 +36,56 @@ export const ModalCrearItem: React.FC<ModalCrearItemProps> = ({
   onSubmit,
 }) => {
   const [nombre, setNombre] = useState('');
-  const [codigo, setCodigo] = useState('IT-0432');
+  const [codigo, setCodigo] = useState(`IT-0${Math.floor(100 + Math.random() * 900)}`);
   const [tipo, setTipo] = useState('Componentes electrónicos');
   const [estacion, setEstacion] = useState('Laboratorio A');
   const [unidades, setUnidades] = useState(1);
   const [estadoInicial, setEstadoInicial] = useState<EstadoItem>('Disponible');
   const [observaciones, setObservaciones] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !codigo.trim()) return;
 
-    onSubmit({
-      nombre: nombre.trim(),
-      codigo: codigo.trim(),
-      tipo,
-      estacion,
-      unidades,
-      estadoInicial,
-      observaciones: observaciones.trim(),
-    });
+    setIsSaving(true);
+    try {
+      await onSubmit({
+        nombre: nombre.trim(),
+        codigo: codigo.trim(),
+        tipo,
+        estacion,
+        unidades,
+        estadoInicial,
+        observaciones: observaciones.trim(),
+      });
 
-    setNombre('');
-    setCodigo(`IT-0${Math.floor(100 + Math.random() * 900)}`);
-    setObservaciones('');
-    onClose();
+      setNombre('');
+      setCodigo(`IT-0${Math.floor(100 + Math.random() * 900)}`);
+      setObservaciones('');
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const footer = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          background: 'transparent',
-          color: '#FFFFFF',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-      >
+      <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
         Cancelar
-      </button>
-
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="primary"
+        size="sm"
         onClick={handleSubmit}
         disabled={!nombre.trim() || !codigo.trim()}
-        style={{
-          padding: '8px 20px',
-          borderRadius: '8px',
-          border: 'none',
-          backgroundColor: '#FFFFFF',
-          color: '#1C1C1C',
-          fontSize: '14px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          cursor: !nombre.trim() || !codigo.trim() ? 'not-allowed' : 'pointer',
-          opacity: !nombre.trim() || !codigo.trim() ? 0.4 : 1,
-        }}
-        onMouseOver={(e) => {
-          if (nombre.trim() && codigo.trim()) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-        }}
-        onMouseOut={(e) => {
-          if (nombre.trim() && codigo.trim()) e.currentTarget.style.backgroundColor = '#FFFFFF';
-        }}
+        isLoading={isSaving}
       >
         Crear ítem
-      </button>
+      </Button>
     </>
   );
 

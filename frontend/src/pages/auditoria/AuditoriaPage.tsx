@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayoutTemplate } from '../../components/templates/DashboardLayoutTemplate/DashboardLayoutTemplate';
 import { EventoAuditoria, TipoEventoAuditoria } from '../../types/auditoria';
 import { auditoriaService } from '../../services/auditoriaService';
+import { Button } from '../../components/atoms/Button/Button';
 import { useToast } from '../../context/ToastContext';
 
 export const AuditoriaPage: React.FC = () => {
@@ -108,40 +109,20 @@ export const AuditoriaPage: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
-            <button
-              onClick={() => setActiveTab('eventos')}
-              style={{
-                padding: '6px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: activeTab === 'eventos' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeTab === 'eventos' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
-                fontSize: '13px',
-                fontWeight: activeTab === 'eventos' ? 600 : 500,
-                fontFamily: 'Inter, sans-serif',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              Eventos
-            </button>
-            <button
-              onClick={() => setActiveTab('reportes')}
-              style={{
-                padding: '6px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: activeTab === 'reportes' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeTab === 'reportes' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
-                fontSize: '13px',
-                fontWeight: activeTab === 'reportes' ? 600 : 500,
-                fontFamily: 'Inter, sans-serif',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              Reportes
-            </button>
+          <Button
+            variant={activeTab === 'eventos' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('eventos')}
+          >
+            Eventos
+          </Button>
+          <Button
+            variant={activeTab === 'reportes' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('reportes')}
+          >
+            Reportes
+          </Button>
           </div>
         </div>
 
@@ -300,36 +281,22 @@ export const AuditoriaPage: React.FC = () => {
           <div style={{ flex: 1 }} />
 
           {/* Botón Exportar */}
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleExportar}
-            disabled={isExporting}
-            style={{
-              height: '36px',
-              padding: '0 16px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#FFFFFF',
-              fontSize: '13px',
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 500,
-              cursor: isExporting ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+            isLoading={isExporting}
+            leftIcon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            }
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {isExporting ? 'Exportando...' : 'Exportar'}
-          </button>
+            Exportar
+          </Button>
         </div>
 
         {/* Contenedor Principal de Auditoría */}

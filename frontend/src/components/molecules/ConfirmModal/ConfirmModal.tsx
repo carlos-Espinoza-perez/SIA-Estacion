@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from '../../organisms/Modal/Modal';
+import { Button } from '../../atoms/Button/Button';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -26,59 +27,28 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   const footer = (
     <>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={onClose}
         disabled={isLoading}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          backgroundColor: 'transparent',
-          color: '#FFFFFF',
-          fontSize: '13px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
       >
         {cancelText}
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant={isDestructive ? 'danger' : 'primary'}
+        size="sm"
         onClick={onConfirm}
-        disabled={isLoading}
-        style={{
-          padding: '8px 20px',
-          borderRadius: '8px',
-          border: 'none',
-          backgroundColor: isDestructive ? '#EF4444' : '#FFFFFF',
-          color: isDestructive ? '#FFFFFF' : '#1C1C1C',
-          fontSize: '13px',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          opacity: isLoading ? 0.6 : 1,
-          boxShadow: isDestructive ? '0 2px 10px rgba(239, 68, 68, 0.3)' : '0 2px 8px rgba(0,0,0,0.2)',
-        }}
-        onMouseOver={(e) => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = isDestructive ? '#DC2626' : 'rgba(255, 255, 255, 0.9)';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = isDestructive ? '#EF4444' : '#FFFFFF';
-          }
-        }}
+        isLoading={isLoading}
       >
-        {isLoading ? 'Procesando...' : confirmText}
-      </button>
+        {confirmText}
+      </Button>
     </>
   );
+
 
   return (
     <Modal

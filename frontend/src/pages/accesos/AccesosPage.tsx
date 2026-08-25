@@ -7,6 +7,7 @@ import { ResultadoBadge, ResultadoAcceso } from '../../components/atoms/Resultad
 import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
 import { accesoService, AccesoRow } from '../../services/accesoService';
+import { Button } from '../../components/atoms/Button/Button';
 
 // Opciones de filtros
 
@@ -209,33 +210,19 @@ export const AccesosPage: React.FC = () => {
             Accesos
           </h2>
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleSimularAcceso}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '7px 14px',
-              height: '34px',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              color: '#FFFFFF',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              fontSize: '13px',
-              fontWeight: 500,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+            leftIcon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14" />
+                <path d="M12 5l7 7-7 7" />
+              </svg>
+            }
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14" />
-              <path d="M12 5l7 7-7 7" />
-            </svg>
             Simular validación NFC/QR
-          </button>
+          </Button>
         </div>
 
         {/* Barra de filtros */}

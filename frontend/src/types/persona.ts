@@ -36,12 +36,18 @@ export interface OperacionItemHistorial {
 
 export interface FichaPersonaDetalle extends Persona {
   fotoReferencia?: {
+    id?: string;
     url?: string;
     estado: string; // 'Cifrada en reposo'
     fechaCaptura: string;
     fechaActualizacion: string;
     retencion: string; // 'Se elimina al pasar a inactivo'
   };
+  fotosReferencia?: Array<{
+    id: string;
+    url: string;
+    fechaCarga: string;
+  }>;
   historialAccesos: AccesoHistorial[];
   operacionesItems: OperacionItemHistorial[];
 }

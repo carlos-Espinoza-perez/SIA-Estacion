@@ -113,7 +113,17 @@ public class PersonasRepository : IPersonasRepository
 
     public async Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, CancellationToken ct)
     {
-        return await _db.FotosReferencia.FirstOrDefaultAsync(f => f.PersonaId == personaId && f.Estado, ct);
+        return await _db.FotosReferencia
+            .OrderByDescending(f => f.FechaCarga)
+            .FirstOrDefaultAsync(f => f.PersonaId == personaId && f.Estado, ct);
+    }
+
+    public async Task<List<FotoReferencia>> ObtenerFotosActivasAsync(Guid personaId, CancellationToken ct)
+    {
+        return await _db.FotosReferencia
+            .Where(f => f.PersonaId == personaId && f.Estado)
+            .OrderByDescending(f => f.FechaCarga)
+            .ToListAsync(ct);
     }
 
     public Task AgregarFotoAsync(FotoReferencia foto, CancellationToken ct)

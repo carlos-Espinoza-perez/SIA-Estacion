@@ -67,25 +67,31 @@ public class ServicioAcceso
                 return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Acceso Denegado", "Se requiere validación facial.", timer.ElapsedMilliseconds));
             }
 
-            FotoReferencia? fotoRef = persona.FotosReferencia.FirstOrDefault(f => f.Estado);
-            if (fotoRef is null)
+            List<FotoReferencia> fotosReferencia = persona.FotosReferencia.Where(f => f.Estado).ToList();
+            if (fotosReferencia.Count == 0)
             {
                 await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "No tiene foto de referencia", request.FechaHoraLocal, ct);
                 return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Revisión Manual", "No tiene foto registrada.", timer.ElapsedMilliseconds));
             }
 
-            byte[] fotoReferenciaBytes;
-            try 
+            bool coinciden = false;
+            try
             {
-                fotoReferenciaBytes = await _almacenamiento.DescargarArchivoAsync(fotoRef.Url, ct);
+                foreach (FotoReferencia fotoRef in fotosReferencia)
+                {
+                    byte[] fotoReferenciaBytes = await _almacenamiento.DescargarArchivoAsync(fotoRef.Url, ct);
+                    if (await _reconocimientoFacial.SonLaMismaPersonaAsync(fotoReferenciaBytes, request.Imagen!, ct))
+                    {
+                        coinciden = true;
+                        break;
+                    }
+                }
             }
             catch (Exception)
             {
                 await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "Error al obtener foto referencia", request.FechaHoraLocal, ct);
                 return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Revisión Manual", "Error al procesar identidad.", timer.ElapsedMilliseconds));
             }
-
-            bool coinciden = await _reconocimientoFacial.SonLaMismaPersonaAsync(fotoReferenciaBytes, request.Imagen!, ct);
 
             if (!coinciden)
             {

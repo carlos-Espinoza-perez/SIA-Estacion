@@ -11,6 +11,7 @@ import { ModalCrearItem } from '../../components/organisms/ModalCrearItem/ModalC
 import { ModalCrearTipoItem } from '../../components/organisms/ModalCrearTipoItem/ModalCrearTipoItem';
 import { ModalEditarItem } from '../../components/organisms/ModalEditarItem/ModalEditarItem';
 import { useToast } from '../../context/ToastContext';
+import { Button } from '../../components/atoms/Button/Button';
 
 // Opciones de Filtros
 
@@ -234,38 +235,30 @@ export const ItemsPage: React.FC = () => {
         width: 80,
         render: (row: Item) => (
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setSelectedItemForEdit(row)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.5)',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
               title="Editar ítem"
+              style={{ color: 'rgba(255,255,255,0.5)', padding: '4px', height: 'auto', minHeight: '28px' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setItemToDelete(row)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(239, 68, 68, 0.6)',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
               title="Eliminar ítem"
+              style={{ color: 'rgba(239,68,68,0.6)', padding: '4px', height: 'auto', minHeight: '28px' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-            </button>
+            </Button>
           </div>
         ),
       },
@@ -347,13 +340,15 @@ export const ItemsPage: React.FC = () => {
         header: 'Estado',
         width: 120,
         render: (row: TipoItem) => (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleToggleTipoEstado(row)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             title="Click para cambiar estado"
+            style={{ padding: 0, height: 'auto', background: 'none' }}
           >
             <StatusBadge status={row.estado} />
-          </button>
+          </Button>
         ),
       },
       {
@@ -362,22 +357,18 @@ export const ItemsPage: React.FC = () => {
         width: 60,
         render: (row: TipoItem) => (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setTipoToDelete(row)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(239, 68, 68, 0.6)',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
               title="Eliminar categoría"
+              style={{ color: 'rgba(239,68,68,0.6)', padding: '4px', height: 'auto', minHeight: '28px' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-            </button>
+            </Button>
           </div>
         ),
       },
@@ -404,40 +395,20 @@ export const ItemsPage: React.FC = () => {
       >
         {/* ── Selector de Pestañas (Ítems / Tipos de ítem) ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
+          <Button
+            variant={activeTab === 'items' ? 'secondary' : 'ghost'}
+            size="sm"
             onClick={() => setActiveTab('items')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: activeTab === 'items' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-              color: activeTab === 'items' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
-              fontSize: '13px',
-              fontWeight: 500,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
           >
             Ítems
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={activeTab === 'tipos' ? 'secondary' : 'ghost'}
+            size="sm"
             onClick={() => setActiveTab('tipos')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: activeTab === 'tipos' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-              color: activeTab === 'tipos' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
-              fontSize: '13px',
-              fontWeight: 500,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
           >
             Tipos de ítem
-          </button>
+          </Button>
         </div>
 
         {activeTab === 'items' ? (
@@ -487,35 +458,20 @@ export const ItemsPage: React.FC = () => {
               </div>
 
               {/* Botón Nuevo Ítem */}
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setIsCrearItemOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  height: '36px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#1C1C1C',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  fontFamily: 'Inter, sans-serif',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)')}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                leftIcon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                }
+                style={{ flexShrink: 0 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
                 Nuevo ítem
-              </button>
+              </Button>
             </div>
 
             {/* Tabla de Ítems */}
@@ -558,35 +514,20 @@ export const ItemsPage: React.FC = () => {
               </div>
 
               {/* Botón Nuevo Tipo */}
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setIsCrearTipoOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  height: '36px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#1C1C1C',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  fontFamily: 'Inter, sans-serif',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)')}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                leftIcon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                }
+                style={{ flexShrink: 0 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
                 Nuevo tipo
-              </button>
+              </Button>
             </div>
 
             {/* Tabla de Tipos de Ítem */}

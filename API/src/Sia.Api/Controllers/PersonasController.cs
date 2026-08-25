@@ -69,15 +69,47 @@ public class PersonasController : SiaControllerBase
 
     [HttpPost("{id:guid}/foto")]
     [RequierePrivilegio("PER", "E")]
-    public async Task<IActionResult> SubirFoto(Guid id, IFormFile foto, CancellationToken ct)
+    public async Task<IActionResult> SubirFoto(Guid id, [FromForm] IFormFile? foto, [FromForm] List<IFormFile>? fotos, CancellationToken ct)
     {
-        if (foto == null || foto.Length == 0)
+        var archivos = new List<IFormFile>();
+        if (foto is not null)
+            archivos.Add(foto);
+        if (fotos is not null)
+            archivos.AddRange(fotos);
+
+        archivos = archivos.Where(archivo => archivo.Length > 0).ToList();
+
+        if (archivos.Count == 0)
             return BadRequest(RespuestaEnvuelta<object>.ConError("FOTO_REQUERIDA", "Se requiere un archivo de foto."));
 
-        using Stream stream = foto.OpenReadStream();
-        var resultado = await _servicio.SubirFotoAsync(id, stream, foto.ContentType, ct);
-        
-        return HandleResult(resultado);
+        if (archivos.Count == 1)
+        {
+            await using Stream stream = archivos[0].OpenReadStream();
+            var resultado = await _servicio.SubirFotoAsync(id, stream, archivos[0].ContentType, ct);
+            return HandleResult(resultado);
+        }
+
+        var fotosReferencia = new List<ArchivoFotoReferencia>();
+        foreach (IFormFile archivo in archivos)
+        {
+            var memoria = new MemoryStream();
+            await archivo.CopyToAsync(memoria, ct);
+            memoria.Position = 0;
+            fotosReferencia.Add(new ArchivoFotoReferencia(memoria, archivo.ContentType));
+        }
+
+        try
+        {
+            var resultado = await _servicio.SubirFotosAsync(id, fotosReferencia, ct);
+            return HandleResult(resultado);
+        }
+        finally
+        {
+            foreach (ArchivoFotoReferencia archivo in fotosReferencia)
+            {
+                await archivo.Contenido.DisposeAsync();
+            }
+        }
     }
 
     [HttpGet("{id:guid}/foto")]

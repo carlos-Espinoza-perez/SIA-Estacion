@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Avatar } from '../../atoms/Avatar/Avatar';
+import { Button } from '../../atoms/Button/Button';
 import { FichaPersonaDetalle, Persona } from '../../../types/persona';
 import { personaService } from '../../../services/personaService';
 import { ResultadoBadge } from '../../atoms/ResultadoBadge/ResultadoBadge';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { useToast } from '../../../context/ToastContext';
+import { CameraCapture } from '../../molecules/CameraCapture/CameraCapture';
 
 export interface FichaPersonaDrawerProps {
   personaId: string | null;
@@ -34,6 +36,10 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
   // Delete Confirm Modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Camera / photo state
+  const [showCamera, setShowCamera] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !personaId) {
@@ -86,6 +92,23 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
       showToast('Error al actualizar datos de la persona', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleFotoCapturada = async (archivos: File[]) => {
+    if (!personaId) return;
+    setIsUploadingPhoto(true);
+    try {
+      await personaService.subirFotoPersona(personaId, archivos);
+      showToast(archivos.length === 1 ? 'Fotografía de referencia actualizada' : 'Fotografías de referencia actualizadas', 'success');
+      setShowCamera(false);
+      const updated = await personaService.getPersonaDetalle(personaId);
+      setDetalle(updated);
+      onPersonaUpdated?.();
+    } catch {
+      showToast('Error al subir la fotografía', 'error');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -187,72 +210,45 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {!loading && detalle && (
               <>
-                <button
+                <Button
+                  variant={isEditing ? 'accent' : 'secondary'}
+                  size="sm"
                   onClick={() => setIsEditing(!isEditing)}
-                  style={{
-                    backgroundColor: isEditing ? '#ADADFB' : 'rgba(255, 255, 255, 0.08)',
-                    color: isEditing ? '#121212' : '#FFFFFF',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '6px',
-                    padding: '5px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
+                  leftIcon={
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  }
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
                   {isEditing ? 'Cancelar edición' : 'Editar'}
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => setIsDeleteModalOpen(true)}
-                  style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                    color: '#EF4444',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderRadius: '6px',
-                    padding: '5px 10px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
                   title="Eliminar persona"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                   </svg>
-                </button>
+                </Button>
               </>
             )}
 
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.4)',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '6px',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.color = '#FFFFFF')}
-              onMouseOut={(e) => (e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)')}
+              style={{ color: 'rgba(255,255,255,0.4)', padding: '4px', height: 'auto' }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -381,36 +377,22 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                      <button
+                      <Button
+                        size="sm"
+                        variant="accent"
                         onClick={handleSaveEdit}
-                        disabled={isSaving}
-                        style={{
-                          backgroundColor: '#ADADFB',
-                          color: '#121212',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '6px 14px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: isSaving ? 'not-allowed' : 'pointer',
-                        }}
+                        isLoading={isSaving}
+                        style={{ backgroundColor: '#ADADFB', color: '#121212' }}
                       >
-                        {isSaving ? 'Guardando...' : 'Guardar cambios'}
-                      </button>
-                      <button
+                        Guardar cambios
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() => setIsEditing(false)}
-                        style={{
-                          backgroundColor: 'transparent',
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
                       >
                         Cancelar
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -434,7 +416,9 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                       >
                         {detalle.rol}
                       </span>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={handleToggleEstado}
                         title="Click para cambiar estado"
                         style={{
@@ -445,13 +429,9 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                           borderRadius: '12px',
                           fontSize: '11px',
                           fontWeight: 500,
-                          backgroundColor:
-                            detalle.estado === 'Activo'
-                              ? 'rgba(34, 197, 94, 0.12)'
-                              : 'rgba(239, 68, 68, 0.12)',
+                          height: 'auto',
+                          backgroundColor: detalle.estado === 'Activo' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                           color: detalle.estado === 'Activo' ? '#4ADE80' : '#F87171',
-                          border: 'none',
-                          cursor: 'pointer',
                         }}
                       >
                         <span
@@ -463,7 +443,8 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                           }}
                         />
                         {detalle.estado} (Cambiar)
-                      </button>
+                      </Button>
+
                     </div>
                   </>
                 )}
@@ -479,31 +460,107 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                 padding: '16px',
               }}
             >
-              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: '#FFFFFF' }}>
-                Fotografía de referencia (Validación facial)
+              {/* Header de la sección */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
+                  Fotografía de referencia
+                  <span style={{ fontSize: '11px', fontWeight: 400, color: 'rgba(255,255,255,0.4)', marginLeft: '6px' }}>
+                    (Validación facial)
+                  </span>
+                </div>
+                {!showCamera && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowCamera(true)}
+                    isLoading={isUploadingPhoto}
+                    style={{ fontSize: '11px', height: '28px', padding: '0 10px' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    Agregar fotos
+                  </Button>
+                )}
               </div>
-              {detalle.fotoReferencia ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
-                  <div>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>Estado</span>
-                    <span style={{ color: '#4ADE80', fontWeight: 500 }}>{detalle.fotoReferencia.estado}</span>
+
+              {/* Componente de cámara */}
+              {showCamera ? (
+                <CameraCapture
+                  onCapture={handleFotoCapturada}
+                  onCancel={() => setShowCamera(false)}
+                />
+              ) : detalle.fotoReferencia ? (
+                /* Info de foto existente */
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 56px)', gap: '6px', flexShrink: 0 }}>
+                    {(detalle.fotosReferencia?.length ? detalle.fotosReferencia : detalle.fotoReferencia?.url ? [{ id: detalle.fotoReferencia.id ?? 'principal', url: detalle.fotoReferencia.url, fechaCarga: detalle.fotoReferencia.fechaCaptura }] : []).map((foto, index) => (
+                      <img
+                        key={foto.id}
+                        src={foto.url}
+                        alt={`Fotografía de referencia ${index + 1}`}
+                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(10,132,255,0.35)' }}
+                      />
+                    ))}
                   </div>
-                  <div>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>Fecha captura</span>
-                    <span style={{ color: '#FFFFFF' }}>{detalle.fotoReferencia.fechaCaptura}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>Actualización</span>
-                    <span style={{ color: '#FFFFFF' }}>{detalle.fotoReferencia.fechaActualizacion}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>Política</span>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{detalle.fotoReferencia.retencion}</span>
+                  {/* Metadatos */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', flex: 1 }}>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block', marginBottom: '2px' }}>Estado</span>
+                      <span style={{ color: '#4ADE80', fontWeight: 500 }}>{detalle.fotoReferencia.estado}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block', marginBottom: '2px' }}>Fotografías</span>
+                      <span style={{ color: '#FFFFFF' }}>{detalle.fotosReferencia?.length ?? 1}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block', marginBottom: '2px' }}>Fecha captura</span>
+                      <span style={{ color: '#FFFFFF' }}>{detalle.fotoReferencia.fechaCaptura}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block', marginBottom: '2px' }}>Última actualización</span>
+                      <span style={{ color: '#FFFFFF' }}>{detalle.fotoReferencia.fechaActualizacion}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', display: 'block', marginBottom: '2px' }}>Política</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>{detalle.fotoReferencia.retencion}</span>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.4)' }}>
-                  Sin fotografía registrada.
+                /* Sin foto — estado vacío */
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '16px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px dashed rgba(255,255,255,0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                    Sin fotografía registrada.<br />
+                    <span style={{ color: 'rgba(255,255,255,0.25)' }}>Necesaria para el reconocimiento facial.</span>
+                  </span>
                 </div>
               )}
             </div>

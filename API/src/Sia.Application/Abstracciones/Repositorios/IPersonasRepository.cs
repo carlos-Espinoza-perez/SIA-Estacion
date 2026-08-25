@@ -14,6 +14,7 @@ public interface IPersonasRepository
     Task AgregarAsync(Persona persona, CancellationToken ct);
     
     Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, CancellationToken ct);
+    Task<List<FotoReferencia>> ObtenerFotosActivasAsync(Guid personaId, CancellationToken ct);
     Task AgregarFotoAsync(FotoReferencia foto, CancellationToken ct);
     
     Task<int> ContarPersonasRegistradasGlobalAsync(CancellationToken ct);
