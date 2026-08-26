@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export interface AvatarProps {
   src?: string;
@@ -13,6 +13,8 @@ export const Avatar: React.FC<AvatarProps> = ({
   size = 24,
   bgColor = 'rgba(255, 255, 255, 0.1)',
 }) => {
+  const [falloImagen, setFalloImagen] = useState(false);
+
   const getInitials = (str: string) => {
     return str
       .split(' ')
@@ -37,14 +39,15 @@ export const Avatar: React.FC<AvatarProps> = ({
         border: '0.5px solid rgba(255, 255, 255, 0.15)',
       }}
     >
-      {src ? (
+      {src && !falloImagen ? (
         <img
           src={src}
           alt={name}
+          referrerPolicy="no-referrer"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={(e) => {
-            // Fallback si la imagen falla
             e.currentTarget.style.display = 'none';
+            setFalloImagen(true);
           }}
         />
       ) : (

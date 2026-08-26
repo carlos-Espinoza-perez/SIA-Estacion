@@ -41,11 +41,15 @@ public class ManejadorExcepcionesMiddleware
             string correlacionId = Guid.NewGuid().ToString();
             _logger.LogError(ex, "Error no controlado. Correlación: {CorrelacionId}", correlacionId);
 
+            var mensajeDetallado = ex.InnerException != null 
+                ? $"{ex.Message} -> {ex.InnerException.Message}" 
+                : ex.Message;
+
             contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await EscribirProblemDetails(
                 contexto,
                 "Error interno",
-                $"Ocurrió un error inesperado. Referencia: {correlacionId} Detalles: {ex.Message} {ex.StackTrace}",
+                $"Ocurrió un error inesperado. Referencia: {correlacionId} Detalles: {mensajeDetallado} {ex.StackTrace}",
                 StatusCodes.Status500InternalServerError);
         }
     }

@@ -1,96 +1,4 @@
-import { PermisoDef, Rol, CrearRolFormData } from '../types/rol';
-
-export const PERMISOS_SISTEMA: PermisoDef[] = [
-  // ACCESOS
-  {
-    codigo: 'acceso.validar',
-    nombre: 'acceso.validar',
-    descripcion: 'Validar ingreso y egreso en una Estación',
-    categoria: 'ACCESOS',
-  },
-  {
-    codigo: 'acceso.consultar',
-    nombre: 'acceso.consultar',
-    descripcion: 'Ver la bitácora de accesos',
-    categoria: 'ACCESOS',
-  },
-
-  // ÍTEMS
-  {
-    codigo: 'item.solicitar',
-    nombre: 'item.solicitar',
-    descripcion: 'Solicitar el préstamo de un ítem',
-    categoria: 'ÍTEMS',
-  },
-  {
-    codigo: 'item.aprobar',
-    nombre: 'item.aprobar',
-    descripcion: 'Aprobar o rechazar solicitudes pendientes',
-    categoria: 'ÍTEMS',
-  },
-  {
-    codigo: 'item.entregar',
-    nombre: 'item.entregar',
-    descripcion: 'Registrar la entrega y la devolución',
-    categoria: 'ÍTEMS',
-  },
-  {
-    codigo: 'item.registrar',
-    nombre: 'item.registrar',
-    descripcion: 'Dar de alta y editar ítems del inventario',
-    categoria: 'ÍTEMS',
-  },
-
-  // CATÁLOGOS
-  {
-    codigo: 'tipoitem.gestionar',
-    nombre: 'tipoitem.gestionar',
-    descripcion: 'Crear y editar tipos de ítem',
-    categoria: 'CATÁLOGOS',
-  },
-  {
-    codigo: 'estacion.configurar',
-    nombre: 'estacion.configurar',
-    descripcion: 'Configurar Estaciones y su flujo',
-    categoria: 'CATÁLOGOS',
-  },
-
-  // ADMINISTRACIÓN
-  {
-    codigo: 'persona.gestionar',
-    nombre: 'persona.gestionar',
-    descripcion: 'Alta, edición y baja de personas',
-    categoria: 'ADMINISTRACIÓN',
-  },
-  {
-    codigo: 'rol.gestionar',
-    nombre: 'rol.gestionar',
-    descripcion: 'Crear roles y asignar Claims',
-    categoria: 'ADMINISTRACIÓN',
-  },
-  {
-    codigo: 'foto.administrar',
-    nombre: 'foto.administrar',
-    descripcion: 'Ver y reemplazar fotografías de referencia',
-    categoria: 'ADMINISTRACIÓN',
-  },
-
-  // AUDITORÍA
-  {
-    codigo: 'auditoria.consultar',
-    nombre: 'auditoria.consultar',
-    descripcion: 'Consultar la bitácora unificada',
-    categoria: 'AUDITORÍA',
-  },
-  {
-    codigo: 'reporte.ver',
-    nombre: 'reporte.ver',
-    descripcion: 'Ver reportes de desempeño',
-    categoria: 'AUDITORÍA',
-  },
-];
-
-// Mocks eliminados; Los datos ahora provienen exclusivamente del backend.
+import { Privilegio, NivelPermiso, RolPrivilegioDetalle, AsignacionPrivilegioRequest, Rol, CrearRolFormData } from '../types/rol';
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta } from '../types/api';
 import { auditoriaService } from './auditoriaService';
@@ -104,6 +12,29 @@ interface RolBackendDto {
   personasAsignadas: number;
   permisos: string[];
 }
+
+export const NIVELES_POR_DEFECTO: NivelPermiso[] = [
+  { id: '11111111-1111-1111-1111-111111111101', codigo: 'C', nombre: 'Crear', orden: 1, estado: true },
+  { id: '11111111-1111-1111-1111-111111111102', codigo: 'L', nombre: 'Lectura', orden: 2, estado: true },
+  { id: '11111111-1111-1111-1111-111111111103', codigo: 'A', nombre: 'Actualizar', orden: 3, estado: true },
+  { id: '11111111-1111-1111-1111-111111111104', codigo: 'B', nombre: 'Borrar', orden: 4, estado: true },
+  { id: '11111111-1111-1111-1111-111111111105', codigo: 'E', nombre: 'Escritura', orden: 5, estado: true },
+  { id: '11111111-1111-1111-1111-111111111106', codigo: 'T', nombre: 'Total', orden: 6, estado: true },
+];
+
+export const PRIVILEGIOS_POR_DEFECTO: Privilegio[] = [
+  { id: '22222222-2222-2222-2222-222222222201', codigo: 'ACC', nombre: 'Control de Accesos', modulo: 'Accesos', estado: true },
+  { id: '22222222-2222-2222-2222-222222222202', codigo: 'OPE', nombre: 'Operaciones y Préstamos', modulo: 'Operaciones', estado: true },
+  { id: '22222222-2222-2222-2222-222222222203', codigo: 'PER', nombre: 'Gestión de Personas', modulo: 'Personas', estado: true },
+  { id: '22222222-2222-2222-2222-222222222204', codigo: 'ITM', nombre: 'Gestión de Ítems e Inventario', modulo: 'Inventario', estado: true },
+  { id: '22222222-2222-2222-2222-222222222205', codigo: 'TIP', nombre: 'Tipos de Ítems y Categorías', modulo: 'Catálogos', estado: true },
+  { id: '22222222-2222-2222-2222-222222222206', codigo: 'EST', nombre: 'Configuración de Estaciones', modulo: 'Estaciones', estado: true },
+  { id: '22222222-2222-2222-2222-222222222207', codigo: 'ROL', nombre: 'Gestión de Roles y Permisos', modulo: 'Seguridad', estado: true },
+  { id: '22222222-2222-2222-2222-222222222208', codigo: 'USU', nombre: 'Gestión de Usuarios', modulo: 'Seguridad', estado: true },
+  { id: '22222222-2222-2222-2222-222222222209', codigo: 'AUD', nombre: 'Auditoría y Bitácora', modulo: 'Auditoría', estado: true },
+  { id: '22222222-2222-2222-2222-222222222210', codigo: 'REP', nombre: 'Reportes y Estadísticas', modulo: 'Reportes', estado: true },
+  { id: '22222222-2222-2222-2222-222222222211', codigo: 'EMP', nombre: 'Configuración de Empresas', modulo: 'Configuración', estado: true },
+];
 
 export const rolService = {
   getRoles: async (): Promise<Rol[]> => {
@@ -126,8 +57,55 @@ export const rolService = {
     return [];
   },
 
-  getPermisos: async (): Promise<PermisoDef[]> => {
-    return [...PERMISOS_SISTEMA];
+  getPrivilegios: async (): Promise<Privilegio[]> => {
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<Privilegio[]>>('/privilegios');
+      if (response.data && Array.isArray(response.data.datos) && response.data.datos.length > 0) {
+        return response.data.datos;
+      }
+    } catch (error) {
+      console.error('Error fetching privilegios from API, using defaults:', error);
+    }
+    return [...PRIVILEGIOS_POR_DEFECTO];
+  },
+
+  crearPrivilegio: async (data: { codigo: string; nombre: string; modulo: string }): Promise<Privilegio> => {
+    const response = await apiClient.post<RespuestaEnvuelta<Privilegio>>('/privilegios', data);
+    if (response.data?.datos) {
+      await auditoriaService.registrarEvento({
+        tipo: 'Seguridad',
+        actor: 'Administrador',
+        descripcion: `Nuevo privilegio creado: [${data.codigo}] ${data.nombre} en módulo ${data.modulo}`,
+        origen: 'Panel',
+        estacion: '—',
+      });
+      return response.data.datos;
+    }
+    throw new Error('No se pudo crear el privilegio');
+  },
+
+  getNivelesPermiso: async (): Promise<NivelPermiso[]> => {
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<NivelPermiso[]>>('/niveles-permiso');
+      if (response.data && Array.isArray(response.data.datos) && response.data.datos.length > 0) {
+        return response.data.datos.sort((a, b) => a.orden - b.orden);
+      }
+    } catch (error) {
+      console.error('Error fetching niveles de permiso from API, using defaults:', error);
+    }
+    return [...NIVELES_POR_DEFECTO];
+  },
+
+  getPrivilegiosRol: async (rolId: string): Promise<RolPrivilegioDetalle[]> => {
+    try {
+      const response = await apiClient.get<RespuestaEnvuelta<RolPrivilegioDetalle[]>>(`/roles/${rolId}/privilegios`);
+      if (response.data && Array.isArray(response.data.datos)) {
+        return response.data.datos;
+      }
+    } catch (error) {
+      console.error(`Error fetching privilegios for role ${rolId}:`, error);
+    }
+    return [];
   },
 
   crearRol: async (formData: CrearRolFormData): Promise<Rol> => {
@@ -193,40 +171,38 @@ export const rolService = {
     throw new Error('No se pudo actualizar el rol');
   },
 
-  actualizarPermisosRol: async (rolId: string, permisos: string[]): Promise<Rol> => {
-    // Obtenemos los permisos (mock o transformamos la lista de ids)
-    // El backend espera una matriz de asignaciones. Asumiendo formato actual:
+  reemplazarMatrizPrivilegios: async (rolId: string, asignaciones: AsignacionPrivilegioRequest[]): Promise<boolean> => {
     const response = await apiClient.put<RespuestaEnvuelta<boolean>>(`/roles/${rolId}/privilegios`, {
-      asignaciones: permisos.map((p) => ({
-        privilegioId: p, 
-        nivelPermisoId: '00000000-0000-0000-0000-000000000000'
-      })),
+      asignaciones,
     });
 
-    if (response.data?.exitoso) {
+    if (response.status === 204 || response.status === 200 || response.data?.exitoso) {
       await auditoriaService.registrarEvento({
         tipo: 'Seguridad',
         actor: 'Administrador',
-        descripcion: `Permisos del rol actualizado (${permisos.length} permisos)`,
+        descripcion: `Matriz de privilegios actualizada para el rol (${asignaciones.length} asignaciones)`,
         origen: 'Panel',
         estacion: '—',
       });
-      // Devolver los roles recargados
-      const roles = await rolService.getRoles();
-      return roles.find(r => r.id === rolId)!;
+      return true;
     }
-    throw new Error('No se pudo actualizar los permisos');
+    throw new Error('No se pudo actualizar la matriz de privilegios');
+  },
+
+  actualizarPermisosRol: async (rolId: string, asignaciones: AsignacionPrivilegioRequest[]): Promise<Rol> => {
+    await rolService.reemplazarMatrizPrivilegios(rolId, asignaciones);
+    const roles = await rolService.getRoles();
+    return roles.find((r) => r.id === rolId)!;
   },
 
   toggleEstadoRol: async (rolId: string): Promise<Rol> => {
-    // Primero obtenemos el rol actual
     const roles = await rolService.getRoles();
-    const rolActual = roles.find(r => r.id === rolId);
+    const rolActual = roles.find((r) => r.id === rolId);
     if (!rolActual) throw new Error('Rol no encontrado');
 
     const response = await rolService.actualizarRol(rolId, {
       ...rolActual,
-      activo: !rolActual.activo
+      activo: !rolActual.activo,
     });
 
     await auditoriaService.registrarEvento({

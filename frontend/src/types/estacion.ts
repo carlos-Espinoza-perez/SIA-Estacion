@@ -18,7 +18,12 @@ export interface Estacion {
   flujo: FlujoEstacion;
   ultimaSincronizacion: string;
   estado: EstadoEstacion;
+  encargadoId?: string;
   encargado?: string;
+  estaVinculada?: boolean;
+  macAddress?: string;
+  codigoVinculacion?: string;
+  fechaVinculacion?: string;
   identificadorDispositivo?: string;
   modoOffline?: boolean;
   firmware?: string;
@@ -34,6 +39,7 @@ export interface CrearEstacionFormData {
   ubicacion: string;
   tipoRecurso: string;
   flujo: FlujoEstacion;
+  encargadoId?: string;
   encargado: string;
   identificadorDispositivo: string;
   modoOffline: boolean;

@@ -69,7 +69,11 @@ export const itemService = {
   },
 
   getTiposItem: async (filtros?: FiltrosTipoItem): Promise<TipoItem[]> => {
-    const response = await apiClient.get<RespuestaEnvuelta<TipoItemBackendDto[]>>('/tipos-items');
+    // Si el filtro es 'Inactivo', traemos todos para poder filtrar; si no, solo activos
+    const soloActivos = filtros?.estado !== 'Inactivo';
+    const response = await apiClient.get<RespuestaEnvuelta<TipoItemBackendDto[]>>(
+      `/tipos-items?soloActivos=${soloActivos}`
+    );
     let lista: TipoItem[] = (response.data?.datos || []).map((t) => ({
       id: t.id,
       nombre: t.nombre,
@@ -96,12 +100,20 @@ export const itemService = {
   },
 
   crearItem: async (data: CrearItemFormData): Promise<Item> => {
+    let tipoItemId = data.tipoItemId;
+    if (!tipoItemId) {
+      const tipos = await itemService.getTiposItem();
+      const tipoEncontrado = tipos.find((t) => t.nombre === data.tipo);
+      tipoItemId = tipoEncontrado?.id || tipos[0]?.id || '00000000-0000-0000-0000-000000000001';
+    }
+
     const response = await apiClient.post<RespuestaEnvuelta<ItemBackendDto>>('/items', {
-      codigoInterno: data.codigo,
+      codigoQr: data.codigo,
       nombre: data.nombre,
-      descripcion: data.observaciones,
-      cantidadDisponible: data.unidades,
-      tipoItemId: '00000000-0000-0000-0000-000000000001',
+      observaciones: data.observaciones,
+      tipoItemId,
+      estacionId: data.estacionId || null,
+      esAgrupador: false,
     });
 
     const itemBackend = response.data.datos!;
@@ -179,22 +191,17 @@ export const itemService = {
       itemsRegistrados: 0,
       requiereAprobacion: tBackend.requiereAprobacion ? 'Sí' : 'No',
       estado: 'Activo',
-      estaciones: data.estaciones,
     };
   },
 
   actualizarTipoItem: async (id: string, data: Partial<TipoItem>): Promise<TipoItem> => {
-    if (data.nombre) {
-      await apiClient.put(`/tipos-items/${id}`, {
-        nombre: data.nombre,
-        descripcion: data.descripcion,
-        requiereAprobacion: data.requiereAprobacion === 'Sí',
-      });
-    }
+    const response = await apiClient.put<RespuestaEnvuelta<TipoItemBackendDto>>(`/tipos-items/${id}`, {
+      nombre: data.nombre,
+      descripcion: data.descripcion,
+      requiereAprobacion: data.requiereAprobacion === 'Sí',
+    });
 
-    const response = await apiClient.get<RespuestaEnvuelta<TipoItemBackendDto>>(`/tipos-items/${id}`);
     const tBackend = response.data.datos!;
-
     return {
       id: tBackend.id,
       nombre: tBackend.nombre,
@@ -207,6 +214,11 @@ export const itemService = {
 
   eliminarTipoItem: async (id: string): Promise<boolean> => {
     await apiClient.delete(`/tipos-items/${id}`);
+    return true;
+  },
+
+  reactivarTipoItem: async (id: string): Promise<boolean> => {
+    await apiClient.patch(`/tipos-items/${id}/reactivar`);
     return true;
   },
 };

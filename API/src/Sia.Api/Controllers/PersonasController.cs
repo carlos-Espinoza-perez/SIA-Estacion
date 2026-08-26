@@ -127,4 +127,12 @@ public class PersonasController : SiaControllerBase
         var resultado = await _servicio.EliminarFotoAsync(id, ct);
         return HandleResult(resultado);
     }
+
+    [HttpDelete("{id:guid}/fotos/{fotoId:guid}")]
+    [RequierePrivilegio("PER", "E")]
+    public async Task<IActionResult> EliminarFoto(Guid id, Guid fotoId, CancellationToken ct)
+    {
+        var resultado = await _servicio.EliminarFotoAsync(id, fotoId, ct);
+        return HandleResult(resultado);
+    }
 }

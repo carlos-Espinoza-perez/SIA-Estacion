@@ -17,6 +17,45 @@ export interface FichaPersonaDrawerProps {
   onPersonaDeleted?: () => void;
 }
 
+const FotoReferenciaPreview: React.FC<{
+  src: string;
+  alt: string;
+  onView: () => void;
+  onDelete: () => void;
+}> = ({ src, alt, onView, onDelete }) => {
+  const [falloImagen, setFalloImagen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ width: '56px', height: '56px', position: 'relative' }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        onError={(event) => {
+          setFalloImagen(true);
+          event.currentTarget.style.display = 'none';
+        }}
+        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(10,132,255,0.35)', background: falloImagen ? 'rgba(255,255,255,0.04)' : undefined }}
+      />
+      {hovered && !falloImagen && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', background: 'rgba(0,0,0,0.56)', borderRadius: '6px' }}>
+          <button type="button" title="Ver fotografía" aria-label="Ver fotografía" onClick={onView} style={{ width: '24px', height: '24px', padding: 0, border: 0, borderRadius: '4px', background: 'rgba(255,255,255,0.16)', color: '#FFFFFF', cursor: 'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+          </button>
+          <button type="button" title="Eliminar fotografía" aria-label="Eliminar fotografía" onClick={onDelete} style={{ width: '24px', height: '24px', padding: 0, border: 0, borderRadius: '4px', background: 'rgba(239,68,68,0.8)', color: '#FFFFFF', cursor: 'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v5M14 11v5" /></svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
   personaId,
   isOpen,
@@ -36,10 +75,15 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
   // Delete Confirm Modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEstadoModalOpen, setIsEstadoModalOpen] = useState(false);
+  const [isChangingEstado, setIsChangingEstado] = useState(false);
 
   // Camera / photo state
   const [showCamera, setShowCamera] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [fotoParaVer, setFotoParaVer] = useState<string | null>(null);
+  const [fotoParaEliminar, setFotoParaEliminar] = useState<{ id: string; url: string } | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !personaId) {
@@ -112,16 +156,38 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
     }
   };
 
-  const handleToggleEstado = async () => {
-    if (!personaId) return;
+  const handleConfirmCambioEstado = async () => {
+    if (!personaId || !detalle) return;
+    const nuevoEstado = detalle.estado === 'Activo' ? 'Inactivo' : 'Activo';
+    setIsChangingEstado(true);
     try {
-      const updated = await personaService.toggleEstadoPersona(personaId);
+      const updated = await personaService.cambiarEstadoPersona(personaId, nuevoEstado);
       showToast(`Estado cambiado a ${updated.estado}`, 'info');
       const det = await personaService.getPersonaDetalle(personaId);
       setDetalle(det);
       onPersonaUpdated?.();
     } catch {
       showToast('Error al cambiar estado de la persona', 'error');
+    } finally {
+      setIsChangingEstado(false);
+      setIsEstadoModalOpen(false);
+    }
+  };
+
+  const handleConfirmDeletePhoto = async () => {
+    if (!personaId || !fotoParaEliminar) return;
+    setIsDeletingPhoto(true);
+    try {
+      await personaService.eliminarFotoPersona(personaId, fotoParaEliminar.id);
+      const updated = await personaService.getPersonaDetalle(personaId);
+      setDetalle(updated);
+      setFotoParaEliminar(null);
+      showToast('Fotografía eliminada', 'success');
+      onPersonaUpdated?.();
+    } catch {
+      showToast('Error al eliminar la fotografía', 'error');
+    } finally {
+      setIsDeletingPhoto(false);
     }
   };
 
@@ -419,8 +485,8 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={handleToggleEstado}
-                        title="Click para cambiar estado"
+                        onClick={() => setIsEstadoModalOpen(true)}
+                        title={detalle.estado === 'Activo' ? 'Inactivar estudiante' : 'Reactivar estudiante'}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -496,11 +562,12 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 56px)', gap: '6px', flexShrink: 0 }}>
                     {(detalle.fotosReferencia?.length ? detalle.fotosReferencia : detalle.fotoReferencia?.url ? [{ id: detalle.fotoReferencia.id ?? 'principal', url: detalle.fotoReferencia.url, fechaCarga: detalle.fotoReferencia.fechaCaptura }] : []).map((foto, index) => (
-                      <img
+                      <FotoReferenciaPreview
                         key={foto.id}
                         src={foto.url}
                         alt={`Fotografía de referencia ${index + 1}`}
-                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(10,132,255,0.35)' }}
+                        onView={() => setFotoParaVer(foto.url)}
+                        onDelete={() => setFotoParaEliminar({ id: foto.id, url: foto.url })}
                       />
                     ))}
                   </div>
@@ -679,6 +746,36 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
         isDestructive={true}
         isLoading={isDeleting}
       />
+
+      <ConfirmModal
+        isOpen={isEstadoModalOpen}
+        onClose={() => setIsEstadoModalOpen(false)}
+        onConfirm={handleConfirmCambioEstado}
+        title={detalle?.estado === 'Activo' ? 'Inactivar estudiante' : 'Reactivar estudiante'}
+        message={detalle?.estado === 'Activo'
+          ? 'Al inactivar a esta persona se eliminarán sus fotografías de referencia y no podrá usarse para reconocimiento facial.'
+          : 'La persona volverá a estar activa. Debes agregar una fotografía de referencia antes de usar el reconocimiento facial.'}
+        confirmText={detalle?.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+        isDestructive={detalle?.estado === 'Activo'}
+        isLoading={isChangingEstado}
+      />
+
+      <ConfirmModal
+        isOpen={fotoParaEliminar !== null}
+        onClose={() => setFotoParaEliminar(null)}
+        onConfirm={handleConfirmDeletePhoto}
+        title="Eliminar fotografía"
+        message="Esta fotografía dejará de estar disponible para la validación facial."
+        confirmText="Eliminar fotografía"
+        isDestructive={true}
+        isLoading={isDeletingPhoto}
+      />
+
+      {fotoParaVer && (
+        <div onClick={() => setFotoParaVer(null)} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <img src={fotoParaVer} alt="Fotografía de referencia ampliada" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 'min(720px, 100%)', maxHeight: 'calc(100vh - 48px)', objectFit: 'contain', borderRadius: '8px' }} />
+        </div>
+      )}
 
       <style>{`
         @keyframes drawerFadeIn {

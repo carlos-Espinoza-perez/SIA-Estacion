@@ -23,9 +23,9 @@ public class ServicioItems
         _contextoEmpresa = contextoEmpresa;
     }
 
-    public async Task<Result<List<TipoItemResponse>>> ObtenerTiposAsync(CancellationToken ct)
+    public async Task<Result<List<TipoItemResponse>>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct)
     {
-        List<TipoItem> tipos = await _repository.ObtenerTiposAsync(ct);
+        List<TipoItem> tipos = await _repository.ObtenerTiposAsync(soloActivos, ct);
         return Result<List<TipoItemResponse>>.Exitoso(_mapper.Map<List<TipoItemResponse>>(tipos));
     }
 
@@ -59,8 +59,24 @@ public class ServicioItems
         TipoItem? tipo = await _repository.ObtenerTipoPorIdAsync(id, ct);
         if (tipo is null)
             throw new EntidadNoEncontradaException(nameof(TipoItem), id);
-        
+
+        List<Item> items = await _repository.ObtenerItemsAsync(null, id, null, ct);
+        if (items.Count > 0)
+            return Result<bool>.Fallido("TIPO_TIENE_ITEMS",
+                $"No se puede eliminar el tipo \"{tipo.Nombre}\" porque tiene {items.Count} ítem(s) asignado(s). Reasigna o elimina los ítems primero.");
+
         tipo.Estado = false;
+        await _repository.SaveChangesAsync(ct);
+        return Result<bool>.Exitoso(true);
+    }
+
+    public async Task<Result<bool>> ReactivarTipoAsync(Guid id, CancellationToken ct)
+    {
+        TipoItem? tipo = await _repository.ObtenerTipoPorIdAsync(id, ct);
+        if (tipo is null)
+            throw new EntidadNoEncontradaException(nameof(TipoItem), id);
+
+        tipo.Estado = true;
         await _repository.SaveChangesAsync(ct);
         return Result<bool>.Exitoso(true);
     }
@@ -170,6 +186,10 @@ public class ServicioItems
 
     public async Task<Result<ItemResponse>> CrearItemAsync(CrearItemRequest request, CancellationToken ct)
     {
+        Item? existente = await _repository.ObtenerItemPorQrAsync(request.CodigoQr, ct);
+        if (existente is not null)
+            return Result<ItemResponse>.Fallido("ITEM_DUPLICADO", $"Ya existe un ítem registrado con el código '{request.CodigoQr}'");
+
         var item = new Item
         {
             Id = Guid.NewGuid(),

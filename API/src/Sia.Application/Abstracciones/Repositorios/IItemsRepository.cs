@@ -5,7 +5,7 @@ namespace Sia.Application.Abstracciones.Repositorios;
 
 public interface IItemsRepository
 {
-    Task<List<TipoItem>> ObtenerTiposAsync(CancellationToken ct);
+    Task<List<TipoItem>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct);
     Task<TipoItem?> ObtenerTipoPorIdAsync(Guid id, CancellationToken ct);
     Task AgregarTipoAsync(TipoItem tipo, CancellationToken ct);
     

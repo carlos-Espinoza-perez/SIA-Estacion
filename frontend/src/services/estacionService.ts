@@ -19,6 +19,10 @@ interface EstacionBackendDto {
   requiereIdentificacion: boolean;
   requiereAprobacion: boolean;
   estado: boolean;
+  estaVinculada?: boolean;
+  macAddress?: string;
+  codigoVinculacion?: string;
+  fechaVinculacion?: string;
   ultimaSincronizacion?: string;
 }
 
@@ -35,7 +39,12 @@ export const estacionService = {
         ? new Date(e.ultimaSincronizacion).toLocaleString()
         : '—',
       estado: e.estado ? 'En línea' : 'Offline',
+      encargadoId: e.encargadoId,
       encargado: e.encargadoNombre || 'Sin asignar',
+      estaVinculada: e.estaVinculada ?? false,
+      macAddress: e.macAddress,
+      codigoVinculacion: e.codigoVinculacion,
+      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
       identificadorDispositivo: e.clientId,
       modoOffline: true,
       firmware: e.firmwareVersion || 'v1.0.3',
@@ -53,6 +62,7 @@ export const estacionService = {
           (e) =>
             e.nombre.toLowerCase().includes(q) ||
             e.ubicacion.toLowerCase().includes(q) ||
+            (e.macAddress && e.macAddress.toLowerCase().includes(q)) ||
             (e.identificadorDispositivo &&
               e.identificadorDispositivo.toLowerCase().includes(q))
         );
@@ -82,7 +92,12 @@ export const estacionService = {
         ? new Date(e.ultimaSincronizacion).toLocaleString()
         : '—',
       estado: e.estado ? 'En línea' : 'Offline',
+      encargadoId: e.encargadoId,
       encargado: e.encargadoNombre || 'Sin asignar',
+      estaVinculada: e.estaVinculada ?? false,
+      macAddress: e.macAddress,
+      codigoVinculacion: e.codigoVinculacion,
+      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
       identificadorDispositivo: e.clientId,
       modoOffline: true,
       firmware: e.firmwareVersion || 'v1.0.3',
@@ -98,6 +113,7 @@ export const estacionService = {
     const response = await apiClient.post<RespuestaEnvuelta<EstacionBackendDto>>('/estaciones', {
       nombre: data.nombre,
       ubicacion: data.ubicacion,
+      encargadoId: data.encargadoId || null,
       requiereIdentificacion: true,
       requiereAprobacion: data.flujo === 'Aprobación',
     });
@@ -111,7 +127,10 @@ export const estacionService = {
       flujo: eb.requiereAprobacion ? 'Aprobación' : 'Directo',
       ultimaSincronizacion: 'Ahora',
       estado: 'En línea',
-      encargado: data.encargado,
+      encargadoId: eb.encargadoId,
+      encargado: eb.encargadoNombre || data.encargado,
+      estaVinculada: eb.estaVinculada ?? false,
+      macAddress: eb.macAddress,
       identificadorDispositivo: eb.clientId || data.identificadorDispositivo,
       modoOffline: data.modoOffline,
       firmware: 'v1.0.3',
@@ -124,14 +143,13 @@ export const estacionService = {
   },
 
   actualizarEstacion: async (id: string, data: Partial<Estacion>): Promise<Estacion> => {
-    if (data.nombre || data.ubicacion) {
-      await apiClient.put(`/estaciones/${id}`, {
-        nombre: data.nombre,
-        ubicacion: data.ubicacion,
-        requiereAprobacion: data.flujo === 'Aprobación',
-        estado: data.estado === 'En línea',
-      });
-    }
+    await apiClient.put(`/estaciones/${id}`, {
+      nombre: data.nombre,
+      ubicacion: data.ubicacion,
+      encargadoId: data.encargadoId || null,
+      requiereAprobacion: data.flujo === 'Aprobación',
+      estado: data.estado === 'En línea',
+    });
 
     const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}`);
     const e = response.data.datos!;
@@ -145,7 +163,12 @@ export const estacionService = {
         ? new Date(e.ultimaSincronizacion).toLocaleString()
         : '—',
       estado: e.estado ? 'En línea' : 'Offline',
+      encargadoId: e.encargadoId,
       encargado: e.encargadoNombre || 'Sin asignar',
+      estaVinculada: e.estaVinculada ?? false,
+      macAddress: e.macAddress,
+      codigoVinculacion: e.codigoVinculacion,
+      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
       identificadorDispositivo: e.clientId,
       modoOffline: true,
       firmware: e.firmwareVersion || 'v1.0.3',
@@ -155,6 +178,43 @@ export const estacionService = {
       latenciaFacialPromedio: '—',
       actividadReciente: [],
     };
+  },
+
+  vincularEstacion: async (id: string, codigoVinculacionOMac: string): Promise<Estacion> => {
+    const response = await apiClient.post<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}/vincular`, {
+      codigoVinculacionOMac,
+    });
+    const e = response.data.datos!;
+    return {
+      id: e.id,
+      nombre: e.nombre,
+      ubicacion: e.ubicacion,
+      tipoRecurso: 'Control de acceso',
+      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
+      ultimaSincronizacion: e.ultimaSincronizacion
+        ? new Date(e.ultimaSincronizacion).toLocaleString()
+        : '—',
+      estado: e.estado ? 'En línea' : 'Offline',
+      encargadoId: e.encargadoId,
+      encargado: e.encargadoNombre || 'Sin asignar',
+      estaVinculada: e.estaVinculada ?? true,
+      macAddress: e.macAddress,
+      codigoVinculacion: e.codigoVinculacion,
+      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : 'Ahora',
+      identificadorDispositivo: e.clientId,
+      modoOffline: true,
+      firmware: e.firmwareVersion || 'v1.0.3',
+      accesosHoy: 0,
+      operacionesHoy: 0,
+      latenciaQrPromedio: '—',
+      latenciaFacialPromedio: '—',
+      actividadReciente: [],
+    };
+  },
+
+  desvincularEstacion: async (id: string): Promise<boolean> => {
+    await apiClient.post(`/estaciones/${id}/desvincular`);
+    return true;
   },
 
   toggleEstadoEstacion: async (id: string): Promise<Estacion> => {
@@ -181,7 +241,11 @@ export const estacionService = {
         ? new Date(e.ultimaSincronizacion).toLocaleString()
         : '—',
       estado: e.estado ? 'En línea' : 'Offline',
+      encargadoId: e.encargadoId,
       encargado: e.encargadoNombre || 'Sin asignar',
+      estaVinculada: e.estaVinculada ?? false,
+      macAddress: e.macAddress,
+      codigoVinculacion: e.codigoVinculacion,
       identificadorDispositivo: e.clientId,
       modoOffline: true,
       firmware: e.firmwareVersion || 'v1.0.3',

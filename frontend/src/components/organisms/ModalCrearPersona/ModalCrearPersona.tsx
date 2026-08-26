@@ -53,7 +53,7 @@ export const ModalCrearPersona: React.FC<ModalCrearPersonaProps> = ({
         nombre: nombre.trim(),
         carnet: carnet.trim(),
         tipo,
-        rol: 'Estudiante',
+        rol: (tipo === 'Estudiante' ? 'Estudiante' : 'Encargado') as any,
         carreraOArea: '',
         correo: '',
         fotoArchivo,

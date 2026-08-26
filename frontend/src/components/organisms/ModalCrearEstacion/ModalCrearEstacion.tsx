@@ -1,41 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal/Modal';
 import { Button } from '../../atoms/Button/Button';
-import { CrearEstacionFormData, FlujoEstacion } from '../../../types/estacion';
+import { CrearEstacionFormData, Estacion, FlujoEstacion } from '../../../types/estacion';
+import { personaService } from '../../../services/personaService';
+import { Persona } from '../../../types/persona';
 
 export interface ModalCrearEstacionProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearEstacionFormData) => void | Promise<void>;
+  onSubmit: (data: CrearEstacionFormData) => Promise<Estacion | void>;
+  onEstacionCreada?: (estacion: Estacion) => void;
 }
 
 const TIPO_RECURSO_OPTIONS = [
-  'Componentes electrónicos',
   'Control de acceso',
   'Equipo de laboratorio',
   'Material bibliográfico',
-];
-
-const ENCARGADO_OPTIONS = [
-  'Weslin Rodríguez',
-  'Martha Sánchez',
-  'Josué Argeñal',
-  'Heberto Espinoza',
 ];
 
 export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  onEstacionCreada,
 }) => {
   const [nombre, setNombre] = useState('');
   const [ubicacion, setUbicacion] = useState('');
-  const [tipoRecurso, setTipoRecurso] = useState('Componentes electrónicos');
+  const [tipoRecurso, setTipoRecurso] = useState('Control de acceso');
   const [flujo, setFlujo] = useState<FlujoEstacion>('Aprobación');
-  const [encargado, setEncargado] = useState('Weslin Rodríguez');
+  const [encargadoId, setEncargadoId] = useState('');
+  const [encargado, setEncargado] = useState('');
+  const [encargadosDisponibles, setEncargadosDisponibles] = useState<Persona[]>([]);
   const [identificadorDispositivo, setIdentificadorDispositivo] = useState('EST-LAB-C-01');
   const [modoOffline, setModoOffline] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNombre('');
+      setUbicacion('');
+      setIdentificadorDispositivo(`EST-PUNTO-0${Math.floor(1 + Math.random() * 9)}`);
+      personaService.getPersonas({ tipo: 'Personal', estado: 'Activo', limite: 100 })
+        .then((res) => {
+          const personal = res.data.filter((p) => p.tipo !== 'Estudiante');
+          setEncargadosDisponibles(personal);
+          if (personal.length > 0 && !encargadoId) {
+            setEncargadoId(personal[0].id);
+            setEncargado(personal[0].nombre);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,20 +59,21 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
 
     setIsSaving(true);
     try {
-      await onSubmit({
+      const nuevaEstacion = await onSubmit({
         nombre: nombre.trim(),
         ubicacion: ubicacion.trim(),
         tipoRecurso,
         flujo: tipoRecurso === 'Control de acceso' ? '—' : flujo,
-        encargado,
+        encargadoId: encargadoId || undefined,
+        encargado: encargado || 'Sin asignar',
         identificadorDispositivo: identificadorDispositivo.trim(),
         modoOffline,
       });
 
-      setNombre('');
-      setUbicacion('');
-      setIdentificadorDispositivo(`EST-PUNTO-0${Math.floor(1 + Math.random() * 9)}`);
       onClose();
+      if (nuevaEstacion && onEstacionCreada) {
+        onEstacionCreada(nuevaEstacion);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -77,7 +94,7 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
         disabled={!nombre.trim() || !ubicacion.trim()}
         isLoading={isSaving}
       >
-        Crear Estación
+        Crear y Escanear QR
       </Button>
     </>
   );
@@ -210,8 +227,13 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
             Encargado asignado
           </label>
           <select
-            value={encargado}
-            onChange={(e) => setEncargado(e.target.value)}
+            value={encargadoId}
+            onChange={(e) => {
+              const selectedId = e.target.value;
+              setEncargadoId(selectedId);
+              const found = encargadosDisponibles.find((p) => p.id === selectedId);
+              setEncargado(found ? found.nombre : '');
+            }}
             style={{
               height: '38px',
               backgroundColor: '#333333',
@@ -224,8 +246,11 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
               outline: 'none',
             }}
           >
-            {ENCARGADO_OPTIONS.map((enc) => (
-              <option key={enc} value={enc}>{enc}</option>
+            <option value="">Sin asignar</option>
+            {encargadosDisponibles.map((enc) => (
+              <option key={enc.id} value={enc.id}>
+                {enc.nombre} ({enc.carnet})
+              </option>
             ))}
           </select>
         </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal/Modal';
 import { Button } from '../../atoms/Button/Button';
-import { CrearRolFormData, Rol, CategoriaPermiso } from '../../../types/rol';
-import { PERMISOS_SISTEMA } from '../../../services/rolService';
+import { CrearRolFormData, Rol, Privilegio } from '../../../types/rol';
+import { rolService } from '../../../services/rolService';
 
 export interface ModalCrearRolProps {
   isOpen: boolean;
@@ -10,14 +10,6 @@ export interface ModalCrearRolProps {
   onSubmit: (formData: CrearRolFormData) => void | Promise<void>;
   rolesExistentes: Rol[];
 }
-
-const CATEGORIAS_ORDEN: CategoriaPermiso[] = [
-  'ACCESOS',
-  'ÍTEMS',
-  'CATÁLOGOS',
-  'ADMINISTRACIÓN',
-  'AUDITORÍA',
-];
 
 export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
   isOpen,
@@ -29,44 +21,49 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
   const [descripcion, setDescripcion] = useState('');
   const [baseRolId, setBaseRolId] = useState('');
   const [activo, setActivo] = useState(true);
-  const [permisosSeleccionados, setPermisosSeleccionados] = useState<string[]>([]);
+  const [privilegiosDisponibles, setPrivilegiosDisponibles] = useState<Privilegio[]>([]);
+  const [privilegiosSeleccionados, setPrivilegiosSeleccionados] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setNombre('');
       setDescripcion('');
       setBaseRolId('');
       setActivo(true);
-      setPermisosSeleccionados([]);
+      setPrivilegiosSeleccionados([]);
+      rolService.getPrivilegios().then((privs) => {
+        setPrivilegiosDisponibles(privs);
+      });
     }
   }, [isOpen]);
 
-  // If user picks a base role, copy its permissions
   const handleBaseRolChange = (rolId: string) => {
     setBaseRolId(rolId);
     if (!rolId) {
-      setPermisosSeleccionados([]);
+      setPrivilegiosSeleccionados([]);
       return;
     }
     const found = rolesExistentes.find((r) => r.id === rolId);
     if (found) {
-      setPermisosSeleccionados([...found.permisos]);
+      const matching = privilegiosDisponibles
+        .filter((p) => found.permisos.includes(p.codigo))
+        .map((p) => p.id);
+      setPrivilegiosSeleccionados(matching);
     }
   };
 
-  const togglePermiso = (codigo: string) => {
-    setPermisosSeleccionados((prev) =>
-      prev.includes(codigo) ? prev.filter((p) => p !== codigo) : [...prev, codigo]
+  const togglePrivilegio = (privId: string) => {
+    setPrivilegiosSeleccionados((prev) =>
+      prev.includes(privId) ? prev.filter((id) => id !== privId) : [...prev, privId]
     );
   };
 
   const handleSelectAll = () => {
-    if (permisosSeleccionados.length === PERMISOS_SISTEMA.length) {
-      setPermisosSeleccionados([]);
+    if (privilegiosSeleccionados.length === privilegiosDisponibles.length) {
+      setPrivilegiosSeleccionados([]);
     } else {
-      setPermisosSeleccionados(PERMISOS_SISTEMA.map((p) => p.codigo));
+      setPrivilegiosSeleccionados(privilegiosDisponibles.map((p) => p.id));
     }
   };
 
@@ -81,7 +78,7 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
         descripcion: descripcion.trim(),
         baseRolId: baseRolId || undefined,
         activo,
-        permisos: permisosSeleccionados,
+        permisos: privilegiosSeleccionados,
       });
       onClose();
     } catch (error) {
@@ -90,6 +87,8 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
       setIsSaving(false);
     }
   };
+
+  const modulos = Array.from(new Set(privilegiosDisponibles.map((p) => p.modulo)));
 
   const footer = (
     <>
@@ -237,26 +236,11 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
           </div>
         </div>
 
-        {/* Banner Informativo sobre Claims */}
-        <div
-          style={{
-            padding: '12px 14px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            fontSize: '12px',
-            color: 'rgba(255, 255, 255, 0.65)',
-            lineHeight: '1.45',
-          }}
-        >
-          💡 <strong style={{ color: '#FFFFFF' }}>Claims sobre ASP.NET Core Identity:</strong> Los permisos seleccionados se guardan como Claims. Un rol nuevo no requiere cambios en el código ni despliegues adicionales.
-        </div>
-
         {/* Header Permisos Disponibles & Badge */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
-              Permisos disponibles
+              Privilegios disponibles
             </span>
             <span
               style={{
@@ -268,7 +252,7 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
                 color: '#FFFFFF',
               }}
             >
-              {permisosSeleccionados.length} de {PERMISOS_SISTEMA.length}
+              {privilegiosSeleccionados.length} de {privilegiosDisponibles.length}
             </span>
           </div>
 
@@ -277,9 +261,9 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleSelectAll}
-            style={{ color: '#3B82F6', fontSize: '12px', padding: '2px 4px', height: 'auto' }}
+            style={{ color: '#ADADFB', fontSize: '12px', padding: '2px 4px', height: 'auto' }}
           >
-            {permisosSeleccionados.length === PERMISOS_SISTEMA.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            {privilegiosSeleccionados.length === privilegiosDisponibles.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
           </Button>
         </div>
 
@@ -294,46 +278,44 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
             paddingRight: '6px',
           }}
         >
-          {CATEGORIAS_ORDEN.map((cat) => {
-            const permisosCat = PERMISOS_SISTEMA.filter((p) => p.categoria === cat);
+          {modulos.map((modulo) => {
+            const privsModulo = privilegiosDisponibles.filter((p) => p.modulo === modulo);
             return (
-              <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={modulo} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <span
                   style={{
                     fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.05em',
                     color: 'rgba(255, 255, 255, 0.4)',
+                    textTransform: 'uppercase',
                   }}
                 >
-                  {cat}
+                  Módulo {modulo}
                 </span>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {permisosCat.map((perm) => {
-                    const isSelected = permisosSeleccionados.includes(perm.codigo);
+                  {privsModulo.map((perm) => {
+                    const isSelected = privilegiosSeleccionados.includes(perm.id);
                     return (
                       <div
-                        key={perm.codigo}
-                        onClick={() => togglePermiso(perm.codigo)}
+                        key={perm.id}
+                        onClick={() => togglePrivilegio(perm.id)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.02)',
-                          border: `1px solid ${isSelected ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.06)'}`,
+                          backgroundColor: isSelected ? 'rgba(173, 173, 251, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                          border: `1px solid ${isSelected ? 'rgba(173, 173, 251, 0.2)' : 'rgba(255, 255, 255, 0.06)'}`,
                           cursor: 'pointer',
                           transition: 'all 0.12s ease',
                         }}
                       >
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: 500, color: '#FFFFFF', fontFamily: 'monospace' }}>
-                            {perm.nombre}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
-                            {perm.descripcion}
+                            [{perm.codigo}] {perm.nombre}
                           </div>
                         </div>
 
@@ -342,12 +324,12 @@ export const ModalCrearRol: React.FC<ModalCrearRolProps> = ({
                             width: '18px',
                             height: '18px',
                             borderRadius: '4px',
-                            border: `1px solid ${isSelected ? '#22C55E' : 'rgba(255, 255, 255, 0.25)'}`,
-                            backgroundColor: isSelected ? '#22C55E' : 'transparent',
+                            border: `1px solid ${isSelected ? '#ADADFB' : 'rgba(255, 255, 255, 0.25)'}`,
+                            backgroundColor: isSelected ? '#ADADFB' : 'transparent',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#FFFFFF',
+                            color: '#1E1E1E',
                             fontSize: '12px',
                             fontWeight: 'bold',
                             flexShrink: 0,

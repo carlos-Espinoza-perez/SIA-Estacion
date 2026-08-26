@@ -8,7 +8,7 @@ using Sia.Application.Servicios;
 namespace Sia.Api.Controllers;
 
 [ApiController]
-[Route("api/tipos-item")]
+[Route("api/tipos-items")]
 [Authorize]
 public class TiposItemController : SiaControllerBase
 {
@@ -21,9 +21,9 @@ public class TiposItemController : SiaControllerBase
 
     [HttpGet]
     [RequierePrivilegio("TIP", "L")]
-    public async Task<IActionResult> ObtenerTodos(CancellationToken ct)
+    public async Task<IActionResult> ObtenerTodos([FromQuery] bool soloActivos = true, CancellationToken ct = default)
     {
-        var resultado = await _servicio.ObtenerTiposAsync(ct);
+        var resultado = await _servicio.ObtenerTiposAsync(soloActivos, ct);
         return HandleResult(resultado);
     }
 
@@ -48,6 +48,14 @@ public class TiposItemController : SiaControllerBase
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken ct)
     {
         var resultado = await _servicio.EliminarTipoAsync(id, ct);
+        return HandleResult(resultado);
+    }
+
+    [HttpPatch("{id:guid}/reactivar")]
+    [RequierePrivilegio("TIP", "E")]
+    public async Task<IActionResult> Reactivar(Guid id, CancellationToken ct)
+    {
+        var resultado = await _servicio.ReactivarTipoAsync(id, ct);
         return HandleResult(resultado);
     }
 

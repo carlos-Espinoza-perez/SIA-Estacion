@@ -92,7 +92,7 @@ public class AuditoriaInterceptor : SaveChangesInterceptor
                 Entidad = nombreEntidad,
                 EntidadId = entidadId,
                 Accion = accion,
-                Descripcion = $"{accion} de {nombreEntidad} #{entidadId}",
+                Descripcion = CrearDescripcion(entry.Entity, accion),
                 Origen = "Panel",
                 UserId = _contextoUsuario.UserId,
                 FechaHora = DateTimeOffset.UtcNow
@@ -106,4 +106,64 @@ public class AuditoriaInterceptor : SaveChangesInterceptor
 
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
+
+    private static string CrearDescripcion(object entidad, string accion)
+    {
+        if (entidad is Persona persona)
+        {
+            string nombrePersona = $"{persona.Nombres} {persona.Apellidos}".Trim();
+            return accion switch
+            {
+                "Crear" => $"Se registró a {nombrePersona}",
+                "Actualizar" => $"Se actualizaron los datos de {nombrePersona}",
+                "Inactivar" => $"Se desactivó a {nombrePersona}",
+                "Activar" => $"Se activó a {nombrePersona}",
+                "Eliminar" => $"Se eliminó a {nombrePersona}",
+                _ => $"Se modificó a {nombrePersona}"
+            };
+        }
+
+        string nombre = entidad switch
+        {
+            FotoReferencia => "una fotografía de referencia",
+            Item item => $"el ítem {item.Nombre}",
+            Estacion estacion => $"la estación {estacion.Nombre}",
+            TipoItem tipoItem => $"el tipo de ítem {tipoItem.Nombre}",
+            _ => NombreEntidad(entidad.GetType().Name)
+        };
+
+        return (accion, entidad) switch
+        {
+            ("Crear", FotoReferencia) => "Se agregó una fotografía de referencia",
+            ("Inactivar", FotoReferencia) => "Se eliminó una fotografía de referencia",
+            ("Crear", _) => $"Se creó {nombre}",
+            ("Actualizar", _) => $"Se actualizó {nombre}",
+            ("Inactivar", _) => $"Se desactivó {nombre}",
+            ("Activar", _) => $"Se activó {nombre}",
+            ("Eliminar", _) => $"Se eliminó {nombre}",
+            _ => $"Se modificó {nombre}"
+        };
+    }
+
+    private static string NombreEntidad(string entidad) => entidad switch
+    {
+        "Persona" => "una persona",
+        "Usuario" => "un usuario",
+        "Item" => "un ítem",
+        "Estacion" => "una estación",
+        "TipoItem" => "un tipo de ítem",
+        "FotoReferencia" => "una fotografía de referencia",
+        "ApplicationRole" => "un rol",
+        "Empresa" => "la empresa",
+        "AtributoDefinicion" => "un atributo de ítem",
+        "EstacionTipoItem" => "la asignación de un tipo de ítem a una estación",
+        "ItemAtributoValor" => "un valor de atributo de ítem",
+        "ItemComposicion" => "la composición de un ítem",
+        "NivelPermiso" => "un nivel de permiso",
+        "OperacionItem" => "una operación de préstamo",
+        "OperacionItemDetalle" => "el detalle de una operación",
+        "Privilegio" => "un privilegio",
+        "RolPrivilegio" => "la asignación de un privilegio a un rol",
+        _ => entidad
+    };
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sia.Api.Filtros;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Servicios;
@@ -19,6 +20,7 @@ public class UsuariosController : SiaControllerBase
     }
 
     [HttpGet]
+    [RequierePrivilegio("USU", "L")]
     public async Task<IActionResult> ObtenerTodos(CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerTodosAsync(ct);
@@ -26,6 +28,7 @@ public class UsuariosController : SiaControllerBase
     }
 
     [HttpPost]
+    [RequierePrivilegio("USU", "C")]
     public async Task<IActionResult> Crear([FromBody] CrearUsuarioRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.CrearAsync(request, ct);
@@ -33,6 +36,7 @@ public class UsuariosController : SiaControllerBase
     }
 
     [HttpPut("{id}")]
+    [RequierePrivilegio("USU", "A")]
     public async Task<IActionResult> Actualizar(string id, [FromBody] CrearUsuarioRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.ActualizarAsync(id, request, ct);
@@ -40,6 +44,7 @@ public class UsuariosController : SiaControllerBase
     }
 
     [HttpPost("{id}/roles")]
+    [RequierePrivilegio("USU", "A")]
     public async Task<IActionResult> AsignarRoles(string id, [FromBody] AsignarRolesRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.AsignarRolesAsync(id, request, ct);
@@ -47,6 +52,7 @@ public class UsuariosController : SiaControllerBase
     }
 
     [HttpDelete("{id}")]
+    [RequierePrivilegio("USU", "B")]
     public async Task<IActionResult> Eliminar(string id, CancellationToken ct)
     {
         var resultado = await _servicio.EliminarAsync(id, ct);

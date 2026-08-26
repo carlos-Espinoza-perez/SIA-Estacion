@@ -23,5 +23,6 @@ public interface ISeguridadRepository
     Task<Dictionary<string, int>> ObtenerConteoUsuariosPorRolAsync(CancellationToken ct);
     Task<List<RolPrivilegio>> ObtenerTodosPrivilegiosRolesAsync(CancellationToken ct);
 
+    Task AsegurarCatalogosDefaultAsync(CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

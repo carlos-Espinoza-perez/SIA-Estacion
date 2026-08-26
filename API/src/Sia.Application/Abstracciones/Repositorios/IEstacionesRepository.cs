@@ -7,6 +7,8 @@ public interface IEstacionesRepository
     Task<List<Estacion>> ObtenerTodasAsync(CancellationToken ct);
     Task<Estacion?> ObtenerPorIdAsync(Guid id, CancellationToken ct);
     Task<Estacion?> ObtenerPorClientIdAsync(string clientId, CancellationToken ct);
+    Task<Estacion?> ObtenerPorMacAsync(string macAddress, CancellationToken ct);
+    Task<Estacion?> ObtenerPorCodigoVinculacionAsync(string codigo, CancellationToken ct);
     Task AgregarAsync(Estacion estacion, CancellationToken ct);
     
     Task<List<EstacionTipoItem>> ObtenerAsignacionesTiposItemAsync(Guid estacionId, CancellationToken ct);

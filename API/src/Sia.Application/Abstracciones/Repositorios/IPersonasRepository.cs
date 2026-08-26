@@ -10,10 +10,12 @@ public interface IPersonasRepository
     Task<Persona?> ObtenerPorIdAsync(Guid id, CancellationToken ct);
     Task<Persona?> ObtenerPorCodigoAsync(string codigo, CancellationToken ct);
     Task<Persona?> ObtenerPorUserIdAsync(string userId, CancellationToken ct);
+    Task<Dictionary<string, string>> ObtenerRolesPorUserIdsAsync(IEnumerable<string> userIds, CancellationToken ct);
     Task<List<string>> ObtenerCodigosSincronizacionAsync(Guid empresaId, CancellationToken ct);
     Task AgregarAsync(Persona persona, CancellationToken ct);
     
     Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, CancellationToken ct);
+    Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, Guid fotoId, CancellationToken ct);
     Task<List<FotoReferencia>> ObtenerFotosActivasAsync(Guid personaId, CancellationToken ct);
     Task AgregarFotoAsync(FotoReferencia foto, CancellationToken ct);
     

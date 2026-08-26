@@ -57,9 +57,12 @@ public class ReportesController : SiaControllerBase
         [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta,
         [FromQuery] string? entidad,
-        CancellationToken ct)
+        [FromQuery] string? busqueda,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int limite = 10,
+        CancellationToken ct = default)
     {
-        var resultado = await _servicio.ObtenerAuditoriaAsync(desde, hasta, entidad, ct);
+        var resultado = await _servicio.ObtenerAuditoriaAsync(desde, hasta, entidad, busqueda, pagina, limite, ct);
         return HandleResult(resultado);
     }
 

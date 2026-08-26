@@ -7,12 +7,15 @@ public class PersonaResponse
     public string Nombres { get; set; } = string.Empty;
     public string Apellidos { get; set; } = string.Empty;
     public string TipoPersona { get; set; } = string.Empty;
+    public string? Rol { get; set; }
+    public string? UserId { get; set; }
     public string? CarreraOArea { get; set; }
     public string? Correo { get; set; }
     public string? Telefono { get; set; }
     public bool Estado { get; set; }
     public DateTimeOffset FechaRegistro { get; set; }
     public bool TieneFotoReferencia { get; set; }
+    public string? AvatarUrl { get; set; }
 }
 
 public class PersonaDetalleResponse : PersonaResponse

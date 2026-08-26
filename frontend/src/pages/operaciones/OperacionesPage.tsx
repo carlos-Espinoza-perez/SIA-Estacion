@@ -9,6 +9,7 @@ import {
 } from '../../components/organisms/Modal/ModalAprobacionPrestamo';
 import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
+import { estacionService } from '../../services/estacionService';
 import {
   operacionService,
   OperacionRow,
@@ -49,15 +50,6 @@ const EstadoBadge: React.FC<{ value: EstadoOperacion }> = ({ value }) => {
   );
 };
 
-// Opciones de filtros
-
-const ESTACION_OPTIONS: SelectOption[] = [
-  { value: '',             label: 'Estación: Todas' },
-  { value: 'Laboratorio A', label: 'Laboratorio A' },
-  { value: 'Taller',       label: 'Taller' },
-  { value: 'Biblioteca',   label: 'Biblioteca' },
-];
-
 const ESTADO_OPTIONS: SelectOption[] = [
   { value: '',          label: 'Estado: Todos' },
   { value: 'Pendiente', label: 'Pendiente' },
@@ -69,10 +61,10 @@ const ESTADO_OPTIONS: SelectOption[] = [
 ];
 
 const FECHA_OPTIONS: SelectOption[] = [
+  { value: '',       label: 'Fecha: Todas' },
   { value: 'hoy',    label: 'Hoy' },
   { value: 'semana', label: 'Esta semana' },
   { value: 'mes',    label: 'Este mes' },
-  { value: '28/07',  label: '28 jul 2026' },
 ];
 
 // Definición de Columnas
@@ -140,11 +132,23 @@ const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
 export const OperacionesPage: React.FC = () => {
   const { showToast } = useToast();
   const [operaciones, setOperaciones] = useState<OperacionRow[]>([]);
+  const [estacionOptions, setEstacionOptions] = useState<SelectOption[]>([
+    { value: '', label: 'Estación: Todas' },
+  ]);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [estado,    setEstado]    = useState('');
-  const [fecha,     setFecha]     = useState('28/07');
+  const [fecha,     setFecha]     = useState('');
   const [modalData, setModalData] = useState<AprobacionPrestamoData | null>(null);
+
+  useEffect(() => {
+    estacionService.getEstaciones().then((ests) => {
+      setEstacionOptions([
+        { value: '', label: 'Estación: Todas' },
+        ...ests.map((e) => ({ value: e.nombre, label: e.nombre })),
+      ]);
+    }).catch(console.error);
+  }, []);
 
   const cargarOperaciones = useCallback(async () => {
     try {
@@ -167,23 +171,24 @@ export const OperacionesPage: React.FC = () => {
   const handleFolioClick = (row: OperacionRow) => {
     if (row.estado !== 'Pendiente') return;
     setModalData({
+      id: row.id,
       folio: row.folio,
       fechaSolicitud: row.fechaHora,
       solicitante: {
         nombre: row.solicitante,
-        carnet: '22-A0200-0056',
-        rol: 'Estudiante',
-        carrera: 'Ing. en Sistemas',
-        prestamosActivos: 3,
+        carnet: row.carnet || '—',
+        rol: 'Usuario',
+        carrera: '—',
+        prestamosActivos: 0,
         devolucionesAtrasadas: 0,
       },
       item: {
         nombre: row.item,
-        codigo: 'IT-0431',
-        categoria: 'Componentes electrónicos',
+        codigo: row.itemId || row.folio,
+        categoria: 'Recurso',
         estado: 'Disponible',
-        disponibles: 4,
-        total: 6,
+        disponibles: 1,
+        total: 1,
       },
       estacion: row.estacion,
       flujo: row.flujo === 'Aprobación' ? 'Requiere aprobación' : 'Directo',
@@ -233,9 +238,9 @@ export const OperacionesPage: React.FC = () => {
 
   const handleAprobarOperacion = async (nota?: string, fechaLimite?: string, cantidad?: number) => {
     if (!modalData) return;
-    await operacionService.aprobarOperacion(modalData.folio, nota);
+    await operacionService.aprobarOperacion(modalData.id, nota);
     setOperaciones((prev) =>
-      prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Aprobada' } : op))
+      prev.map((op) => (op.id === modalData.id ? { ...op, estado: 'Aprobada' } : op))
     );
 
     const detalleStr = [
@@ -260,9 +265,9 @@ export const OperacionesPage: React.FC = () => {
 
   const handleRechazarOperacion = async () => {
     if (!modalData) return;
-    await operacionService.rechazarOperacion(modalData.folio);
+    await operacionService.rechazarOperacion(modalData.id);
     setOperaciones((prev) =>
-      prev.map((op) => (op.folio === modalData.folio ? { ...op, estado: 'Cancelada' } : op))
+      prev.map((op) => (op.id === modalData.id ? { ...op, estado: 'Cancelada' } : op))
     );
 
     await auditoriaService.registrarEvento({
@@ -311,7 +316,7 @@ export const OperacionesPage: React.FC = () => {
             width={300}
           />
           <Select
-            options={ESTACION_OPTIONS}
+            options={estacionOptions}
             value={estacion}
             onChange={setEstacion}
             placeholder="Estación: Todas"

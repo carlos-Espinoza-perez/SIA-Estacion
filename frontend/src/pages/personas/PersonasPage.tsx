@@ -48,16 +48,17 @@ export const PersonasPage: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Cargar datos
-  const cargarPersonas = () => {
+  const cargarPersonas = React.useCallback(async () => {
     const filtros: FiltrosPersona = {
-      busqueda,
+      busqueda: busqueda.trim(),
       rol: rolFiltro,
       tipo: tipoFiltro,
       estado: estadoFiltro,
       pagina: currentPage,
       limite: 10,
     };
-    personaService.getPersonas(filtros).then((result) => {
+    try {
+      const result = await personaService.getPersonas(filtros);
       setPersonas(result.data);
       if (result.paginacion) {
         setTotalPages(result.paginacion.totalPaginas);
@@ -66,12 +67,30 @@ export const PersonasPage: React.FC = () => {
         setTotalPages(1);
         setTotalRegistros(result.data.length);
       }
-    });
+    } catch (err) {
+      console.error('Error al cargar personas:', err);
+    }
+  }, [busqueda, rolFiltro, tipoFiltro, estadoFiltro, currentPage]);
+
+  const handleBusquedaChange = (val: string) => {
+    setBusqueda(val);
+    setCurrentPage(1);
   };
 
-  useEffect(() => {
+  const handleRolChange = (val: string) => {
+    setRolFiltro(val);
     setCurrentPage(1);
-  }, [busqueda, rolFiltro, tipoFiltro, estadoFiltro]);
+  };
+
+  const handleTipoChange = (val: string) => {
+    setTipoFiltro(val);
+    setCurrentPage(1);
+  };
+
+  const handleEstadoChange = (val: string) => {
+    setEstadoFiltro(val);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     rolService.getRoles().then((roles) => {
@@ -85,7 +104,7 @@ export const PersonasPage: React.FC = () => {
 
   useEffect(() => {
     cargarPersonas();
-  }, [busqueda, rolFiltro, tipoFiltro, estadoFiltro, currentPage]);
+  }, [cargarPersonas]);
 
   const handleCrearPersona = async (formData: CrearPersonaFormData) => {
     await personaService.crearPersona(formData);
@@ -270,14 +289,14 @@ export const PersonasPage: React.FC = () => {
             <SearchInput
               placeholder="Buscar por nombre o carnet"
               value={busqueda}
-              onChange={setBusqueda}
+              onChange={handleBusquedaChange}
               width={260}
             />
 
             <Select
               options={rolesOptions}
               value={rolFiltro}
-              onChange={setRolFiltro}
+              onChange={handleRolChange}
               placeholder="Rol: Todos"
               width={180}
             />
@@ -285,7 +304,7 @@ export const PersonasPage: React.FC = () => {
             <Select
               options={TIPO_OPTIONS}
               value={tipoFiltro}
-              onChange={setTipoFiltro}
+              onChange={handleTipoChange}
               placeholder="Tipo: Todos"
               width={160}
             />
@@ -293,7 +312,7 @@ export const PersonasPage: React.FC = () => {
             <Select
               options={ESTADO_OPTIONS}
               value={estadoFiltro}
-              onChange={setEstadoFiltro}
+              onChange={handleEstadoChange}
               placeholder="Estado: Todos"
               width={160}
             />

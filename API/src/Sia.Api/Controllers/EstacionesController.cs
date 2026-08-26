@@ -83,4 +83,36 @@ public class EstacionesController : SiaControllerBase
         var resultado = await _servicio.ReemplazarTiposItemAsync(id, request, ct);
         return HandleResult(resultado);
     }
+
+    [HttpPost("{id:guid}/vincular")]
+    [RequierePrivilegio("EST", "E")]
+    public async Task<IActionResult> Vincular(Guid id, [FromBody] VincularEstacionRequest request, CancellationToken ct)
+    {
+        var resultado = await _servicio.VincularAsync(id, request, ct);
+        return HandleResult(resultado);
+    }
+
+    [HttpPost("{id:guid}/desvincular")]
+    [RequierePrivilegio("EST", "E")]
+    public async Task<IActionResult> Desvincular(Guid id, CancellationToken ct)
+    {
+        var resultado = await _servicio.DesvincularAsync(id, ct);
+        return HandleResult(resultado);
+    }
+
+    [HttpPost("solicitar-pairing")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SolicitarPairing([FromBody] SolicitarPairingRequest request, CancellationToken ct)
+    {
+        var resultado = await _servicio.SolicitarPairingAsync(request, ct);
+        return HandleResult(resultado);
+    }
+
+    [HttpPost("verificar-pairing")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerificarPairing([FromBody] VerificarPairingRequest request, CancellationToken ct)
+    {
+        var resultado = await _servicio.VerificarPairingAsync(request, ct);
+        return HandleResult(resultado);
+    }
 }

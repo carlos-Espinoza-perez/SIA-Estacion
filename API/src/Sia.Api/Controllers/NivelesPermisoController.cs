@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sia.Api.Filtros;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Servicios;
@@ -19,6 +20,7 @@ public class NivelesPermisoController : SiaControllerBase
     }
 
     [HttpGet]
+    [RequierePrivilegio("ROL", "L")]
     public async Task<IActionResult> ObtenerTodos(CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerTodosAsync(ct);
@@ -26,6 +28,7 @@ public class NivelesPermisoController : SiaControllerBase
     }
 
     [HttpPost]
+    [RequierePrivilegio("ROL", "C")]
     public async Task<IActionResult> Crear([FromBody] CrearNivelPermisoRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.CrearAsync(request, ct);
@@ -33,6 +36,7 @@ public class NivelesPermisoController : SiaControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [RequierePrivilegio("ROL", "A")]
     public async Task<IActionResult> Actualizar(Guid id, [FromBody] CrearNivelPermisoRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.ActualizarAsync(id, request, ct);
@@ -40,6 +44,7 @@ public class NivelesPermisoController : SiaControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequierePrivilegio("ROL", "B")]
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken ct)
     {
         var resultado = await _servicio.EliminarAsync(id, ct);

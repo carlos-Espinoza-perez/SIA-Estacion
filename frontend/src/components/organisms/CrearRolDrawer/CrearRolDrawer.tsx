@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Rol, CrearRolFormData, CategoriaPermiso } from '../../../types/rol';
-import { PERMISOS_SISTEMA } from '../../../services/rolService';
+import { Rol, CrearRolFormData, Privilegio, NivelPermiso } from '../../../types/rol';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 
 export interface CrearRolDrawerProps {
@@ -10,15 +9,9 @@ export interface CrearRolDrawerProps {
   onDelete?: (rolId: string) => void;
   rolesExistentes: Rol[];
   rolAEditar?: Rol | null;
+  privilegiosDisponibles?: Privilegio[];
+  nivelesDisponibles?: NivelPermiso[];
 }
-
-const CATEGORIAS_ORDEN: CategoriaPermiso[] = [
-  'ACCESOS',
-  'ÍTEMS',
-  'CATÁLOGOS',
-  'ADMINISTRACIÓN',
-  'AUDITORÍA',
-];
 
 export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
   isOpen,
@@ -27,77 +20,111 @@ export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
   onDelete,
   rolesExistentes,
   rolAEditar,
+  privilegiosDisponibles = [],
+  nivelesDisponibles = [],
 }) => {
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [baseRolId, setBaseRolId] = useState('');
   const [activo, setActivo] = useState(true);
-  const [permisosSeleccionados, setPermisosSeleccionados] = useState<string[]>([
-    'acceso.consultar',
-    'item.aprobar',
-    'item.entregar',
-    'item.registrar',
-    'auditoria.consultar',
-  ]);
+  const [nivelPorDefecto, setNivelPorDefecto] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  
+  // Mapa de { [privilegioId]: nivelCodigo ('NINGUNO' | 'L' | 'E' | 'T') }
+  const [nivelesPorPrivilegio, setNivelesPorPrivilegio] = useState<Record<string, string>>({});
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Reset or initialize on open / when rolAEditar changes
+  // Inicializar o resetear al abrir
   useEffect(() => {
     if (isOpen) {
+      setBusqueda('');
+      const defaultNivel = nivelesDisponibles.find((n) => n.codigo === 'L')?.id || nivelesDisponibles[0]?.id || '';
+      setNivelPorDefecto(defaultNivel);
+
       if (rolAEditar) {
         setNombre(rolAEditar.nombre);
-        setDescripcion(rolAEditar.descripcion);
+        setDescripcion(rolAEditar.descripcion || '');
         setBaseRolId('');
         setActivo(rolAEditar.activo ?? true);
-        setPermisosSeleccionados([...rolAEditar.permisos]);
+
+        // Inicializar privilegios existentes
+        const mapa: Record<string, string> = {};
+        privilegiosDisponibles.forEach((p) => {
+          if (rolAEditar.permisos.includes(p.codigo)) {
+            mapa[p.id] = 'L'; // Nivel base
+          }
+        });
+        setNivelesPorPrivilegio(mapa);
       } else {
         setNombre('');
         setDescripcion('');
         setBaseRolId('');
         setActivo(true);
-        setPermisosSeleccionados([
-          'acceso.consultar',
-          'item.aprobar',
-          'item.entregar',
-          'item.registrar',
-          'auditoria.consultar',
-        ]);
+        
+        // Privilegios sugeridos por defecto (ACC y OPE en Lectura)
+        const mapa: Record<string, string> = {};
+        privilegiosDisponibles.forEach((p) => {
+          if (p.codigo === 'ACC' || p.codigo === 'OPE') {
+            mapa[p.id] = 'L';
+          }
+        });
+        setNivelesPorPrivilegio(mapa);
       }
     }
-  }, [isOpen, rolAEditar]);
+  }, [isOpen, rolAEditar, privilegiosDisponibles, nivelesDisponibles]);
 
   if (!isOpen) return null;
 
   const handleBaseRolChange = (rolId: string) => {
     setBaseRolId(rolId);
     if (!rolId) {
-      setPermisosSeleccionados([]);
+      setNivelesPorPrivilegio({});
       return;
     }
     const found = rolesExistentes.find((r) => r.id === rolId);
     if (found) {
-      setPermisosSeleccionados([...found.permisos]);
+      const mapa: Record<string, string> = {};
+      privilegiosDisponibles.forEach((p) => {
+        if (found.permisos.includes(p.codigo)) {
+          mapa[p.id] = 'L';
+        }
+      });
+      setNivelesPorPrivilegio(mapa);
     }
   };
 
-  const togglePermiso = (codigo: string) => {
-    setPermisosSeleccionados((prev) =>
-      prev.includes(codigo) ? prev.filter((p) => p !== codigo) : [...prev, codigo]
-    );
+  const handleSetNivel = (privId: string, nivelCodigo: string) => {
+    setNivelesPorPrivilegio((prev) => {
+      if (nivelCodigo === 'NINGUNO') {
+        const copy = { ...prev };
+        delete copy[privId];
+        return copy;
+      }
+      return { ...prev, [privId]: nivelCodigo };
+    });
   };
 
-  const handleSelectAll = () => {
-    if (permisosSeleccionados.length === PERMISOS_SISTEMA.length) {
-      setPermisosSeleccionados([]);
-    } else {
-      setPermisosSeleccionados(PERMISOS_SISTEMA.map((p) => p.codigo));
-    }
+  const handleSetModuloNivel = (modulo: string, nivelCodigo: string) => {
+    const privsModulo = privilegiosDisponibles.filter((p) => p.modulo === modulo);
+    setNivelesPorPrivilegio((prev) => {
+      const copy = { ...prev };
+      privsModulo.forEach((p) => {
+        if (nivelCodigo === 'NINGUNO') {
+          delete copy[p.id];
+        } else {
+          copy[p.id] = nivelCodigo;
+        }
+      });
+      return copy;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim() || !descripcion.trim()) return;
+    if (!nombre.trim()) return;
+
+    const privsSeleccionados = Object.keys(nivelesPorPrivilegio);
 
     onSubmit(
       {
@@ -105,7 +132,8 @@ export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
         descripcion: descripcion.trim(),
         baseRolId: baseRolId || undefined,
         activo,
-        permisos: permisosSeleccionados,
+        permisos: privsSeleccionados,
+        nivelPorDefecto,
       },
       rolAEditar?.id
     );
@@ -125,147 +153,121 @@ export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
     }
   };
 
+  // Filtrar privilegios por búsqueda
+  const privilegiosFiltrados = privilegiosDisponibles.filter((p) => {
+    const q = busqueda.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      p.codigo.toLowerCase().includes(q) ||
+      p.nombre.toLowerCase().includes(q) ||
+      p.modulo.toLowerCase().includes(q)
+    );
+  });
+
+  const modulos = Array.from(new Set(privilegiosFiltrados.map((p) => p.modulo)));
+  const totalAsignados = Object.keys(nivelesPorPrivilegio).length;
+
   return (
     <>
-      {/* Backdrop */}
       <div
-        onClick={onClose}
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(3px)',
-          zIndex: 100,
-          transition: 'opacity 0.25s ease',
-        }}
-      />
-
-      {/* Slide-over Drawer Panel */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          width: '580px',
-          maxWidth: '94vw',
-          height: '100vh',
-          backgroundColor: '#1E1E1E',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
-          zIndex: 101,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
           display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.5)',
-          fontFamily: 'Inter, sans-serif',
+          justifyContent: 'flex-end',
         }}
+        onClick={onClose}
       >
-        {/* Header */}
         <div
           style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#242424',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>
-                {rolAEditar ? `Editar rol: ${rolAEditar.nombre}` : 'Nuevo rol'}
-              </h2>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                }}
-              >
-                Roles y permisos
-              </span>
-            </div>
-            <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.45)', margin: '4px 0 0' }}>
-              {rolAEditar
-                ? 'Modifica los claims y configuración del rol en ASP.NET Core Identity.'
-                : 'Define un nuevo perfil de permisos en el sistema.'}
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'rgba(255, 255, 255, 0.5)',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Scrollable Content Body */}
-        <div
-          style={{
-            padding: '24px',
+            width: '600px',
+            maxWidth: '100%',
+            height: '100%',
+            backgroundColor: '#17171C',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
-            overflowY: 'auto',
-            flex: 1,
+            boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.6)',
+            fontFamily: 'Inter, sans-serif',
           }}
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Card 1: Datos del rol */}
+          {/* Header */}
           <div
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '20px',
+              padding: '20px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
             }}
           >
-            <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>
-              Datos del rol
-            </span>
+            <div>
+              <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>
+                {rolAEditar ? 'Configuración de Rol' : 'Crear Nuevo Rol'}
+              </h3>
+              <span style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                {rolAEditar ? `Editando privilegios de "${rolAEditar.nombre}"` : 'Define los accesos y privilegios del nuevo perfil'}
+              </span>
+            </div>
 
-            {/* Nombre del rol */}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '20px',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Form Content */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+          >
+            {/* Nombre del Rol */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500 }}>
-                Nombre del rol
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#FFFFFF' }}>
+                Nombre del rol <span style={{ color: '#EF4444' }}>*</span>
               </label>
               <input
                 type="text"
-                placeholder="Ej. Encargado de biblioteca"
+                placeholder="Ej. Coordinador de Turno, Supervisor de Seguridad"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
+                required
                 style={{
-                  height: '40px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  height: '42px',
+                  borderRadius: '10px',
                   border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '0 12px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  padding: '0 14px',
                   color: '#FFFFFF',
-                  fontSize: '13px',
-                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '14px',
                   outline: 'none',
                 }}
               />
@@ -273,262 +275,298 @@ export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
 
             {/* Descripción */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500 }}>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#FFFFFF' }}>
                 Descripción
               </label>
               <textarea
-                placeholder="Qué puede hacer este rol dentro del sistema."
+                placeholder="Indica las responsabilidades y alcance de este rol..."
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                rows={3}
+                rows={2}
                 style={{
-                  minHeight: '76px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
                   border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   color: '#FFFFFF',
                   fontSize: '13px',
-                  fontFamily: 'Inter, sans-serif',
                   outline: 'none',
                   resize: 'none',
-                  lineHeight: '1.4',
                 }}
               />
             </div>
 
-            {/* Partir de un rol existente */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500 }}>
-                Partir de un rol existente
-              </label>
-              <select
-                value={baseRolId}
-                onChange={(e) => handleBaseRolChange(e.target.value)}
-                style={{
-                  height: '40px',
-                  backgroundColor: '#2A2A2A',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '0 12px',
-                  color: '#FFFFFF',
-                  fontSize: '13px',
-                  fontFamily: 'Inter, sans-serif',
-                  outline: 'none',
-                }}
-              >
-                <option value="">Ninguno (empezar en blanco)</option>
-                {rolesExistentes.map((r) => (
-                  <option key={r.id} value={r.id}>{r.nombre}</option>
-                ))}
-              </select>
-            </div>
+            {/* Partir de rol existente & Rol Activo */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '14px', alignItems: 'flex-end' }}>
+              {!rolAEditar && rolesExistentes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.8)' }}>
+                    Copiar de rol existente
+                  </label>
+                  <select
+                    value={baseRolId}
+                    onChange={(e) => handleBaseRolChange(e.target.value)}
+                    style={{
+                      height: '40px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      backgroundColor: '#2A2A2A',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      padding: '0 12px',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">-- Ninguno (en blanco) --</option>
+                    {rolesExistentes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nombre} ({r.permisos.length} privilegios)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            {/* Rol activo Switch */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 0',
-              }}
-            >
-              <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 500 }}>
-                Rol activo
-              </span>
               <div
                 onClick={() => setActivo(!activo)}
                 style={{
-                  width: '36px',
-                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  height: '40px',
+                  padding: '0 14px',
                   borderRadius: '10px',
-                  backgroundColor: activo ? '#71DD8C' : 'rgba(255, 255, 255, 0.2)',
-                  position: 'relative',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s',
+                  userSelect: 'none',
                 }}
               >
+                <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 500 }}>Activo</span>
                 <div
                   style={{
-                    width: '14px',
-                    height: '14px',
-                    borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
-                    position: 'absolute',
-                    top: '3px',
-                    left: activo ? '19px' : '3px',
-                    transition: 'left 0.2s',
+                    width: '32px',
+                    height: '18px',
+                    borderRadius: '9px',
+                    backgroundColor: activo ? '#22C55E' : 'rgba(255, 255, 255, 0.2)',
+                    position: 'relative',
+                    transition: 'background-color 0.2s',
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      backgroundColor: '#FFFFFF',
+                      position: 'absolute',
+                      top: '2px',
+                      left: activo ? '16px' : '2px',
+                      transition: 'left 0.2s',
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Separador */}
             <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
 
-            {/* Conteo de permisos */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
-                Permisos seleccionados
-              </span>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
-                {permisosSeleccionados.length} de {PERMISOS_SISTEMA.length}
-              </span>
-            </div>
+            {/* Header de Privilegios y Buscador */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>
+                    Privilegios y Accesos
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(173, 173, 251, 0.15)',
+                      color: '#ADADFB',
+                    }}
+                  >
+                    {totalAsignados} de {privilegiosDisponibles.length} asignados
+                  </span>
+                </div>
+              </div>
 
-            {/* Párrafo explicativo ASP.NET Core Identity */}
-            <p
-              style={{
-                fontSize: '11.5px',
-                color: 'rgba(255, 255, 255, 0.45)',
-                lineHeight: '1.45',
-                margin: 0,
-              }}
-            >
-              Los permisos se guardan como Claims sobre ASP.NET Core Identity. Un rol nuevo no requiere cambios en el código ni un nuevo despliegue.
-            </p>
-
-            {/* Separador */}
-            <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
-
-            {/* Advertencia de rol.gestionar */}
-            <p
-              style={{
-                fontSize: '11.5px',
-                color: 'rgba(255, 255, 255, 0.45)',
-                lineHeight: '1.45',
-                margin: 0,
-              }}
-            >
-              Ningún rol puede autoasignarse <code>rol.gestionar</code>. Solo un Administrador existente puede concederlo.
-            </p>
-          </div>
-
-          {/* Card 2: Permisos disponibles */}
-          <div
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            {/* Header Permisos */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>
-                Permisos disponibles
-              </span>
-
-              <button
-                type="button"
-                onClick={handleSelectAll}
+              {/* Input de Búsqueda rápida */}
+              <input
+                type="text"
+                placeholder="🔍 Buscar privilegio por nombre, código o módulo..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
                 style={{
-                  height: '26px',
-                  padding: '0 10px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
+                  height: '36px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  padding: '0 12px',
                   color: '#FFFFFF',
-                  fontSize: '11px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease',
+                  fontSize: '12.5px',
+                  outline: 'none',
                 }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-              >
-                {permisosSeleccionados.length === PERMISOS_SISTEMA.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
-              </button>
+              />
             </div>
 
-            {/* Categorías y Claims */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {CATEGORIAS_ORDEN.map((cat) => {
-                const permisosCat = PERMISOS_SISTEMA.filter((p) => p.categoria === cat);
+            {/* Lista Interactiva de Módulos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {modulos.map((modulo) => {
+                const privsModulo = privilegiosFiltrados.filter((p) => p.modulo === modulo);
                 return (
-                  <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* Encabezado Categoría */}
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        letterSpacing: '0.06em',
-                        color: 'rgba(255, 255, 255, 0.4)',
-                      }}
-                    >
-                      {cat}
-                    </span>
+                  <div
+                    key={modulo}
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                    }}
+                  >
+                    {/* Cabecera del Módulo */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: 'rgba(255, 255, 255, 0.6)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Módulo {modulo}
+                      </span>
 
-                    {/* Filas de Permisos */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {permisosCat.map((perm) => {
-                        const isSelected = permisosSeleccionados.includes(perm.codigo);
+                      {/* Botones de acción rápida de módulo */}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuloNivel(modulo, 'L')}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            border: '1px solid rgba(56, 189, 248, 0.25)',
+                            color: '#38BDF8',
+                            fontSize: '10.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + Todos L
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuloNivel(modulo, 'T')}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            border: '1px solid rgba(34, 197, 94, 0.25)',
+                            color: '#4ADE80',
+                            fontSize: '10.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + Todos T
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuloNivel(modulo, 'NINGUNO')}
+                          style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            fontSize: '10.5px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filas de Privilegios */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {privsModulo.map((priv) => {
+                        const nivelActual = nivelesPorPrivilegio[priv.id] || 'NINGUNO';
                         return (
                           <div
-                            key={perm.codigo}
-                            onClick={() => togglePermiso(perm.codigo)}
+                            key={priv.id}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '12px',
+                              justifyContent: 'space-between',
                               padding: '8px 10px',
                               borderRadius: '8px',
-                              cursor: 'pointer',
-                              userSelect: 'none',
-                              backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                              transition: 'background-color 0.1s ease',
-                            }}
-                            onMouseOver={(e) => {
-                              if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)';
-                            }}
-                            onMouseOut={(e) => {
-                              if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                              backgroundColor: nivelActual !== 'NINGUNO' ? 'rgba(173, 173, 251, 0.05)' : 'transparent',
+                              border: `1px solid ${nivelActual !== 'NINGUNO' ? 'rgba(173, 173, 251, 0.15)' : 'transparent'}`,
+                              transition: 'all 0.12s ease',
                             }}
                           >
-                            {/* Checkbox Cuadrado */}
-                            <div
-                              style={{
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '4px',
-                                border: `1px solid ${isSelected ? '#71DD8C' : 'rgba(255, 255, 255, 0.16)'}`,
-                                backgroundColor: isSelected ? 'rgba(113, 221, 140, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#71DD8C',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {isSelected && '✓'}
-                            </div>
-
-                            {/* Contenido del Claim */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1 }}>
-                              <span
-                                style={{
-                                  fontSize: '13px',
-                                  fontWeight: isSelected ? 600 : 500,
-                                  color: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
-                                {perm.codigo}
-                              </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span
                                 style={{
                                   fontSize: '11px',
-                                  color: isSelected ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 255, 255, 0.35)',
+                                  color: '#ADADFB',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(173, 173, 251, 0.12)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
                                 }}
                               >
-                                {perm.descripcion}
+                                {priv.codigo}
                               </span>
+                              <span style={{ fontSize: '13px', color: nivelActual !== 'NINGUNO' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)' }}>
+                                {priv.nombre}
+                              </span>
+                            </div>
+
+                            {/* Selector de Nivel de Permiso (Píldoras) */}
+                            <div style={{ display: 'flex', gap: '4px', backgroundColor: 'rgba(255, 255, 255, 0.04)', padding: '2px', borderRadius: '6px' }}>
+                              {[
+                                { cod: 'NINGUNO', label: '—', color: 'rgba(255, 255, 255, 0.3)' },
+                                { cod: 'L', label: 'L', color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.2)' },
+                                { cod: 'E', label: 'E', color: '#FBBF24', bg: 'rgba(245, 158, 11, 0.2)' },
+                                { cod: 'T', label: 'T', color: '#4ADE80', bg: 'rgba(34, 197, 94, 0.2)' },
+                              ].map((lvl) => {
+                                const isSelected = nivelActual === lvl.cod;
+                                return (
+                                  <button
+                                    key={lvl.cod}
+                                    type="button"
+                                    onClick={() => handleSetNivel(priv.id, lvl.cod)}
+                                    style={{
+                                      width: '24px',
+                                      height: '22px',
+                                      borderRadius: '4px',
+                                      border: isSelected && lvl.cod !== 'NINGUNO' ? `1px solid ${lvl.color}` : 'none',
+                                      backgroundColor: isSelected ? (lvl.bg || 'rgba(255, 255, 255, 0.15)') : 'transparent',
+                                      color: isSelected ? (lvl.cod === 'NINGUNO' ? '#FFFFFF' : lvl.color) : 'rgba(255, 255, 255, 0.3)',
+                                      fontSize: '11px',
+                                      fontWeight: isSelected ? 700 : 500,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'all 0.1s ease',
+                                    }}
+                                  >
+                                    {lvl.label}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -539,117 +577,93 @@ export const CrearRolDrawer: React.FC<CrearRolDrawerProps> = ({
               })}
             </div>
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            backgroundColor: '#242424',
-          }}
-        >
-          {rolAEditar && !rolAEditar.esSistema && onDelete ? (
-            <button
-              type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                color: '#EF4444',
-                fontSize: '12px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              Eliminar rol
-            </button>
-          ) : (
-            <div />
-          )}
+          {/* Footer Actions */}
+          <div
+            style={{
+              padding: '16px 24px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            {rolAEditar && !rolAEditar.esSistema && onDelete ? (
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#EF4444',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                }}
+              >
+                Eliminar rol
+              </button>
+            ) : (
+              <div />
+            )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 18px',
-                height: '38px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)')}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
-            >
-              Cancelar
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Cancelar
+              </button>
 
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!nombre.trim() || !descripcion.trim()}
-              style={{
-                padding: '8px 22px',
-                height: '38px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#ADADFB',
-                color: '#17171C',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                cursor: !nombre.trim() || !descripcion.trim() ? 'not-allowed' : 'pointer',
-                opacity: !nombre.trim() || !descripcion.trim() ? 0.45 : 1,
-                boxShadow: '0 2px 10px rgba(173, 173, 251, 0.2)',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                if (nombre.trim() && descripcion.trim()) e.currentTarget.style.backgroundColor = '#BFBFFC';
-              }}
-              onMouseOut={(e) => {
-                if (nombre.trim() && descripcion.trim()) e.currentTarget.style.backgroundColor = '#ADADFB';
-              }}
-            >
-              {rolAEditar ? 'Guardar cambios' : 'Crear rol'}
-            </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!nombre.trim()}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#ADADFB',
+                  color: '#17171C',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: !nombre.trim() ? 'not-allowed' : 'pointer',
+                  opacity: !nombre.trim() ? 0.45 : 1,
+                  boxShadow: '0 2px 8px rgba(173, 173, 251, 0.2)',
+                }}
+              >
+                {rolAEditar ? 'Guardar cambios' : 'Crear rol'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Confirm Delete Role Modal */}
-      {rolAEditar && (
-        <ConfirmModal
-          isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleConfirmDelete}
-          title="Eliminar rol"
-          message={`¿Estás seguro de que deseas eliminar el rol "${rolAEditar.nombre}"? Los usuarios con este rol perderán sus claims asociados.`}
-          confirmText="Eliminar rol"
-          isDestructive={true}
-          isLoading={isDeleting}
-        />
-      )}
+      {/* Modal de confirmación de eliminación */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="¿Eliminar este rol?"
+        message={`¿Estás seguro de que deseas eliminar el rol "${rolAEditar?.nombre}"? Los usuarios asignados a este rol perderán sus privilegios correspondientes.`}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+        isDestructive={true}
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setIsDeleteModalOpen(false)}
+      />
     </>
   );
 };

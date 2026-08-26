@@ -60,6 +60,7 @@ public class AuditoriaResponse
     public string Origen { get; set; } = "Panel";
     public Guid? EstacionId { get; set; }
     public string? UserId { get; set; }
+    public string? NombreUsuario { get; set; }
     public DateTimeOffset FechaHora { get; set; }
 }
 

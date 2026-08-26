@@ -151,4 +151,82 @@ public class ServicioEstaciones
         await _repository.SaveChangesAsync(ct);
         return Result<bool>.Exitoso(true);
     }
+
+    public async Task<Result<EstacionResponse>> VincularAsync(Guid id, VincularEstacionRequest request, CancellationToken ct)
+    {
+        Estacion? estacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (estacion is null)
+            throw new EntidadNoEncontradaException(nameof(Estacion), id);
+
+        string codigoLimpio = request.CodigoVinculacionOMac.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(codigoLimpio))
+            return Result<EstacionResponse>.Fallido("DATOS_INVALIDOS", "Debe ingresar el código QR o dirección MAC del dispositivo físico.");
+
+        Estacion? otraEstacionConMismaMac = await _repository.ObtenerPorMacAsync(codigoLimpio, ct);
+        if (otraEstacionConMismaMac is not null && otraEstacionConMismaMac.Id != id && otraEstacionConMismaMac.EstaVinculada)
+        {
+            return Result<EstacionResponse>.Fallido("DISPOSITIVO_YA_VINCULADO", 
+                $"El dispositivo físico '{codigoLimpio}' ya se encuentra vinculado a la estación '{otraEstacionConMismaMac.Nombre}'. Desvinclúlelo primero.");
+        }
+
+        estacion.MacAddress = codigoLimpio;
+        estacion.EstaVinculada = true;
+        estacion.CodigoVinculacion = null;
+        estacion.FechaVinculacion = DateTimeOffset.UtcNow;
+        estacion.UltimaSincronizacion = DateTimeOffset.UtcNow;
+
+        await _repository.SaveChangesAsync(ct);
+
+        Estacion? estacionActualizada = await _repository.ObtenerPorIdAsync(id, ct);
+        return Result<EstacionResponse>.Exitoso(_mapper.Map<EstacionResponse>(estacionActualizada ?? estacion));
+    }
+
+    public async Task<Result<bool>> DesvincularAsync(Guid id, CancellationToken ct)
+    {
+        Estacion? estacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (estacion is null)
+            throw new EntidadNoEncontradaException(nameof(Estacion), id);
+
+        estacion.EstaVinculada = false;
+        estacion.MacAddress = null;
+        estacion.CodigoVinculacion = null;
+        estacion.FechaVinculacion = null;
+
+        await _repository.SaveChangesAsync(ct);
+        return Result<bool>.Exitoso(true);
+    }
+
+    public async Task<Result<SolicitarPairingResponse>> SolicitarPairingAsync(SolicitarPairingRequest request, CancellationToken ct)
+    {
+        string macLimpia = request.MacAddress.Trim().ToUpperInvariant();
+        string codigo = $"PAIR-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
+
+        return await Task.FromResult(Result<SolicitarPairingResponse>.Exitoso(new SolicitarPairingResponse
+        {
+            CodigoVinculacion = codigo,
+            MacAddress = macLimpia,
+            ExpiraEnMinutos = 15
+        }));
+    }
+
+    public async Task<Result<VerificarPairingResponse>> VerificarPairingAsync(VerificarPairingRequest request, CancellationToken ct)
+    {
+        string macLimpia = request.MacAddress.Trim().ToUpperInvariant();
+        Estacion? estacion = await _repository.ObtenerPorMacAsync(macLimpia, ct);
+
+        if (estacion is null || !estacion.EstaVinculada)
+        {
+            return Result<VerificarPairingResponse>.Exitoso(new VerificarPairingResponse
+            {
+                Vinculada = false
+            });
+        }
+
+        return Result<VerificarPairingResponse>.Exitoso(new VerificarPairingResponse
+        {
+            Vinculada = true,
+            EstacionNombre = estacion.Nombre,
+            ClientId = estacion.ClientId
+        });
+    }
 }

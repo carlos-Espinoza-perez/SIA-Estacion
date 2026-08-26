@@ -1,4 +1,4 @@
-export type TipoEventoAuditoria = 'Acceso' | 'Ítem' | 'Seguridad' | 'Configuración';
+export type TipoEventoAuditoria = 'Acceso' | 'Ítem' | 'Operación' | 'Seguridad' | 'Configuración';
 
 export type OrigenAuditoria = 'Estación' | 'Panel' | 'Sistema';
 
@@ -19,4 +19,6 @@ export interface FiltrosAuditoria {
   estacion?: string;
   fechaDesde?: string;
   fechaHasta?: string;
+  pagina?: number;
+  limite?: number;
 }

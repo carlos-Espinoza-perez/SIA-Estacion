@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { auditoriaService } from './auditoriaService';
 
 export type TipoNotificacion = 'acceso' | 'prestamo' | 'sistema' | 'alerta';
 
@@ -15,58 +16,15 @@ export interface Notificacion {
 const NOTIF_STORAGE_KEY = 'sia_notificaciones';
 const NOTIF_EVENT = 'sia_notif_change';
 
-const MOCK_NOTIFICACIONES_INICIALES: Notificacion[] = [
-  {
-    id: 'n-1',
-    titulo: 'Acceso validado en Entrada Principal',
-    descripcion: 'Diego Vargas Torres ingresó con verificación NFC correcta.',
-    tiempo: 'Hace 2 min',
-    tipo: 'acceso',
-    leida: false,
-    rutaDestino: '/accesos',
-  },
-  {
-    id: 'n-2',
-    titulo: 'Solicitud de préstamo pendiente',
-    descripcion: 'Carlos Ruiz solicitó Multímetro digital UNI-T (PR-2026-004).',
-    tiempo: 'Hace 15 min',
-    tipo: 'prestamo',
-    leida: false,
-    rutaDestino: '/operaciones',
-  },
-  {
-    id: 'n-3',
-    titulo: 'Alerta de estación sin conexión',
-    descripcion: 'Laboratorio B cambió su estado a Fuera de línea.',
-    tiempo: 'Hace 1 h',
-    tipo: 'alerta',
-    leida: false,
-    rutaDestino: '/estaciones',
-  },
-  {
-    id: 'n-4',
-    titulo: 'Ítem asignado a mantenimiento',
-    descripcion: 'Osciloscopio Digital 100MHz fue retirado temporalmente de inventario.',
-    tiempo: 'Hace 3 h',
-    tipo: 'sistema',
-    leida: true,
-    rutaDestino: '/items',
-  },
-  {
-    id: 'n-5',
-    titulo: 'Nuevo rol de seguridad registrado',
-    descripcion: 'Se agregaron permisos de supervisión al rol Guardia.',
-    tiempo: 'Ayer',
-    tipo: 'sistema',
-    leida: true,
-    rutaDestino: '/roles',
-  },
-];
-
 function notifyNotifChange() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(NOTIF_EVENT));
   }
+}
+
+// Limpiar residuos obsoletos con IDs estáticos antiguos si existieran en localStorage
+function limpiarNotificacionesObsoletas(notificaciones: Notificacion[]): Notificacion[] {
+  return notificaciones.filter((n) => !/^n-[1-5]$/.test(n.id));
 }
 
 export const notificacionService = {
@@ -74,13 +32,66 @@ export const notificacionService = {
     try {
       const data = localStorage.getItem(NOTIF_STORAGE_KEY);
       if (!data) {
-        localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(MOCK_NOTIFICACIONES_INICIALES));
-        return MOCK_NOTIFICACIONES_INICIALES;
+        return [];
       }
-      return JSON.parse(data);
+      const parsed: Notificacion[] = JSON.parse(data);
+      const limpias = limpiarNotificacionesObsoletas(parsed);
+      if (limpias.length !== parsed.length) {
+        localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(limpias));
+      }
+      return limpias;
     } catch {
-      return MOCK_NOTIFICACIONES_INICIALES;
+      return [];
     }
+  },
+
+  async sincronizarEventosRecientes(): Promise<Notificacion[]> {
+    try {
+      const res = await auditoriaService.getEventos({ limite: 5 });
+      if (res.data && res.data.length > 0) {
+        const list = this.getNotificaciones();
+        const existentesIds = new Set(list.map((n) => n.id));
+        const nuevas: Notificacion[] = [];
+
+        for (const ev of res.data) {
+          const id = `ev-${ev.id}`;
+          if (!existentesIds.has(id)) {
+            let tipo: TipoNotificacion = 'sistema';
+            let rutaDestino = '/auditoria';
+            if (ev.tipo === 'Acceso') {
+              tipo = 'acceso';
+              rutaDestino = '/accesos';
+            } else if (ev.tipo === 'Operación') {
+              tipo = 'prestamo';
+              rutaDestino = '/operaciones';
+            } else if (ev.tipo === 'Seguridad') {
+              tipo = 'alerta';
+              rutaDestino = '/roles';
+            }
+
+            nuevas.push({
+              id,
+              titulo: `${ev.tipo}: ${ev.descripcion}`,
+              descripcion: `Registrado por ${ev.actor} · Estación: ${ev.estacion}`,
+              tiempo: ev.fechaHora.split(', ')[1] || 'Reciente',
+              tipo,
+              leida: false,
+              rutaDestino,
+            });
+          }
+        }
+
+        if (nuevas.length > 0) {
+          const actualizadas = [...nuevas, ...list].slice(0, 20);
+          localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(actualizadas));
+          notifyNotifChange();
+          return actualizadas;
+        }
+      }
+    } catch (e) {
+      console.error('Error sincronizando notificaciones:', e);
+    }
+    return this.getNotificaciones();
   },
 
   marcarComoLeida(id: string): void {
@@ -126,6 +137,9 @@ export function useNotificaciones() {
   );
 
   useEffect(() => {
+    // Sincronizar con eventos reales del backend
+    notificacionService.sincronizarEventosRecientes().then(setNotificaciones).catch(() => {});
+
     const handleUpdate = () => {
       setNotificaciones(notificacionService.getNotificaciones());
     };
@@ -148,5 +162,6 @@ export function useNotificaciones() {
     marcarTodasComoLeidas: notificacionService.marcarTodasComoLeidas.bind(notificacionService),
     eliminarNotificacion: notificacionService.eliminarNotificacion.bind(notificacionService),
     agregarNotificacion: notificacionService.agregarNotificacion.bind(notificacionService),
+    sincronizarEventosRecientes: notificacionService.sincronizarEventosRecientes.bind(notificacionService),
   };
 }

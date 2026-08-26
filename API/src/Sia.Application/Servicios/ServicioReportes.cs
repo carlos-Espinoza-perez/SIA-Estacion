@@ -116,9 +116,18 @@ public class ServicioReportes
         return Result<TrazabilidadItemResponse>.Exitoso(response);
     }
 
-    public async Task<Result<List<AuditoriaResponse>>> ObtenerAuditoriaAsync(DateTimeOffset? desde, DateTimeOffset? hasta, string? entidad, CancellationToken ct)
+    public async Task<Result<List<AuditoriaResponse>>> ObtenerAuditoriaAsync(DateTimeOffset? desde, DateTimeOffset? hasta, string? entidad, string? busqueda, int pagina, int limite, CancellationToken ct)
     {
-        List<AuditoriaCambio> registros = await _eventosRepository.ObtenerAuditoriaAsync(desde, hasta, entidad, ct);
+        int totalRegistros = await _eventosRepository.ContarAuditoriaAsync(desde, hasta, entidad, busqueda, ct);
+        List<AuditoriaCambio> registros = await _eventosRepository.ObtenerAuditoriaAsync(desde, hasta, entidad, busqueda, pagina, limite, ct);
+
+        var paginacion = new Sia.Application.Dtos.Comunes.PaginacionMetadata
+        {
+            PaginaActual = pagina,
+            TamanoPagina = limite,
+            TotalRegistros = totalRegistros,
+            TotalPaginas = (int)Math.Ceiling(totalRegistros / (double)limite)
+        };
 
         var response = registros.Select(a => new AuditoriaResponse
         {
@@ -130,10 +139,11 @@ public class ServicioReportes
             Origen = a.Origen,
             EstacionId = a.EstacionId,
             UserId = a.UserId,
+            NombreUsuario = a.NombreUsuario,
             FechaHora = a.FechaHora
         }).ToList();
 
-        return Result<List<AuditoriaResponse>>.Exitoso(response);
+        return Result<List<AuditoriaResponse>>.ExitosoConPaginacion(response, paginacion);
     }
 
     public async Task<Result<object>> ObtenerEstadisticasPublicasAsync(CancellationToken ct)

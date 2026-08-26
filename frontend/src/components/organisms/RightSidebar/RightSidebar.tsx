@@ -24,14 +24,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen = true }) => 
   useEffect(() => {
     let montado = true;
 
-    auditoriaService.getEventos().then((eventos) => {
+    auditoriaService.getEventos({ limite: 10 }).then((res) => {
+      const eventos = res.data;
       if (montado && eventos && eventos.length > 0) {
         // Formatear eventos de auditoría para Timeline
         const liveActs: ActivityEvent[] = eventos.slice(0, 6).map((e) => {
           // Limpiar GUIDs largos de la descripción si existen
           const cleanDesc = e.descripcion.replace(/#[a-f0-9-]{12,}/i, '').trim();
-          const parts = e.fechaHora.split(' ');
-          const timeStr = parts.length > 1 ? parts[1].substring(0, 5) : 'Hoy';
+          const timeStr = e.fechaHora.split(', ')[1] || 'Hoy';
 
           return {
             id: e.id,
@@ -54,14 +54,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen = true }) => 
           }
 
           const cleanDesc = e.descripcion.replace(/#[a-f0-9-]{12,}/i, '').trim();
-          const parts = e.fechaHora.split(' ');
-          const timeStr = parts.length > 1 ? parts[1].substring(0, 5) : 'Reciente';
+          const timeStr = e.fechaHora.split(', ')[1] || 'Reciente';
 
           return {
             id: e.id,
             iconType: icon,
             title: cleanDesc || `${e.tipo} en ${e.estacion}`,
-            time: timeStr,
+            time: `${e.actor} · ${timeStr}`,
           };
         });
         setNotificaciones(liveNotifs);

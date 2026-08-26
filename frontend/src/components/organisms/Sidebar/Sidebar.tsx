@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from '../../atoms/Avatar/Avatar';
 import { useNavStorage } from '../../../services/navigationStorageService';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export interface SidebarProps {
   isOpen?: boolean;
@@ -10,10 +11,11 @@ export interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { canAccessRoute } = usePermissions();
   const [activeTab, setActiveTab] = useState<'favoritos' | 'recientes'>('favoritos');
   const { favorites, recents, removeFavorite } = useNavStorage();
 
-  const mainNavItems = [
+  const rawMainNavItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -51,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
     },
   ];
 
-  const adminNavItems = [
+  const rawAdminNavItems = [
     {
       id: 'personas',
       label: 'Personas',
@@ -111,6 +113,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
       ),
     },
   ];
+
+  const mainNavItems = rawMainNavItems.filter((item) => canAccessRoute(item.path));
+  const adminNavItems = rawAdminNavItems.filter((item) => canAccessRoute(item.path));
 
   return (
     <aside
@@ -338,106 +343,110 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
       </div>
 
       {/* 3. Sección Principal */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <span
-          style={{
-            fontSize: '14px',
-            fontWeight: 400,
-            color: 'rgba(255, 255, 255, 0.4)',
-            fontFamily: 'Inter, sans-serif',
-            padding: '4px 8px',
-          }}
-        >
-          Principal
-        </span>
+      {mainNavItems.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span
+            style={{
+              fontSize: '14px',
+              fontWeight: 400,
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontFamily: 'Inter, sans-serif',
+              padding: '4px 8px',
+            }}
+          >
+            Principal
+          </span>
 
-        {mainNavItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <button
-              key={item.id}
-              onClick={() => navigate(item.path)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '12px',
-                border: 'none',
-                backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.65)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                width: '100%',
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '14px',
-                fontWeight: isActive ? 500 : 400,
-                transition: 'background-color 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
-              }}
-              onMouseOut={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              {item.icon}
-              <span style={{ flex: 1 }}>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+          {mainNavItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.65)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '14px',
+                  fontWeight: isActive ? 500 : 400,
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                }}
+                onMouseOut={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {item.icon}
+                <span style={{ flex: 1 }}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 4. Sección Administración */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <span
-          style={{
-            fontSize: '14px',
-            fontWeight: 400,
-            color: 'rgba(255, 255, 255, 0.4)',
-            fontFamily: 'Inter, sans-serif',
-            padding: '4px 8px',
-          }}
-        >
-          Administración
-        </span>
+      {adminNavItems.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span
+            style={{
+              fontSize: '14px',
+              fontWeight: 400,
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontFamily: 'Inter, sans-serif',
+              padding: '4px 8px',
+            }}
+          >
+            Administración
+          </span>
 
-        {adminNavItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <button
-              key={item.id}
-              onClick={() => navigate(item.path)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '12px',
-                border: 'none',
-                backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.65)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                width: '100%',
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '14px',
-                fontWeight: isActive ? 500 : 400,
-                transition: 'background-color 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
-              }}
-              onMouseOut={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              {item.icon}
-              <span style={{ flex: 1 }}>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+          {adminNavItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.65)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '14px',
+                  fontWeight: isActive ? 500 : 400,
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                }}
+                onMouseOut={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {item.icon}
+                <span style={{ flex: 1 }}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Footer / Logo SnowUI */}
       <div

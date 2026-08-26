@@ -19,18 +19,46 @@ export const AppRouter: React.FC = () => {
         {/* Ruta Pública */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Rutas Protegidas */}
+        {/* Rutas Base Protegidas (Requiere solo autenticación) */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/"          element={<DashboardPage />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/accesos"      element={<AccesosPage />} />
-          <Route path="/operaciones"  element={<OperacionesPage />} />
-          <Route path="/personas"     element={<PersonasPage />} />
-          <Route path="/items"        element={<ItemsPage />} />
-          <Route path="/estaciones"   element={<EstacionesPage />} />
-          <Route path="/roles"        element={<RolesPage />} />
-          <Route path="/roles/nuevo"  element={<CrearRolPage />} />
-          <Route path="/auditoria"    element={<AuditoriaPage />} />
+        </Route>
+
+        {/* Módulo Accesos */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'ACC', nivel: 'L' }} />}>
+          <Route path="/accesos" element={<AccesosPage />} />
+        </Route>
+
+        {/* Módulo Operaciones */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'OPE', nivel: 'L' }} />}>
+          <Route path="/operaciones" element={<OperacionesPage />} />
+        </Route>
+
+        {/* Módulo Personas */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'PER', nivel: 'L' }} />}>
+          <Route path="/personas" element={<PersonasPage />} />
+        </Route>
+
+        {/* Módulo Ítems */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'ITM', nivel: 'L' }} />}>
+          <Route path="/items" element={<ItemsPage />} />
+        </Route>
+
+        {/* Módulo Estaciones */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'EST', nivel: 'L' }} />}>
+          <Route path="/estaciones" element={<EstacionesPage />} />
+        </Route>
+
+        {/* Módulo Roles y Permisos */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'ROL', nivel: 'L' }} />}>
+          <Route path="/roles" element={<RolesPage />} />
+          <Route path="/roles/nuevo" element={<CrearRolPage />} />
+        </Route>
+
+        {/* Módulo Auditoría */}
+        <Route element={<ProtectedRoute requiredPrivilege={{ codigo: 'AUD', nivel: 'L' }} />}>
+          <Route path="/auditoria" element={<AuditoriaPage />} />
         </Route>
 
         {/* Redirección por defecto */}
@@ -39,3 +67,4 @@ export const AppRouter: React.FC = () => {
     </BrowserRouter>
   );
 };
+

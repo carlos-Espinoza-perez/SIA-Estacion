@@ -27,11 +27,45 @@ public static class SiaDbContextSeed
             await context.SaveChangesAsync();
         }
 
-        // Rol Administrador
-        const string rolAdmin = "Administrador Global";
+        // Roles del sistema
+        const string rolAdmin = "Administrador General";
+        var rolesPermitidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            rolAdmin,
+            "Docente",
+            "Estudiante"
+        };
+
+        // Depurar roles antiguos no permitidos
+        var todosLosRoles = await roleManager.Roles.ToListAsync();
+        foreach (var r in todosLosRoles)
+        {
+            if (!rolesPermitidos.Contains(r.Name ?? string.Empty))
+            {
+                // Eliminar asignaciones de privilegios asociadas
+                var privsAsociados = await context.RolPrivilegios.Where(rp => rp.RoleId == r.Id).ToListAsync();
+                if (privsAsociados.Any())
+                {
+                    context.RolPrivilegios.RemoveRange(privsAsociados);
+                    await context.SaveChangesAsync();
+                }
+                await roleManager.DeleteAsync(r);
+            }
+        }
+
         if (!await roleManager.RoleExistsAsync(rolAdmin))
         {
             await roleManager.CreateAsync(new ApplicationRole(rolAdmin) { Descripcion = "Administrador completo del sistema", EsSistema = true, Activo = true });
+        }
+
+        // Roles adicionales del sistema
+        var rolesAdicionales = new[] { "Docente", "Estudiante" };
+        foreach (var rol in rolesAdicionales)
+        {
+            if (!await roleManager.RoleExistsAsync(rol))
+            {
+                await roleManager.CreateAsync(new ApplicationRole(rol) { EsSistema = true, Activo = true });
+            }
         }
 
         // Usuario Administrador
@@ -56,35 +90,6 @@ public static class SiaDbContextSeed
             if (!await userManager.IsInRoleAsync(user, rolAdmin))
             {
                 await userManager.AddToRoleAsync(user, rolAdmin);
-            }
-        }
-
-        // Perfil de persona asociado al administrador
-        var persona = await context.Personas.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.UserId == user.Id);
-        if (persona == null)
-        {
-            persona = new Persona
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = empresa.Id,
-                CodigoEstudiantil = "ADMIN-QR",
-                Nombres = "Administrador",
-                Apellidos = "Global",
-                TipoPersona = TipoPersona.Administrador,
-                UserId = user.Id,
-                Estado = true
-            };
-            context.Personas.Add(persona);
-            await context.SaveChangesAsync();
-        }
-
-        // Roles adicionales del sistema
-        var rolesAdicionales = new[] { "Guardia", "Operador", "Docente", "Estudiante" };
-        foreach (var rol in rolesAdicionales)
-        {
-            if (!await roleManager.RoleExistsAsync(rol))
-            {
-                await roleManager.CreateAsync(new ApplicationRole(rol) { EsSistema = true, Activo = true });
             }
         }
 
@@ -296,5 +301,106 @@ public static class SiaDbContextSeed
             context.Personas.AddRange(estudiantesYDocentes);
             await context.SaveChangesAsync();
         }
+
+        // Niveles de Permiso iniciales
+        var niveles = new List<NivelPermiso>
+        {
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111101"), Codigo = "C", Nombre = "Crear", Orden = 1, Estado = true },
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111102"), Codigo = "L", Nombre = "Lectura", Orden = 2, Estado = true },
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111103"), Codigo = "A", Nombre = "Actualizar", Orden = 3, Estado = true },
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111104"), Codigo = "B", Nombre = "Borrar", Orden = 4, Estado = true },
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111105"), Codigo = "E", Nombre = "Escritura", Orden = 5, Estado = true },
+            new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111106"), Codigo = "T", Nombre = "Total", Orden = 6, Estado = true },
+        };
+
+        foreach (var nivel in niveles)
+        {
+            var existente = await context.NivelesPermiso.FirstOrDefaultAsync(n => n.Codigo == nivel.Codigo);
+            if (existente == null)
+            {
+                context.NivelesPermiso.Add(nivel);
+            }
+        }
+        await context.SaveChangesAsync();
+
+        // Privilegios del Sistema
+        var privilegios = new List<Privilegio>
+        {
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222201"), Codigo = "ACC", Nombre = "Control de Accesos", Modulo = "Accesos", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222202"), Codigo = "OPE", Nombre = "Operaciones y Préstamos", Modulo = "Operaciones", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222203"), Codigo = "PER", Nombre = "Gestión de Personas", Modulo = "Personas", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222204"), Codigo = "ITM", Nombre = "Gestión de Ítems e Inventario", Modulo = "Inventario", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222205"), Codigo = "TIP", Nombre = "Tipos de Ítems y Categorías", Modulo = "Catálogos", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222206"), Codigo = "EST", Nombre = "Configuración de Estaciones", Modulo = "Estaciones", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222207"), Codigo = "ROL", Nombre = "Gestión de Roles y Permisos", Modulo = "Seguridad", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222208"), Codigo = "USU", Nombre = "Gestión de Usuarios", Modulo = "Seguridad", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222209"), Codigo = "AUD", Nombre = "Auditoría y Bitácora", Modulo = "Auditoría", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222210"), Codigo = "REP", Nombre = "Reportes y Estadísticas", Modulo = "Reportes", Estado = true },
+            new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222211"), Codigo = "EMP", Nombre = "Configuración de Empresas", Modulo = "Configuración", Estado = true },
+        };
+
+        foreach (var priv in privilegios)
+        {
+            var existente = await context.Privilegios.FirstOrDefaultAsync(p => p.Codigo == priv.Codigo);
+            if (existente == null)
+            {
+                context.Privilegios.Add(priv);
+            }
+        }
+        await context.SaveChangesAsync();
+
+        // Mapeo de Nivel y Privilegio en memoria
+        var mapaNiveles = await context.NivelesPermiso.ToDictionaryAsync(n => n.Codigo, n => n.Id);
+        var mapaPrivs = await context.Privilegios.ToDictionaryAsync(p => p.Codigo, p => p.Id);
+
+        // Asignaciones de RolPrivilegio por defecto para roles del sistema
+        async Task AsignarPrivilegiosRolAsync(string nombreRol, Dictionary<string, string> privNivelMap)
+        {
+            var rol = await roleManager.FindByNameAsync(nombreRol);
+            if (rol == null) return;
+
+            var asignados = await context.RolPrivilegios.Where(rp => rp.RoleId == rol.Id).ToListAsync();
+            if (!asignados.Any())
+            {
+                var nuevos = new List<RolPrivilegio>();
+                foreach (var kvp in privNivelMap)
+                {
+                    if (mapaPrivs.TryGetValue(kvp.Key, out var privId) && mapaNiveles.TryGetValue(kvp.Value, out var nivelId))
+                    {
+                        nuevos.Add(new RolPrivilegio
+                        {
+                            Id = Guid.NewGuid(),
+                            RoleId = rol.Id,
+                            PrivilegioId = privId,
+                            NivelPermisoId = nivelId,
+                            Estado = true,
+                            FechaAsignacion = DateTimeOffset.UtcNow
+                        });
+                    }
+                }
+                context.RolPrivilegios.AddRange(nuevos);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        // Docente: Operaciones Escritura, Accesos Lectura, Personas Lectura, Items Lectura, Tipos Lectura, Estaciones Lectura, Reportes Lectura
+        await AsignarPrivilegiosRolAsync("Docente", new()
+        {
+            ["ACC"] = "L",
+            ["OPE"] = "E",
+            ["PER"] = "L",
+            ["ITM"] = "L",
+            ["TIP"] = "L",
+            ["EST"] = "L",
+            ["REP"] = "L"
+        });
+
+        // Estudiante: Accesos Lectura, Operaciones Lectura, Items Lectura
+        await AsignarPrivilegiosRolAsync("Estudiante", new()
+        {
+            ["ACC"] = "L",
+            ["OPE"] = "L",
+            ["ITM"] = "L"
+        });
     }
 }

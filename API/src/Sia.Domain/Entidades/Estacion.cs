@@ -14,6 +14,10 @@ public class Estacion
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
     public bool Estado { get; set; } = true;
+    public bool EstaVinculada { get; set; } = false;
+    public string? MacAddress { get; set; }
+    public string? CodigoVinculacion { get; set; }
+    public DateTimeOffset? FechaVinculacion { get; set; }
     public DateTimeOffset? UltimaSincronizacion { get; set; }
 
     public Empresa Empresa { get; set; } = null!;

@@ -14,9 +14,12 @@ public class ItemsRepository : IItemsRepository
         _db = db;
     }
 
-    public async Task<List<TipoItem>> ObtenerTiposAsync(CancellationToken ct)
+    public async Task<List<TipoItem>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct)
     {
-        return await _db.TiposItem.Where(t => t.Estado).OrderBy(t => t.Nombre).ToListAsync(ct);
+        IQueryable<TipoItem> query = _db.TiposItem;
+        if (soloActivos)
+            query = query.Where(t => t.Estado);
+        return await query.OrderBy(t => t.Nombre).ToListAsync(ct);
     }
 
     public async Task<TipoItem?> ObtenerTipoPorIdAsync(Guid id, CancellationToken ct)

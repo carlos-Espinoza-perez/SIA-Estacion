@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Sia.Domain.Entidades;
 
 public class AuditoriaCambio
@@ -13,6 +15,7 @@ public class AuditoriaCambio
     public string? ValoresAnteriores { get; set; }
     public string? ValoresNuevos { get; set; }
     public string? UserId { get; set; }
+    [NotMapped] public string? NombreUsuario { get; set; }
     public DateTimeOffset FechaHora { get; set; } = DateTimeOffset.UtcNow;
 
     public Empresa Empresa { get; set; } = null!;

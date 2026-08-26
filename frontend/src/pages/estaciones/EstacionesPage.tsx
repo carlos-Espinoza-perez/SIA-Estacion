@@ -7,6 +7,8 @@ import { Estacion, CrearEstacionFormData, FiltrosEstacion } from '../../types/es
 import { estacionService } from '../../services/estacionService';
 import { ModalCrearEstacion } from '../../components/organisms/ModalCrearEstacion/ModalCrearEstacion';
 import { ConfiguracionEstacionDrawer } from '../../components/organisms/ConfiguracionEstacionDrawer/ConfiguracionEstacionDrawer';
+import { ConfirmModal } from '../../components/molecules/ConfirmModal/ConfirmModal';
+import { QrScannerModal } from '../../components/organisms/QrScannerModal/QrScannerModal';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/atoms/Button/Button';
 
@@ -15,7 +17,6 @@ import { Button } from '../../components/atoms/Button/Button';
 const TIPO_RECURSO_FILTER_OPTIONS: SelectOption[] = [
   { value: '', label: 'Tipo de recurso: Todos' },
   { value: 'Control de acceso', label: 'Control de acceso' },
-  { value: 'Componentes electrónicos', label: 'Componentes electrónicos' },
   { value: 'Equipo de laboratorio', label: 'Equipo de laboratorio' },
   { value: 'Material bibliográfico', label: 'Material bibliográfico' },
 ];
@@ -36,8 +37,11 @@ export const EstacionesPage: React.FC = () => {
 
   // Modales y Drawers
   const [isCrearOpen, setIsCrearOpen] = useState(false);
+  const [estacionToPair, setEstacionToPair] = useState<Estacion | null>(null);
   const [selectedEstacion, setSelectedEstacion] = useState<Estacion | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [estacionToDelete, setEstacionToDelete] = useState<Estacion | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const cargarEstaciones = () => {
     const filtros: FiltrosEstacion = {
@@ -52,10 +56,25 @@ export const EstacionesPage: React.FC = () => {
     cargarEstaciones();
   }, [busqueda, tipoRecursoFiltro, estadoFiltro]);
 
-  const handleCrearEstacion = async (formData: CrearEstacionFormData) => {
-    await estacionService.crearEstacion(formData);
+  const handleCrearEstacion = async (formData: CrearEstacionFormData): Promise<Estacion> => {
+    const nueva = await estacionService.crearEstacion(formData);
     showToast(`Estación "${formData.nombre}" creada con éxito`, 'success');
     cargarEstaciones();
+    return nueva;
+  };
+
+  const handleScanPairSuccess = async (scannedCode: string) => {
+    if (!estacionToPair) return;
+    try {
+      await estacionService.vincularEstacion(estacionToPair.id, scannedCode);
+      showToast(`¡Estación "${estacionToPair.nombre}" vinculada exitosamente con el ESP32!`, 'success');
+      setEstacionToPair(null);
+      cargarEstaciones();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo vincular el dispositivo con ese código QR.';
+      showToast(msg, 'error');
+    }
   };
 
   const handleGuardarConfiguracion = async (estacionActualizada: Estacion) => {
@@ -64,10 +83,25 @@ export const EstacionesPage: React.FC = () => {
     cargarEstaciones();
   };
 
-  const handleEliminarEstacion = async (id: string) => {
-    await estacionService.eliminarEstacion(id);
-    setSelectedEstacion(null);
-    cargarEstaciones();
+  const handleEliminarEstacion = async (idAEliminar?: string) => {
+    const id = (typeof idAEliminar === 'string' && idAEliminar) ? idAEliminar : estacionToDelete?.id;
+    if (!id) return;
+    setIsDeleting(true);
+    try {
+      await estacionService.eliminarEstacion(id);
+      showToast(`Estación eliminada con éxito`, 'success');
+      setEstacionToDelete(null);
+      setSelectedEstacion(null);
+      setIsDrawerOpen(false);
+      cargarEstaciones();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo eliminar la estación.';
+      showToast(msg, 'error');
+      setEstacionToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleRowClick = (estacion: Estacion) => {
@@ -81,9 +115,9 @@ export const EstacionesPage: React.FC = () => {
       {
         key: 'nombre',
         header: 'Estación',
-        width: 220,
+        width: 240,
         render: (row: Estacion) => (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
             <span
               style={{
                 fontSize: '14px',
@@ -95,6 +129,19 @@ export const EstacionesPage: React.FC = () => {
             >
               {row.nombre}
             </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+              {row.estaVinculada ? (
+                <span style={{ color: '#4ADE80', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#4ADE80' }} />
+                  {row.macAddress || 'ESP32 vinculado'}
+                </span>
+              ) : (
+                <span style={{ color: 'rgba(250, 204, 21, 0.8)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#FACC15' }} />
+                  Pendiente vinculación QR
+                </span>
+              )}
+            </div>
           </div>
         ),
       },
@@ -167,6 +214,35 @@ export const EstacionesPage: React.FC = () => {
         header: 'Estado',
         width: 140,
         render: (row: Estacion) => {
+          if (!row.estaVinculada) {
+            return (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  fontFamily: 'Inter, sans-serif',
+                  backgroundColor: 'rgba(250, 204, 21, 0.12)',
+                  color: '#FACC15',
+                }}
+              >
+                <div
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FACC15',
+                  }}
+                />
+                Sin vincular
+              </div>
+            );
+          }
+
           let dotColor = '#4ADE80';
           let bgColor = 'rgba(34, 197, 94, 0.12)';
           let textColor = '#4ADE80';
@@ -208,6 +284,27 @@ export const EstacionesPage: React.FC = () => {
             </div>
           );
         },
+      },
+      {
+        key: 'acciones',
+        header: '',
+        width: 60,
+        render: (row: Estacion) => (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEstacionToDelete(row)}
+              title="Eliminar estación"
+              style={{ color: 'rgba(239,68,68,0.6)', padding: '4px', height: 'auto', minHeight: '28px' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </Button>
+          </div>
+        ),
       },
     ],
     []
@@ -308,6 +405,16 @@ export const EstacionesPage: React.FC = () => {
           isOpen={isCrearOpen}
           onClose={() => setIsCrearOpen(false)}
           onSubmit={handleCrearEstacion}
+          onEstacionCreada={(nueva) => setEstacionToPair(nueva)}
+        />
+
+        {/* Modal de Escáner QR de Cámara al Crear */}
+        <QrScannerModal
+          isOpen={!!estacionToPair}
+          onClose={() => setEstacionToPair(null)}
+          onScanSuccess={handleScanPairSuccess}
+          title={`Escanear QR para "${estacionToPair?.nombre || 'Estación'}"`}
+          subtitle="Apunta la cámara al código QR mostrado en la pantalla del ESP32"
         />
 
         {/* Drawer de Configuración de Estación */}
@@ -317,6 +424,17 @@ export const EstacionesPage: React.FC = () => {
           onClose={() => setIsDrawerOpen(false)}
           onSave={handleGuardarConfiguracion}
           onDelete={handleEliminarEstacion}
+        />
+
+        <ConfirmModal
+          isOpen={!!estacionToDelete}
+          onClose={() => setEstacionToDelete(null)}
+          onConfirm={handleEliminarEstacion}
+          title="Eliminar estación"
+          message={`¿Estás seguro de que deseas eliminar permanentemente la estación "${estacionToDelete?.nombre}"?`}
+          confirmText="Eliminar estación"
+          isDestructive={true}
+          isLoading={isDeleting}
         />
       </div>
     </DashboardLayoutTemplate>

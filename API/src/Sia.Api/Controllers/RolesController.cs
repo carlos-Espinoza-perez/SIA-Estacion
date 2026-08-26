@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sia.Api.Filtros;
 using Sia.Application.Dtos.Comunes;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Servicios;
@@ -19,6 +20,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpGet]
+    [RequierePrivilegio("ROL", "L")]
     public async Task<IActionResult> ObtenerTodos(CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerTodosAsync(ct);
@@ -26,6 +28,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpPost]
+    [RequierePrivilegio("ROL", "C")]
     public async Task<IActionResult> Crear([FromBody] CrearRolRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.CrearAsync(request, ct);
@@ -33,6 +36,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpPut("{id}")]
+    [RequierePrivilegio("ROL", "A")]
     public async Task<IActionResult> Actualizar(string id, [FromBody] CrearRolRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.ActualizarAsync(id, request, ct);
@@ -40,6 +44,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpDelete("{id}")]
+    [RequierePrivilegio("ROL", "B")]
     public async Task<IActionResult> Eliminar(string id, CancellationToken ct)
     {
         var resultado = await _servicio.EliminarAsync(id, ct);
@@ -47,6 +52,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpGet("{id}/privilegios")]
+    [RequierePrivilegio("ROL", "L")]
     public async Task<IActionResult> ObtenerPrivilegios(string id, CancellationToken ct)
     {
         var resultado = await _servicio.ObtenerPrivilegiosRolAsync(id, ct);
@@ -54,6 +60,7 @@ public class RolesController : SiaControllerBase
     }
 
     [HttpPut("{id}/privilegios")]
+    [RequierePrivilegio("ROL", "A")]
     public async Task<IActionResult> ReemplazarPrivilegios(string id, [FromBody] MatrizPrivilegiosRequest request, CancellationToken ct)
     {
         var resultado = await _servicio.ReemplazarMatrizAsync(id, request, ct);

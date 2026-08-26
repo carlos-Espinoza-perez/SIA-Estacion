@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../Modal/Modal';
 
 export interface AprobacionPrestamoData {
+  id: string;
   folio: string;
   fechaSolicitud: string;
   solicitante: {

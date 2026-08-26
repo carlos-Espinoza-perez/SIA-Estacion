@@ -96,6 +96,19 @@ public class PersonasRepository : IPersonasRepository
             .FirstOrDefaultAsync(p => p.UserId == userId, ct);
     }
 
+    public async Task<Dictionary<string, string>> ObtenerRolesPorUserIdsAsync(IEnumerable<string> userIds, CancellationToken ct)
+    {
+        var idList = userIds.ToList();
+        var lista = await _db.UserRoles
+            .Where(ur => idList.Contains(ur.UserId))
+            .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, RoleName = r.Name })
+            .ToListAsync(ct);
+
+        return lista
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.First().RoleName ?? string.Empty);
+    }
+
     public async Task<List<string>> ObtenerCodigosSincronizacionAsync(Guid empresaId, CancellationToken ct)
     {
         return await _db.Personas
@@ -116,6 +129,12 @@ public class PersonasRepository : IPersonasRepository
         return await _db.FotosReferencia
             .OrderByDescending(f => f.FechaCarga)
             .FirstOrDefaultAsync(f => f.PersonaId == personaId && f.Estado, ct);
+    }
+
+    public async Task<FotoReferencia?> ObtenerFotoActivaAsync(Guid personaId, Guid fotoId, CancellationToken ct)
+    {
+        return await _db.FotosReferencia
+            .FirstOrDefaultAsync(f => f.Id == fotoId && f.PersonaId == personaId && f.Estado, ct);
     }
 
     public async Task<List<FotoReferencia>> ObtenerFotosActivasAsync(Guid personaId, CancellationToken ct)

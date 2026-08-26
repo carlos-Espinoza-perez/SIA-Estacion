@@ -19,14 +19,15 @@ export interface TipoItem {
   itemsRegistrados: number;
   requiereAprobacion: 'Sí' | 'No' | '—';
   estado: 'Activo' | 'Inactivo';
-  estaciones?: string[];
 }
 
 export interface CrearItemFormData {
   nombre: string;
   codigo: string;
   tipo: string;
+  tipoItemId?: string;
   estacion: string;
+  estacionId?: string;
   unidades: number;
   estadoInicial: EstadoItem;
   observaciones: string;
@@ -36,18 +37,16 @@ export interface CrearTipoItemFormData {
   nombre: string;
   descripcion: string;
   flujoPorDefecto: FlujoTipoItem;
-  estaciones: string[];
-  activo: boolean;
 }
 
 export interface FiltrosItem {
-  busqueda: string;
-  tipo: string;
-  estacion: string;
-  estado: string;
+  busqueda?: string;
+  tipo?: string;
+  estacion?: string;
+  estado?: string;
 }
 
 export interface FiltrosTipoItem {
-  busqueda: string;
-  estado: string;
+  busqueda?: string;
+  estado?: string;
 }

@@ -8,18 +8,9 @@ import { useToast } from '../../context/ToastContext';
 import { auditoriaService } from '../../services/auditoriaService';
 import { accesoService, AccesoRow } from '../../services/accesoService';
 import { Button } from '../../components/atoms/Button/Button';
+import { estacionService } from '../../services/estacionService';
 
 // Opciones de filtros
-
-const ESTACION_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Estación: Todas' },
-  { value: 'Entrada principal', label: 'Entrada principal' },
-  { value: 'Laboratorio A',    label: 'Laboratorio A' },
-  { value: 'Biblioteca',       label: 'Biblioteca' },
-  { value: 'Taller',           label: 'Taller' },
-  { value: 'Cafetería',        label: 'Cafetería' },
-  { value: 'Salida norte',     label: 'Salida norte' },
-];
 
 const RESULTADO_OPTIONS: SelectOption[] = [
   { value: '',           label: 'Resultado: Todos' },
@@ -30,10 +21,10 @@ const RESULTADO_OPTIONS: SelectOption[] = [
 ];
 
 const FECHA_OPTIONS: SelectOption[] = [
+  { value: '',         label: 'Fecha: Todas' },
   { value: 'hoy',      label: 'Hoy' },
   { value: 'semana',   label: 'Esta semana' },
   { value: 'mes',      label: 'Este mes' },
-  { value: '28/07',    label: '28 jul 2026' },
 ];
 
 // Definición de Columnas
@@ -110,10 +101,22 @@ const COLUMNS: TableColumn<AccesoRow>[] = [
 export const AccesosPage: React.FC = () => {
   const { showToast } = useToast();
   const [accesos,   setAccesos]   = useState<AccesoRow[]>([]);
+  const [estacionOptions, setEstacionOptions] = useState<SelectOption[]>([
+    { value: '', label: 'Estación: Todas' },
+  ]);
   const [search,    setSearch]    = useState('');
   const [estacion,  setEstacion]  = useState('');
   const [resultado, setResultado] = useState('');
-  const [fecha,     setFecha]     = useState('28/07');
+  const [fecha,     setFecha]     = useState('');
+
+  useEffect(() => {
+    estacionService.getEstaciones().then((ests) => {
+      setEstacionOptions([
+        { value: '', label: 'Estación: Todas' },
+        ...ests.map((e) => ({ value: e.nombre, label: e.nombre })),
+      ]);
+    }).catch(console.error);
+  }, []);
 
   const cargarAccesos = useCallback(async () => {
     try {
@@ -241,7 +244,7 @@ export const AccesosPage: React.FC = () => {
             width={300}
           />
           <Select
-            options={ESTACION_OPTIONS}
+            options={estacionOptions}
             value={estacion}
             onChange={setEstacion}
             placeholder="Estación: Todas"

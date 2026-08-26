@@ -36,6 +36,20 @@ public class EstacionesRepository : IEstacionesRepository
             .FirstOrDefaultAsync(e => e.ClientId == clientId && e.Estado, ct);
     }
 
+    public async Task<Estacion?> ObtenerPorMacAsync(string macAddress, CancellationToken ct)
+    {
+        return await _db.Estaciones
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(e => e.MacAddress == macAddress && e.Estado, ct);
+    }
+
+    public async Task<Estacion?> ObtenerPorCodigoVinculacionAsync(string codigo, CancellationToken ct)
+    {
+        return await _db.Estaciones
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(e => e.CodigoVinculacion == codigo && e.Estado, ct);
+    }
+
     public Task AgregarAsync(Estacion estacion, CancellationToken ct)
     {
         _db.Estaciones.Add(estacion);

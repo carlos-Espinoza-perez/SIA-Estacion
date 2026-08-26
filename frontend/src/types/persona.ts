@@ -64,10 +64,10 @@ export interface CrearPersonaFormData {
 }
 
 export interface FiltrosPersona {
-  busqueda: string;
-  rol: string;
-  tipo: string;
-  estado: string;
+  busqueda?: string;
+  rol?: string;
+  tipo?: string;
+  estado?: string;
   pagina?: number;
   limite?: number;
 }

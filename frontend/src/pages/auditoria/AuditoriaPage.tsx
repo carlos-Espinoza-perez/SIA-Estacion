@@ -1,48 +1,95 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DashboardLayoutTemplate } from '../../components/templates/DashboardLayoutTemplate/DashboardLayoutTemplate';
 import { EventoAuditoria, TipoEventoAuditoria } from '../../types/auditoria';
 import { auditoriaService } from '../../services/auditoriaService';
+import { estacionService } from '../../services/estacionService';
+import { Estacion } from '../../types/estacion';
 import { Button } from '../../components/atoms/Button/Button';
+import { Spinner } from '../../components/atoms/Spinner/Spinner';
 import { useToast } from '../../context/ToastContext';
 
 export const AuditoriaPage: React.FC = () => {
   const { showToast } = useToast();
   const [eventos, setEventos] = useState<EventoAuditoria[]>([]);
+  const [estaciones, setEstaciones] = useState<Estacion[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'eventos' | 'reportes'>('eventos');
+
+  // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<TipoEventoAuditoria | 'Todos'>('Todos');
   const [estacionFiltro, setEstacionFiltro] = useState('Todas');
   const [isExporting, setIsExporting] = useState(false);
 
-  const cargarEventos = () => {
-    auditoriaService
-      .getEventos({
-        busqueda,
+  // Paginación server-side
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPorPagina, setItemsPorPagina] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+
+  // Debounce para búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBusquedaDebounced(busqueda);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [busqueda]);
+
+  // Cargar estaciones reales del backend para el filtro
+  useEffect(() => {
+    estacionService.getEstaciones().then(setEstaciones).catch(console.error);
+  }, []);
+
+  const cargarEventos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await auditoriaService.getEventos({
+        busqueda: busquedaDebounced.trim(),
         tipo: tipoFiltro,
         estacion: estacionFiltro,
-      })
-      .then(setEventos);
-  };
+        pagina: currentPage,
+        limite: itemsPorPagina,
+      });
+
+      setEventos(result.data);
+      if (result.paginacion) {
+        setTotalPages(result.paginacion.totalPaginas);
+        setTotalRegistros(result.paginacion.totalRegistros);
+      } else {
+        setTotalPages(1);
+        setTotalRegistros(result.data.length);
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Error al cargar eventos de auditoría', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [busquedaDebounced, tipoFiltro, estacionFiltro, currentPage, itemsPorPagina, showToast]);
 
   useEffect(() => {
     cargarEventos();
-  }, [busqueda, tipoFiltro, estacionFiltro]);
+  }, [cargarEventos]);
 
-  const estacionesUnicas = useMemo(() => {
-    const list = ['Todas', 'Entrada principal', 'Laboratorio A', 'Cafetería', 'Salida norte', 'Taller', 'Laboratorio B'];
-    return list;
-  }, []);
+  // Lista de nombres de estaciones reales
+  const estacionesNombres = useMemo(() => {
+    const nombres = estaciones.map((e) => e.nombre);
+    return ['Todas', ...Array.from(new Set(nombres))];
+  }, [estaciones]);
 
   const getTipoColor = (tipo: TipoEventoAuditoria) => {
     switch (tipo) {
       case 'Acceso':
-        return '#71DD8C'; // Green
+        return '#71DD8C'; // Verde
       case 'Ítem':
-        return '#7DBBFF'; // Blue
+        return '#7DBBFF'; // Azul
+      case 'Operación':
+        return '#FBBF24'; // Ámbar
       case 'Seguridad':
-        return '#B899EB'; // Purple / Magenta
+        return '#B899EB'; // Púrpura
       case 'Configuración':
-        return '#ADADFB'; // Lavender / Indigo
+        return '#ADADFB'; // Índigo
       default:
         return 'rgba(255, 255, 255, 0.4)';
     }
@@ -72,6 +119,9 @@ export const AuditoriaPage: React.FC = () => {
     }
   };
 
+  const indiceInicio = totalRegistros === 0 ? 0 : (currentPage - 1) * itemsPorPagina + 1;
+  const indiceFin = Math.min(currentPage * itemsPorPagina, totalRegistros);
+
   return (
     <DashboardLayoutTemplate breadcrumbTitle="Auditoría">
       <div
@@ -87,17 +137,21 @@ export const AuditoriaPage: React.FC = () => {
       >
         {/* Encabezado: Título + Pestañas */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <h2
-            style={{
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              fontFamily: 'Inter, sans-serif',
-              margin: 0,
-            }}
-          >
-            Auditoría
-          </h2>
+          <div>
+            <h2
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#FFFFFF',
+                margin: 0,
+              }}
+            >
+              Auditoría y Bitácora
+            </h2>
+            <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.45)' }}>
+              Registro inmutable de acciones, cambios de seguridad y accesos consultados directamente en base de datos
+            </span>
+          </div>
 
           {/* Pestañas Eventos / Reportes */}
           <div
@@ -109,20 +163,20 @@ export const AuditoriaPage: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
-          <Button
-            variant={activeTab === 'eventos' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('eventos')}
-          >
-            Eventos
-          </Button>
-          <Button
-            variant={activeTab === 'reportes' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('reportes')}
-          >
-            Reportes
-          </Button>
+            <Button
+              variant={activeTab === 'eventos' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('eventos')}
+            >
+              Eventos ({totalRegistros})
+            </Button>
+            <Button
+              variant={activeTab === 'reportes' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('reportes')}
+            >
+              Reportes
+            </Button>
           </div>
         </div>
 
@@ -157,57 +211,62 @@ export const AuditoriaPage: React.FC = () => {
             </svg>
             <input
               type="text"
-              placeholder="Buscar persona, ítem o folio"
+              placeholder="Buscar persona, actor o detalle..."
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setCurrentPage(1);
+              }}
               style={{
                 width: '100%',
                 height: '36px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
                 paddingLeft: '34px',
                 paddingRight: '12px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: '#FFFFFF',
                 fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
                 outline: 'none',
                 boxSizing: 'border-box',
               }}
             />
           </div>
 
-          {/* Filtro: Tipo de evento */}
+          {/* Selector de Tipo de Evento */}
           <div style={{ position: 'relative' }}>
             <select
               value={tipoFiltro}
-              onChange={(e) => setTipoFiltro(e.target.value as TipoEventoAuditoria | 'Todos')}
+              onChange={(e) => {
+                setTipoFiltro(e.target.value as any);
+                setCurrentPage(1);
+              }}
               style={{
                 height: '36px',
-                backgroundColor: '#262626',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '0 32px 0 12px',
                 borderRadius: '8px',
-                padding: '0 30px 0 12px',
+                backgroundColor: '#2A2A2A',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: '#FFFFFF',
                 fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
+                appearance: 'none',
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
               }}
             >
               <option value="Todos">Tipo de evento: Todos</option>
-              <option value="Acceso">Tipo de evento: Acceso</option>
-              <option value="Ítem">Tipo de evento: Ítem</option>
-              <option value="Seguridad">Tipo de evento: Seguridad</option>
-              <option value="Configuración">Tipo de evento: Configuración</option>
+              <option value="Seguridad">Seguridad (Roles/Usuarios)</option>
+              <option value="Acceso">Acceso</option>
+              <option value="Operación">Operación (Préstamos)</option>
+              <option value="Ítem">Ítem (Inventario)</option>
+              <option value="Configuración">Configuración</option>
             </select>
             <svg
               width="10"
               height="6"
               viewBox="0 0 10 6"
               fill="none"
-              stroke="rgba(255, 255, 255, 0.4)"
+              stroke="rgba(255, 255, 255, 0.5)"
               strokeWidth="1.5"
               style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
             >
@@ -215,28 +274,30 @@ export const AuditoriaPage: React.FC = () => {
             </svg>
           </div>
 
-          {/* Filtro: Estación */}
+          {/* Selector de Estación Real */}
           <div style={{ position: 'relative' }}>
             <select
               value={estacionFiltro}
-              onChange={(e) => setEstacionFiltro(e.target.value)}
+              onChange={(e) => {
+                setEstacionFiltro(e.target.value);
+                setCurrentPage(1);
+              }}
               style={{
                 height: '36px',
-                backgroundColor: '#262626',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '0 32px 0 12px',
                 borderRadius: '8px',
-                padding: '0 30px 0 12px',
+                backgroundColor: '#2A2A2A',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: '#FFFFFF',
                 fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
+                appearance: 'none',
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
               }}
             >
-              {estacionesUnicas.map((est) => (
+              {estacionesNombres.map((est) => (
                 <option key={est} value={est}>
-                  {est === 'Todas' ? 'Estación: Todas' : `Estación: ${est}`}
+                  {est === 'Todas' ? 'Estación: Todas' : est}
                 </option>
               ))}
             </select>
@@ -245,37 +306,12 @@ export const AuditoriaPage: React.FC = () => {
               height="6"
               viewBox="0 0 10 6"
               fill="none"
-              stroke="rgba(255, 255, 255, 0.4)"
+              stroke="rgba(255, 255, 255, 0.5)"
               strokeWidth="1.5"
               style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
             >
               <path d="M1 1L5 5L9 1" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </div>
-
-          {/* Rango de Fechas */}
-          <div
-            style={{
-              height: '36px',
-              padding: '0 14px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              color: 'rgba(255, 255, 255, 0.8)',
-              userSelect: 'none',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            01 – 28 jul 2026
           </div>
 
           <div style={{ flex: 1 }} />
@@ -295,7 +331,7 @@ export const AuditoriaPage: React.FC = () => {
               </svg>
             }
           >
-            Exportar
+            Exportar CSV
           </Button>
         </div>
 
@@ -303,7 +339,7 @@ export const AuditoriaPage: React.FC = () => {
         <div
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            borderRadius: '20px',
+            borderRadius: '18px',
             border: '1px solid rgba(255, 255, 255, 0.06)',
             padding: '24px',
             display: 'flex',
@@ -312,220 +348,377 @@ export const AuditoriaPage: React.FC = () => {
             boxSizing: 'border-box',
           }}
         >
-          <div style={{ overflowX: 'auto' }}>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                      width: '150px',
-                    }}
-                  >
-                    Fecha y hora
-                  </th>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                      width: '140px',
-                    }}
-                  >
-                    Tipo
-                  </th>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                      width: '180px',
-                    }}
-                  >
-                    Actor
-                  </th>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                    }}
-                  >
-                    Descripción
-                  </th>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                      width: '160px',
-                    }}
-                  >
-                    Estación
-                  </th>
-                  <th
-                    style={{
-                      padding: '12px 14px',
-                      textAlign: 'left',
-                      fontWeight: 500,
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontSize: '12px',
-                      width: '92px',
-                    }}
-                  >
-                    Origen
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventos.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      style={{
-                        padding: '36px 14px',
-                        textAlign: 'center',
-                        color: 'rgba(255, 255, 255, 0.4)',
-                        fontSize: '13px',
-                      }}
-                    >
-                      No se encontraron eventos con los filtros seleccionados
-                    </td>
-                  </tr>
-                ) : (
-                  eventos.map((ev, idx) => {
-                    const dotColor = getTipoColor(ev.tipo);
-                    const isSystemOrUnknown = ev.actor === 'No identificado' || ev.actor === 'Sistema';
-
-                    return (
-                      <tr
-                        key={ev.id}
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '280px' }}>
+              <Spinner size={32} color="var(--primary)" />
+            </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '13px',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <th
                         style={{
-                          borderBottom:
-                            idx === eventos.length - 1
-                              ? 'none'
-                              : '1px solid rgba(255, 255, 255, 0.05)',
-                          transition: 'background-color 0.1s ease',
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                          width: '170px',
                         }}
-                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)')}
-                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
-                        {/* Fecha y hora */}
+                        Fecha y hora
+                      </th>
+                      <th
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                          width: '140px',
+                        }}
+                      >
+                        Tipo
+                      </th>
+                      <th
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                          width: '180px',
+                        }}
+                      >
+                        Actor
+                      </th>
+                      <th
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                        }}
+                      >
+                        Descripción
+                      </th>
+                      <th
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                          width: '140px',
+                        }}
+                      >
+                        Estación
+                      </th>
+                      <th
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          fontWeight: 500,
+                          color: 'rgba(255, 255, 255, 0.45)',
+                          fontSize: '12px',
+                          width: '90px',
+                        }}
+                      >
+                        Origen
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventos.length === 0 ? (
+                      <tr>
                         <td
+                          colSpan={6}
                           style={{
-                            padding: '14px 14px',
-                            color: 'rgba(255, 255, 255, 0.85)',
+                            padding: '40px 14px',
+                            textAlign: 'center',
+                            color: 'rgba(255, 255, 255, 0.4)',
                             fontSize: '13px',
-                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {ev.fechaHora}
-                        </td>
-
-                        {/* Tipo con Indicador Circular de Color */}
-                        <td style={{ padding: '14px 14px' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                            <div
-                              style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                backgroundColor: dotColor,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span style={{ color: '#FFFFFF', fontWeight: 500, fontSize: '13px' }}>
-                              {ev.tipo}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Actor */}
-                        <td
-                          style={{
-                            padding: '14px 14px',
-                            color: isSystemOrUnknown ? 'rgba(255, 255, 255, 0.5)' : '#FFFFFF',
-                            fontWeight: isSystemOrUnknown ? 400 : 500,
-                            fontSize: '13px',
-                          }}
-                        >
-                          {ev.actor}
-                        </td>
-
-                        {/* Descripción */}
-                        <td
-                          style={{
-                            padding: '14px 14px',
-                            color: '#FFFFFF',
-                            fontSize: '13px',
-                            lineHeight: '1.4',
-                          }}
-                        >
-                          {ev.descripcion}
-                        </td>
-
-                        {/* Estación */}
-                        <td
-                          style={{
-                            padding: '14px 14px',
-                            color: ev.estacion === '—' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.75)',
-                            fontSize: '13px',
-                          }}
-                        >
-                          {ev.estacion}
-                        </td>
-
-                        {/* Origen */}
-                        <td
-                          style={{
-                            padding: '14px 14px',
-                            color: 'rgba(255, 255, 255, 0.55)',
-                            fontSize: '13px',
-                          }}
-                        >
-                          {ev.origen}
+                          No se encontraron eventos con los filtros seleccionados
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      eventos.map((ev, idx) => {
+                        const dotColor = getTipoColor(ev.tipo);
+                        const isSystemOrUnknown = ev.actor === 'Usuario' || ev.actor === 'Sistema';
 
-          {/* Footer de la Tabla */}
-          <div
-            style={{
-              paddingTop: '14px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-              fontSize: '12px',
-              color: 'rgba(255, 255, 255, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>{eventos.length} de 4,812 eventos · registro inmutable</span>
-          </div>
+                        return (
+                          <tr
+                            key={ev.id + '-' + idx}
+                            style={{
+                              borderBottom:
+                                idx === eventos.length - 1
+                                  ? 'none'
+                                  : '1px solid rgba(255, 255, 255, 0.05)',
+                              transition: 'background-color 0.1s ease',
+                            }}
+                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)')}
+                            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            {/* Fecha y hora */}
+                            <td
+                              style={{
+                                padding: '14px 14px',
+                                color: 'rgba(255, 255, 255, 0.85)',
+                                fontSize: '12.5px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {ev.fechaHora}
+                            </td>
+
+                            {/* Tipo con Indicador Circular de Color */}
+                            <td style={{ padding: '14px 14px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                <div
+                                  style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: dotColor,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span style={{ color: '#FFFFFF', fontWeight: 500, fontSize: '12.5px' }}>
+                                  {ev.tipo}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Actor */}
+                            <td
+                              style={{
+                                padding: '14px 14px',
+                                color: isSystemOrUnknown ? 'rgba(255, 255, 255, 0.6)' : '#FFFFFF',
+                                fontWeight: isSystemOrUnknown ? 400 : 500,
+                                fontSize: '13px',
+                              }}
+                            >
+                              {ev.actor}
+                            </td>
+
+                            {/* Descripción */}
+                            <td
+                              style={{
+                                padding: '14px 14px',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                lineHeight: '1.4',
+                              }}
+                            >
+                              {ev.descripcion}
+                            </td>
+
+                            {/* Estación */}
+                            <td
+                              style={{
+                                padding: '14px 14px',
+                                color: ev.estacion === '—' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.75)',
+                                fontSize: '12.5px',
+                              }}
+                            >
+                              {ev.estacion}
+                            </td>
+
+                            {/* Origen */}
+                            <td
+                              style={{
+                                padding: '14px 14px',
+                                color: 'rgba(255, 255, 255, 0.55)',
+                                fontSize: '12.5px',
+                              }}
+                            >
+                              {ev.origen}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Controles de Paginación Server-Side */}
+              {totalRegistros > 0 && (
+                <div
+                  style={{
+                    paddingTop: '16px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                    fontSize: '12.5px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  {/* Selector de Items por Página */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>Mostrando</span>
+                    <select
+                      value={itemsPorPagina}
+                      onChange={(e) => {
+                        setItemsPorPagina(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        height: '30px',
+                        borderRadius: '6px',
+                        backgroundColor: '#2A2A2A',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        padding: '0 8px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span>
+                      registros ({indiceInicio} - {indiceFin} de {totalRegistros})
+                    </span>
+                  </div>
+
+                  {/* Botones de Navegación de Página */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {/* Botón Primera Página */}
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(1)}
+                      style={{
+                        height: '30px',
+                        padding: '0 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        color: currentPage === 1 ? 'rgba(255, 255, 255, 0.2)' : '#FFFFFF',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                      }}
+                      title="Primera página"
+                    >
+                      «
+                    </button>
+
+                    {/* Botón Página Anterior */}
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      style={{
+                        height: '30px',
+                        padding: '0 10px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        color: currentPage === 1 ? 'rgba(255, 255, 255, 0.2)' : '#FFFFFF',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                      }}
+                    >
+                      Anterior
+                    </button>
+
+                    {/* Indicador de Páginas */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .map((p, idx, arr) => {
+                        const prevPage = arr[idx - 1];
+                        const showEllipsis = prevPage && p - prevPage > 1;
+                        const isSelected = p === currentPage;
+
+                        return (
+                          <React.Fragment key={p}>
+                            {showEllipsis && <span style={{ padding: '0 4px', color: 'rgba(255, 255, 255, 0.3)' }}>...</span>}
+                            <button
+                              type="button"
+                              onClick={() => setCurrentPage(p)}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '6px',
+                                border: isSelected ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                                backgroundColor: isSelected ? '#ADADFB' : 'rgba(255, 255, 255, 0.04)',
+                                color: isSelected ? '#17171C' : '#FFFFFF',
+                                fontWeight: isSelected ? 700 : 400,
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              {p}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+
+                    {/* Botón Página Siguiente */}
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      style={{
+                        height: '30px',
+                        padding: '0 10px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        color: currentPage === totalPages ? 'rgba(255, 255, 255, 0.2)' : '#FFFFFF',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                      }}
+                    >
+                      Siguiente
+                    </button>
+
+                    {/* Botón Última Página */}
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      style={{
+                        height: '30px',
+                        padding: '0 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                        color: currentPage === totalPages ? 'rgba(255, 255, 255, 0.2)' : '#FFFFFF',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                      }}
+                      title="Última página"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </DashboardLayoutTemplate>

@@ -62,7 +62,6 @@ public class ServicioAlmacenamientoBlob : IServicioAlmacenamiento
             BlobContainerName = blobClient.BlobContainerName,
             BlobName = blobClient.Name,
             Resource = "b",
-            StartsOn = DateTimeOffset.UtcNow,
             ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(_opciones.UrlFirmadaMinutos)
         };
 

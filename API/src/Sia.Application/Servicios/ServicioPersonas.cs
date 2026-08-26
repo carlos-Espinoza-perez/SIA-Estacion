@@ -35,6 +35,8 @@ public class ServicioPersonas
                 tp = TipoPersona.Estudiante;
             else if (tipo.Equals("Personal", StringComparison.OrdinalIgnoreCase))
                 isPersonal = true;
+            else if (Enum.TryParse<TipoPersona>(tipo, true, out var parsedTp))
+                tp = parsedTp;
         }
 
         bool? estado = null;
@@ -57,7 +59,34 @@ public class ServicioPersonas
             TotalPaginas = (int)Math.Ceiling(totalRegistros / (double)limite)
         };
 
-        return Result<List<PersonaResponse>>.ExitosoConPaginacion(_mapper.Map<List<PersonaResponse>>(personas), paginacion);
+        List<PersonaResponse> respuesta = _mapper.Map<List<PersonaResponse>>(personas);
+        var userIds = personas.Where(p => !string.IsNullOrEmpty(p.UserId)).Select(p => p.UserId!).Distinct().ToList();
+        var rolesMap = userIds.Count > 0 ? await _repository.ObtenerRolesPorUserIdsAsync(userIds, ct) : new Dictionary<string, string>();
+
+        for (int indice = 0; indice < personas.Count; indice++)
+        {
+            var p = personas[indice];
+            respuesta[indice].UserId = p.UserId;
+
+            if (!string.IsNullOrEmpty(p.UserId) && rolesMap.TryGetValue(p.UserId, out var rolNombre))
+            {
+                respuesta[indice].Rol = rolNombre;
+            }
+            else
+            {
+                respuesta[indice].Rol = p.TipoPersona == TipoPersona.Estudiante ? "Estudiante" : (p.TipoPersona == TipoPersona.Administrador ? "Administrador Global" : p.TipoPersona.ToString());
+            }
+
+            FotoReferencia? fotoPrincipal = p.FotosReferencia
+                .Where(foto => foto.Estado)
+                .OrderByDescending(foto => foto.FechaCarga)
+                .FirstOrDefault();
+
+            if (fotoPrincipal is not null)
+                respuesta[indice].AvatarUrl = await _almacenamiento.ObtenerUrlFirmadaAsync(fotoPrincipal.Url, ct);
+        }
+
+        return Result<List<PersonaResponse>>.ExitosoConPaginacion(respuesta, paginacion);
     }
 
     public async Task<Result<PersonaDetalleResponse>> ObtenerPorIdAsync(Guid id, CancellationToken ct)
@@ -67,6 +96,19 @@ public class ServicioPersonas
             throw new EntidadNoEncontradaException(nameof(Persona), id);
 
         PersonaDetalleResponse response = _mapper.Map<PersonaDetalleResponse>(persona);
+        if (!string.IsNullOrEmpty(persona.UserId))
+        {
+            var rolesMap = await _repository.ObtenerRolesPorUserIdsAsync([persona.UserId], ct);
+            if (rolesMap.TryGetValue(persona.UserId, out var rolNombre))
+                response.Rol = rolNombre;
+            else
+                response.Rol = persona.TipoPersona.ToString();
+        }
+        else
+        {
+            response.Rol = persona.TipoPersona == TipoPersona.Estudiante ? "Estudiante" : persona.TipoPersona.ToString();
+        }
+
         List<FotoReferencia> fotosActivas = persona.FotosReferencia
             .Where(f => f.Estado)
             .OrderByDescending(f => f.FechaCarga)
@@ -94,8 +136,16 @@ public class ServicioPersonas
 
     public async Task<Result<PersonaResponse>> CrearAsync(CrearPersonaRequest request, CancellationToken ct)
     {
-        if (!Enum.TryParse<TipoPersona>(request.TipoPersona, out TipoPersona tp))
-            return Result<PersonaResponse>.Fallido("TIPO_PERSONA_INVALIDO", $"Tipo de persona '{request.TipoPersona}' no válido.");
+        TipoPersona tp = TipoPersona.Estudiante;
+        if (!string.IsNullOrWhiteSpace(request.TipoPersona))
+        {
+            if (request.TipoPersona.Equals("Personal", StringComparison.OrdinalIgnoreCase))
+                tp = TipoPersona.Encargado;
+            else if (Enum.TryParse<TipoPersona>(request.TipoPersona, true, out TipoPersona parsedTp))
+                tp = parsedTp;
+            else
+                return Result<PersonaResponse>.Fallido("TIPO_PERSONA_INVALIDO", $"Tipo de persona '{request.TipoPersona}' no válido.");
+        }
 
         var persona = new Persona
         {
@@ -122,8 +172,16 @@ public class ServicioPersonas
         if (persona is null)
             throw new EntidadNoEncontradaException(nameof(Persona), id);
 
-        if (!Enum.TryParse<TipoPersona>(request.TipoPersona, out TipoPersona tp))
-            return Result<PersonaResponse>.Fallido("TIPO_PERSONA_INVALIDO", $"Tipo de persona '{request.TipoPersona}' no válido.");
+        TipoPersona tp = persona.TipoPersona;
+        if (!string.IsNullOrWhiteSpace(request.TipoPersona))
+        {
+            if (request.TipoPersona.Equals("Personal", StringComparison.OrdinalIgnoreCase))
+                tp = TipoPersona.Encargado;
+            else if (Enum.TryParse<TipoPersona>(request.TipoPersona, true, out TipoPersona parsedTp))
+                tp = parsedTp;
+            else
+                return Result<PersonaResponse>.Fallido("TIPO_PERSONA_INVALIDO", $"Tipo de persona '{request.TipoPersona}' no válido.");
+        }
 
         persona.Nombres = request.Nombres;
         persona.Apellidos = request.Apellidos;
@@ -209,6 +267,17 @@ public class ServicioPersonas
     public async Task<Result<bool>> EliminarFotoAsync(Guid personaId, CancellationToken ct)
     {
         FotoReferencia? foto = await _repository.ObtenerFotoActivaAsync(personaId, ct);
+        return await EliminarFotoAsync(personaId, foto, ct);
+    }
+
+    public async Task<Result<bool>> EliminarFotoAsync(Guid personaId, Guid fotoId, CancellationToken ct)
+    {
+        FotoReferencia? foto = await _repository.ObtenerFotoActivaAsync(personaId, fotoId, ct);
+        return await EliminarFotoAsync(personaId, foto, ct);
+    }
+
+    private async Task<Result<bool>> EliminarFotoAsync(Guid personaId, FotoReferencia? foto, CancellationToken ct)
+    {
         if (foto is null)
             throw new EntidadNoEncontradaException("FotoReferencia", personaId);
 
@@ -225,6 +294,7 @@ public class ServicioPersonas
         "image/jpeg" => ".jpg",
         "image/png" => ".png",
         "image/webp" => ".webp",
+        "image/avif" => ".avif",
         _ => ".bin"
     };
 

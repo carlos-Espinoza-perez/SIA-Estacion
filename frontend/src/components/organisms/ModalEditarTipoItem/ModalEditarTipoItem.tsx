@@ -1,41 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal/Modal';
 import { Button } from '../../atoms/Button/Button';
-import { CrearTipoItemFormData, FlujoTipoItem } from '../../../types/item';
+import { TipoItem, FlujoTipoItem } from '../../../types/item';
 
-export interface ModalCrearTipoItemProps {
+export interface ModalEditarTipoItemProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CrearTipoItemFormData) => void | Promise<void>;
+  tipo: TipoItem | null;
+  onSubmit: (id: string, data: { nombre: string; descripcion: string; flujoPorDefecto: FlujoTipoItem }) => void | Promise<void>;
+  onDelete?: (id: string) => void;
 }
 
-
-
-export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
+export const ModalEditarTipoItem: React.FC<ModalEditarTipoItemProps> = ({
   isOpen,
   onClose,
+  tipo,
   onSubmit,
+  onDelete,
 }) => {
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [flujo, setFlujo] = useState<FlujoTipoItem>('Requiere aprobación');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Poblar campos cuando se abre el modal con un tipo
+  useEffect(() => {
+    if (tipo) {
+      setNombre(tipo.nombre);
+      setDescripcion(tipo.descripcion === 'Sin descripción' ? '' : tipo.descripcion);
+      setFlujo(tipo.requiereAprobacion === 'Sí' ? 'Requiere aprobación' : 'Retiro directo');
+    }
+  }, [tipo]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim()) return;
+    if (!nombre.trim() || !tipo) return;
 
     setIsSaving(true);
     try {
-      await onSubmit({
+      await onSubmit(tipo.id, {
         nombre: nombre.trim(),
         descripcion: descripcion.trim(),
         flujoPorDefecto: flujo,
       });
-
-      setNombre('');
-      setDescripcion('');
-      setFlujo('Requiere aprobación');
       onClose();
     } catch (error) {
       console.error(error);
@@ -44,8 +51,41 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    height: '38px',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: '8px',
+    padding: '0 12px',
+    color: '#FFFFFF',
+    fontSize: '14px',
+    fontFamily: 'Inter, sans-serif',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '13px',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: 500,
+  };
+
   const footer = (
     <>
+      {onDelete && tipo && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => { onDelete(tipo.id); onClose(); }}
+          disabled={isSaving}
+          style={{ color: 'rgba(239,68,68,0.7)', marginRight: 'auto' }}
+        >
+          Eliminar
+        </Button>
+      )}
       <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isSaving}>
         Cancelar
       </Button>
@@ -57,7 +97,7 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
         disabled={!nombre.trim()}
         isLoading={isSaving}
       >
-        Crear tipo
+        Guardar cambios
       </Button>
     </>
   );
@@ -66,65 +106,40 @@ export const ModalCrearTipoItem: React.FC<ModalCrearTipoItemProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Nuevo tipo de ítem"
-      subtitle="Define un tipo y el flujo que tendrán sus operaciones."
+      title="Editar tipo de ítem"
+      subtitle={tipo ? `Modificando "${tipo.nombre}"` : ''}
       width={560}
       footer={footer}
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '12px' }}>
-        {/* Nombre del tipo */}
+        {/* Nombre */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Nombre del tipo
-          </label>
+          <label style={labelStyle}>Nombre del tipo</label>
           <input
             type="text"
             placeholder="Ej. Equipo de laboratorio"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            style={{
-              height: '38px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-            }}
+            style={inputStyle}
+            autoFocus
           />
         </div>
 
         {/* Descripción */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Descripción
-          </label>
+          <label style={labelStyle}>Descripción</label>
           <input
             type="text"
             placeholder="Describe qué recursos agrupa este tipo"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            style={{
-              height: '38px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-            }}
+            style={inputStyle}
           />
         </div>
 
-        {/* Flujo por defecto (Segmented) */}
+        {/* Flujo por defecto */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Flujo por defecto
-          </label>
+          <label style={labelStyle}>Flujo por defecto</label>
           <div
             style={{
               display: 'flex',

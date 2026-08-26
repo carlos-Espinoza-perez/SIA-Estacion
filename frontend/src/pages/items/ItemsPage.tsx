@@ -5,31 +5,17 @@ import { SearchInput } from '../../components/atoms/SearchInput/SearchInput';
 import { Select, SelectOption } from '../../components/atoms/Select/Select';
 import { StatusBadge } from '../../components/atoms/StatusBadge/StatusBadge';
 import { ConfirmModal } from '../../components/molecules/ConfirmModal/ConfirmModal';
-import { Item, TipoItem, CrearItemFormData, CrearTipoItemFormData, FiltrosItem, FiltrosTipoItem } from '../../types/item';
+import { Item, TipoItem, FlujoTipoItem, CrearItemFormData, CrearTipoItemFormData, FiltrosItem, FiltrosTipoItem } from '../../types/item';
 import { itemService } from '../../services/itemService';
 import { ModalCrearItem } from '../../components/organisms/ModalCrearItem/ModalCrearItem';
 import { ModalCrearTipoItem } from '../../components/organisms/ModalCrearTipoItem/ModalCrearTipoItem';
 import { ModalEditarItem } from '../../components/organisms/ModalEditarItem/ModalEditarItem';
+import { ModalEditarTipoItem } from '../../components/organisms/ModalEditarTipoItem/ModalEditarTipoItem';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/atoms/Button/Button';
+import { estacionService } from '../../services/estacionService';
 
 // Opciones de Filtros
-
-const TIPO_FILTER_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Tipo: Todos' },
-  { value: 'Equipo de laboratorio', label: 'Equipo de laboratorio' },
-  { value: 'Componentes electrónicos', label: 'Componentes electrónicos' },
-  { value: 'Material bibliográfico', label: 'Material bibliográfico' },
-  { value: 'Mobiliario', label: 'Mobiliario' },
-];
-
-const ESTACION_FILTER_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Estación: Todas' },
-  { value: 'Laboratorio A', label: 'Laboratorio A' },
-  { value: 'Laboratorio B', label: 'Laboratorio B' },
-  { value: 'Taller', label: 'Taller' },
-  { value: 'Biblioteca', label: 'Biblioteca' },
-];
 
 const ESTADO_ITEM_FILTER_OPTIONS: SelectOption[] = [
   { value: '', label: 'Estado: Todos' },
@@ -40,14 +26,17 @@ const ESTADO_ITEM_FILTER_OPTIONS: SelectOption[] = [
 ];
 
 const ESTADO_TIPO_FILTER_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Estado: Todos' },
-  { value: 'Activo', label: 'Activo' },
-  { value: 'Inactivo', label: 'Inactivo' },
+  { value: 'Activo', label: 'Estado: Activo' },
+  { value: 'Inactivo', label: 'Estado: Inactivo' },
 ];
 
 export const ItemsPage: React.FC = () => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'items' | 'tipos'>('items');
+
+  // Opciones dinámicas de filtros
+  const [tipoOptions, setTipoOptions] = useState<SelectOption[]>([{ value: '', label: 'Tipo: Todos' }]);
+  const [estacionOptions, setEstacionOptions] = useState<SelectOption[]>([{ value: '', label: 'Estación: Todas' }]);
 
   // Estados de Pestaña 1 (Ítems)
   const [items, setItems] = useState<Item[]>([]);
@@ -63,10 +52,27 @@ export const ItemsPage: React.FC = () => {
   // Estados de Pestaña 2 (Tipos de ítem)
   const [tiposItem, setTiposItem] = useState<TipoItem[]>([]);
   const [busquedaTipo, setBusquedaTipo] = useState('');
-  const [estadoTipoFiltro, setEstadoTipoFiltro] = useState('');
+  const [estadoTipoFiltro, setEstadoTipoFiltro] = useState('Activo');
   const [isCrearTipoOpen, setIsCrearTipoOpen] = useState(false);
+  const [selectedTipoForEdit, setSelectedTipoForEdit] = useState<TipoItem | null>(null);
   const [tipoToDelete, setTipoToDelete] = useState<TipoItem | null>(null);
   const [isDeletingTipo, setIsDeletingTipo] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      itemService.getTiposItem(),
+      estacionService.getEstaciones(),
+    ]).then(([tipos, ests]) => {
+      setTipoOptions([
+        { value: '', label: 'Tipo: Todos' },
+        ...tipos.map((t) => ({ value: t.nombre, label: t.nombre })),
+      ]);
+      setEstacionOptions([
+        { value: '', label: 'Estación: Todas' },
+        ...ests.map((e) => ({ value: e.nombre, label: e.nombre })),
+      ]);
+    }).catch(console.error);
+  }, []);
 
   // Cargar Ítems
   const cargarItems = () => {
@@ -134,6 +140,19 @@ export const ItemsPage: React.FC = () => {
     cargarTiposItem();
   };
 
+  const handleActualizarTipoItem = async (
+    id: string,
+    data: { nombre: string; descripcion: string; flujoPorDefecto: FlujoTipoItem }
+  ) => {
+    await itemService.actualizarTipoItem(id, {
+      nombre: data.nombre,
+      descripcion: data.descripcion,
+      requiereAprobacion: data.flujoPorDefecto === 'Requiere aprobación' ? 'Sí' : 'No',
+    });
+    showToast(`Tipo "${data.nombre}" actualizado con éxito`, 'success');
+    cargarTiposItem();
+  };
+
   const handleConfirmDeleteTipo = async () => {
     if (!tipoToDelete) return;
     setIsDeletingTipo(true);
@@ -142,9 +161,21 @@ export const ItemsPage: React.FC = () => {
       showToast(`Categoría "${tipoToDelete.nombre}" eliminada`, 'success');
       setTipoToDelete(null);
       cargarTiposItem();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje
+        ?? 'No se pudo eliminar la categoría.';
+      showToast(msg, 'error');
+      setTipoToDelete(null);
     } finally {
       setIsDeletingTipo(false);
     }
+  };
+
+  const handleReactivarTipo = async (tipo: TipoItem) => {
+    await itemService.reactivarTipoItem(tipo.id);
+    showToast(`Categoría "${tipo.nombre}" reactivada`, 'success');
+    cargarTiposItem();
   };
 
   // Columnas de Tabla Ítems
@@ -275,12 +306,16 @@ export const ItemsPage: React.FC = () => {
         width: 220,
         render: (row: TipoItem) => (
           <span
+            onClick={() => setSelectedTipoForEdit(row)}
             style={{
               fontSize: '14px',
               fontWeight: 500,
               color: '#FFFFFF',
               fontFamily: 'Inter, sans-serif',
+              cursor: 'pointer',
             }}
+            onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+            onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
           >
             {row.nombre}
           </span>
@@ -357,18 +392,34 @@ export const ItemsPage: React.FC = () => {
         width: 60,
         render: (row: TipoItem) => (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTipoToDelete(row)}
-              title="Eliminar categoría"
-              style={{ color: 'rgba(239,68,68,0.6)', padding: '4px', height: 'auto', minHeight: '28px' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </Button>
+            {row.estado === 'Inactivo' ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReactivarTipo(row)}
+                title="Reactivar categoría"
+                style={{ color: 'rgba(34,197,94,0.7)', padding: '4px', height: 'auto', minHeight: '28px' }}
+              >
+                {/* ✓ check / reactivar */}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTipoToDelete(row)}
+                title="Eliminar categoría"
+                style={{ color: 'rgba(239,68,68,0.6)', padding: '4px', height: 'auto', minHeight: '28px' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </Button>
+            )}
           </div>
         ),
       },
@@ -433,7 +484,7 @@ export const ItemsPage: React.FC = () => {
                 />
 
                 <Select
-                  options={TIPO_FILTER_OPTIONS}
+                  options={tipoOptions}
                   value={tipoFiltro}
                   onChange={setTipoFiltro}
                   placeholder="Tipo: Todos"
@@ -441,7 +492,7 @@ export const ItemsPage: React.FC = () => {
                 />
 
                 <Select
-                  options={ESTACION_FILTER_OPTIONS}
+                  options={estacionOptions}
                   value={estacionFiltro}
                   onChange={setEstacionFiltro}
                   placeholder="Estación: Todas"
@@ -479,7 +530,7 @@ export const ItemsPage: React.FC = () => {
               columns={COLUMNS_ITEMS}
               data={items}
               rowKey={(row) => row.id}
-              footerText={`Mostrando ${items.length} de 580 ítems`}
+              footerText={`Mostrando ${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}`}
               emptyMessage="No se encontraron ítems con los filtros seleccionados."
             />
           </>
@@ -552,6 +603,19 @@ export const ItemsPage: React.FC = () => {
           isOpen={isCrearTipoOpen}
           onClose={() => setIsCrearTipoOpen(false)}
           onSubmit={handleCrearTipoItem}
+        />
+
+        {/* Modal Editar Tipo de Ítem */}
+        <ModalEditarTipoItem
+          isOpen={!!selectedTipoForEdit}
+          onClose={() => setSelectedTipoForEdit(null)}
+          tipo={selectedTipoForEdit}
+          onSubmit={handleActualizarTipoItem}
+          onDelete={(id) => {
+            const found = tiposItem.find((t) => t.id === id);
+            setSelectedTipoForEdit(null);
+            if (found) setTipoToDelete(found);
+          }}
         />
 
         {/* Modal Editar Ítem */}

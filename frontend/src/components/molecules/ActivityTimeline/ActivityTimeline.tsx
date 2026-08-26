@@ -74,7 +74,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
                 marginTop: '2px',
               }}
             >
-              {event.time}
+              {event.name} · {event.time}
             </span>
           </div>
         </div>

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Estacion, EstadoEstacion, FlujoEstacion } from '../../../types/estacion';
+import { Estacion, FlujoEstacion } from '../../../types/estacion';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
+import { QrScannerModal } from '../QrScannerModal/QrScannerModal';
 import { useToast } from '../../../context/ToastContext';
+import { personaService } from '../../../services/personaService';
+import { estacionService } from '../../../services/estacionService';
+import { Persona } from '../../../types/persona';
 
 export interface ConfiguracionEstacionDrawerProps {
   estacion: Estacion | null;
@@ -12,17 +16,9 @@ export interface ConfiguracionEstacionDrawerProps {
 }
 
 const TIPO_RECURSO_OPTIONS = [
-  'Componentes electrónicos',
   'Control de acceso',
   'Equipo de laboratorio',
   'Material bibliográfico',
-];
-
-const ENCARGADO_OPTIONS = [
-  'Weslin Rodríguez',
-  'Martha Sánchez',
-  'Josué Argeñal',
-  'Heberto Espinoza',
 ];
 
 export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerProps> = ({
@@ -39,15 +35,33 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
   const [ubicacion, setUbicacion] = useState('');
   const [tipoRecurso, setTipoRecurso] = useState('');
   const [flujo, setFlujo] = useState<FlujoEstacion>('—');
+  const [encargadoId, setEncargadoId] = useState('');
   const [encargado, setEncargado] = useState('');
+  const [encargadosDisponibles, setEncargadosDisponibles] = useState<Persona[]>([]);
   const [identificadorDispositivo, setIdentificadorDispositivo] = useState('');
   const [modoOffline, setModoOffline] = useState(true);
-  const [estado, setEstado] = useState<EstadoEstacion>('En línea');
+
+  // Pairing State
+  const [codigoPairingInput, setCodigoPairingInput] = useState('');
+  const [isPairing, setIsPairing] = useState(false);
+  const [isUnpairing, setIsUnpairing] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   const [guardadoExitoso, setGuardadoExitoso] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      personaService.getPersonas({ tipo: 'Personal', estado: 'Activo', limite: 100 })
+        .then((res) => {
+          const personal = res.data.filter((p) => p.tipo !== 'Estudiante');
+          setEncargadosDisponibles(personal);
+        })
+        .catch(console.error);
+    }
+  }, [isOpen]);
 
   // Sync state with selected station
   useEffect(() => {
@@ -56,15 +70,56 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
       setUbicacion(estacion.ubicacion || '');
       setTipoRecurso(estacion.tipoRecurso || 'Control de acceso');
       setFlujo(estacion.flujo || '—');
-      setEncargado(estacion.encargado || 'Martha Sánchez');
+      setEncargadoId(estacion.encargadoId || '');
+      setEncargado(estacion.encargado || '');
       setIdentificadorDispositivo(estacion.identificadorDispositivo || 'EST-001');
       setModoOffline(estacion.modoOffline !== false);
-      setEstado(estacion.estado || 'En línea');
+      setCodigoPairingInput('');
       setGuardadoExitoso(false);
     }
   }, [estacion, isOpen]);
 
   if (!isOpen || !estacion) return null;
+
+  const handleVincular = async () => {
+    if (!codigoPairingInput.trim() || !estacion) return;
+    setIsPairing(true);
+    try {
+      const estacionActualizada = await estacionService.vincularEstacion(estacion.id, codigoPairingInput.trim());
+      if (onSave) onSave(estacionActualizada);
+      showToast(`Dispositivo físico vinculado exitosamente a "${estacion.nombre}"`, 'success');
+      setCodigoPairingInput('');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo vincular el dispositivo físico.';
+      showToast(msg, 'error');
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
+  const handleDesvincular = async () => {
+    if (!estacion) return;
+    setIsUnpairing(true);
+    try {
+      await estacionService.desvincularEstacion(estacion.id);
+      const estacionDesvinculada = {
+        ...estacion,
+        estaVinculada: false,
+        macAddress: undefined,
+        codigoVinculacion: undefined,
+        fechaVinculacion: undefined
+      };
+      if (onSave) onSave(estacionDesvinculada);
+      showToast(`Dispositivo físico desvinculado de "${estacion.nombre}"`, 'success');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo desvincular el dispositivo.';
+      showToast(msg, 'error');
+    } finally {
+      setIsUnpairing(false);
+    }
+  };
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,10 +132,10 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
       ubicacion: ubicacion.trim(),
       tipoRecurso,
       flujo: tipoRecurso === 'Control de acceso' ? '—' : flujo,
-      encargado,
+      encargadoId: encargadoId || undefined,
+      encargado: encargado || 'Sin asignar',
       identificadorDispositivo: identificadorDispositivo.trim(),
       modoOffline,
-      estado,
     };
 
     if (onSave) {
@@ -108,7 +163,25 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
     }
   };
 
-  const isOnline = estado === 'En línea';
+  const handleScanSuccess = async (scannedCode: string) => {
+    setCodigoPairingInput(scannedCode);
+    if (!estacion) return;
+    setIsPairing(true);
+    try {
+      const estacionActualizada = await estacionService.vincularEstacion(estacion.id, scannedCode);
+      if (onSave) onSave(estacionActualizada);
+      showToast(`¡Estación "${estacion.nombre}" vinculada exitosamente con el ESP32!`, 'success');
+      setIsQrScannerOpen(false);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo vincular el dispositivo con ese código QR.';
+      showToast(msg, 'error');
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
+  const isOnline = !!estacion?.estaVinculada;
 
   return (
     <>
@@ -360,8 +433,13 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                     Encargado asignado
                   </label>
                   <select
-                    value={encargado}
-                    onChange={(e) => setEncargado(e.target.value)}
+                    value={encargadoId || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setEncargadoId(selectedId);
+                      const found = encargadosDisponibles.find((p) => p.id === selectedId);
+                      setEncargado(found ? found.nombre : '');
+                    }}
                     style={{
                       height: '38px',
                       backgroundColor: '#2A2A2A',
@@ -374,8 +452,11 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                       outline: 'none',
                     }}
                   >
-                    {ENCARGADO_OPTIONS.map((enc) => (
-                      <option key={enc} value={enc}>{enc}</option>
+                    <option value="">Sin asignar</option>
+                    {encargadosDisponibles.map((enc) => (
+                      <option key={enc.id} value={enc.id}>
+                        {enc.nombre} ({enc.carnet})
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -404,44 +485,6 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                 </div>
               </div>
 
-              {/* Estado de Conexión Editable */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
-                  Estado de la estación
-                </label>
-                <div
-                  style={{
-                    display: 'flex',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    borderRadius: '8px',
-                    padding: '3px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    gap: '4px',
-                  }}
-                >
-                  {(['En línea', 'Offline', 'Mantenimiento'] as EstadoEstacion[]).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setEstado(st)}
-                      style={{
-                        flex: 1,
-                        height: '32px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: estado === st ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                        color: estado === st ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                        fontSize: '12px',
-                        fontFamily: 'Inter, sans-serif',
-                        fontWeight: estado === st ? 500 : 400,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {/* Modo offline switch */}
               <div
@@ -490,6 +533,157 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                     }}
                   />
                 </div>
+              </div>
+
+              {/* Sección Dispositivo Físico (ESP32 - Vinculación 1 a 1) */}
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: '8px',
+                  backgroundColor: estacion.estaVinculada ? 'rgba(34, 197, 94, 0.05)' : 'rgba(250, 204, 21, 0.05)',
+                  border: `1px solid ${estacion.estaVinculada ? 'rgba(34, 197, 94, 0.2)' : 'rgba(250, 204, 21, 0.2)'}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={estacion.estaVinculada ? '#4ADE80' : '#FACC15'} strokeWidth="2">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                      <rect x="9" y="9" width="6" height="6" />
+                      <line x1="9" y1="1" x2="9" y2="4" />
+                      <line x1="15" y1="1" x2="15" y2="4" />
+                      <line x1="9" y1="20" x2="9" y2="23" />
+                      <line x1="15" y1="20" x2="15" y2="23" />
+                      <line x1="20" y1="9" x2="23" y2="9" />
+                      <line x1="20" y1="14" x2="23" y2="14" />
+                      <line x1="1" y1="9" x2="4" y2="9" />
+                      <line x1="1" y1="14" x2="4" y2="14" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
+                      Dispositivo Físico (ESP32)
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      backgroundColor: estacion.estaVinculada ? 'rgba(34, 197, 94, 0.15)' : 'rgba(250, 204, 21, 0.15)',
+                      color: estacion.estaVinculada ? '#4ADE80' : '#FACC15',
+                    }}
+                  >
+                    {estacion.estaVinculada ? 'Vinculado 1 a 1' : 'No Vinculado'}
+                  </span>
+                </div>
+
+                {estacion.estaVinculada ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Dirección MAC / Hardware ID:</span>
+                      <span style={{ color: '#FFFFFF', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {estacion.macAddress || '—'}
+                      </span>
+                    </div>
+                    {estacion.fechaVinculacion && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Fecha de emparejamiento:</span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>{estacion.fechaVinculacion}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDesvincular}
+                      disabled={isUnpairing}
+                      style={{
+                        marginTop: '6px',
+                        alignSelf: 'flex-start',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        color: '#EF4444',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isUnpairing ? 'Desvinculando...' : 'Desvincular ESP32'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
+                      Enciende el ESP32. En su pantalla se mostrará un código QR. Escanéalo con la cámara o ingresa el código/MAC:
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Ej. PAIR-A8492 o MAC A4:CF:..."
+                        value={codigoPairingInput}
+                        onChange={(e) => setCodigoPairingInput(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '6px',
+                          padding: '0 10px',
+                          color: '#FFFFFF',
+                          fontSize: '13px',
+                          fontFamily: 'monospace',
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsQrScannerOpen(true)}
+                        style={{
+                          padding: '0 12px',
+                          height: '36px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                        title="Abrir escáner de cámara"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        Escanear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleVincular}
+                        disabled={isPairing || !codigoPairingInput.trim()}
+                        style={{
+                          padding: '0 14px',
+                          height: '36px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: '#3B82F6',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          opacity: !codigoPairingInput.trim() ? 0.6 : 1,
+                        }}
+                      >
+                        {isPairing ? 'Vinculando...' : 'Vincular'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Botones de Acción en la sección */}
@@ -579,8 +773,16 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                   borderRadius: '12px',
                   fontSize: '11px',
                   fontWeight: 500,
-                  backgroundColor: isOnline ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                  color: isOnline ? '#4ADE80' : '#F87171',
+                  backgroundColor: !estacion.estaVinculada
+                    ? 'rgba(250, 204, 21, 0.12)'
+                    : isOnline
+                    ? 'rgba(34, 197, 94, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+                  color: !estacion.estaVinculada
+                    ? '#FACC15'
+                    : isOnline
+                    ? '#4ADE80'
+                    : '#F87171',
                 }}
               >
                 <div
@@ -588,68 +790,126 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                     width: '6px',
                     height: '6px',
                     borderRadius: '50%',
-                    backgroundColor: isOnline ? '#4ADE80' : '#F87171',
+                    backgroundColor: !estacion.estaVinculada
+                      ? '#FACC15'
+                      : isOnline
+                      ? '#4ADE80'
+                      : '#F87171',
                   }}
                 />
-                {estado}
+                {!estacion.estaVinculada ? 'Sin vincular' : isOnline ? 'En línea' : 'Offline'}
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Firmware
-                </span>
-                <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
-                  {estacion.firmware || 'v1.0.3'}
-                </span>
+            {!estacion.estaVinculada ? (
+              /* Bloque cuando no hay dispositivo conectado */
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed rgba(255, 255, 255, 0.12)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  gap: '10px',
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255, 255, 255, 0.4)" strokeWidth="2">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                </svg>
+                <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', margin: 0, maxWidth: '320px', lineHeight: 1.4 }}>
+                  No hay un dispositivo físico (ESP32) conectado a esta estación. Para activar la telemetría, monitoreo de firmware y latencia, vincula el hardware escaneando su código QR.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsQrScannerOpen(true)}
+                  style={{
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    color: '#60A5FA',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  Escanear Código QR
+                </button>
               </div>
+            ) : (
+              /* Telemetría real cuando sí está vinculado */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Firmware
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
+                    {estacion.firmware || 'v1.0.3'}
+                  </span>
+                </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Accesos hoy
-                </span>
-                <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
-                  {estacion.accesosHoy ?? 0}
-                </span>
-              </div>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Accesos hoy
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
+                    {estacion.accesosHoy ?? 0}
+                  </span>
+                </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Operaciones hoy
-                </span>
-                <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
-                  {estacion.operacionesHoy ?? 0}
-                </span>
-              </div>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Operaciones hoy
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600 }}>
+                    {estacion.operacionesHoy ?? 0}
+                  </span>
+                </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Última sincr.
-                </span>
-                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                  {estacion.ultimaSincronizacion}
-                </span>
-              </div>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Última sincr.
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)' }}>
+                    {estacion.ultimaSincronizacion || '—'}
+                  </span>
+                </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Latencia QR
-                </span>
-                <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
-                  {estacion.latenciaQrPromedio || '—'}
-                </span>
-              </div>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Latencia QR
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
+                    {estacion.latenciaQrPromedio || '—'}
+                  </span>
+                </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                  Latencia Facial
-                </span>
-                <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
-                  {estacion.latenciaFacialPromedio || '—'}
-                </span>
+                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
+                    Latencia Facial
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
+                    {estacion.latenciaFacialPromedio || '—'}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Card 3: Actividad reciente en esta Estación */}
@@ -741,6 +1001,15 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
         confirmText="Eliminar estación"
         isDestructive={true}
         isLoading={isDeleting}
+      />
+
+      {/* QR Scanner Camera Modal */}
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleScanSuccess}
+        title={`Escanear QR para "${estacion.nombre}"`}
+        subtitle="Apunta la cámara al código QR mostrado en la pantalla del ESP32"
       />
     </>
   );

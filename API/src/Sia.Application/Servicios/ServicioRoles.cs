@@ -122,20 +122,35 @@ public class ServicioRoles
         if (role is null)
             throw new EntidadNoEncontradaException("Rol", roleId);
 
-        List<RolPrivilegio> existentes = await _repository.ObtenerPrivilegiosRolAsync(roleId, ct);
+        // Asegurar que los catálogos existan en la BD
+        await _repository.AsegurarCatalogosDefaultAsync(ct);
 
+        var privilegiosValidos = (await _repository.ObtenerPrivilegiosAsync(ct)).ToDictionary(p => p.Id);
+        var nivelesValidos = (await _repository.ObtenerNivelesPermisoAsync(ct)).ToDictionary(n => n.Id);
+
+        List<RolPrivilegio> existentes = await _repository.ObtenerPrivilegiosRolAsync(roleId, ct);
         await _repository.EliminarPrivilegiosRolAsync(existentes, ct);
 
-        List<RolPrivilegio> nuevas = request.Asignaciones.Select(a => new RolPrivilegio
-        {
-            Id = Guid.NewGuid(),
-            RoleId = roleId,
-            PrivilegioId = a.PrivilegioId,
-            NivelPermisoId = a.NivelPermisoId,
-            FechaAsignacion = DateTimeOffset.UtcNow
-        }).ToList();
+        // Filtrar únicamente asignaciones que tengan PrivilegioId y NivelPermisoId válidos en BD y sin duplicados
+        var nuevas = request.Asignaciones
+            .Where(a => privilegiosValidos.ContainsKey(a.PrivilegioId) && nivelesValidos.ContainsKey(a.NivelPermisoId))
+            .DistinctBy(a => new { a.PrivilegioId, a.NivelPermisoId })
+            .Select(a => new RolPrivilegio
+            {
+                Id = Guid.NewGuid(),
+                RoleId = roleId,
+                PrivilegioId = a.PrivilegioId,
+                NivelPermisoId = a.NivelPermisoId,
+                Estado = true,
+                FechaAsignacion = DateTimeOffset.UtcNow
+            })
+            .ToList();
 
-        await _repository.AgregarPrivilegiosRolesAsync(nuevas, ct);
+        if (nuevas.Any())
+        {
+            await _repository.AgregarPrivilegiosRolesAsync(nuevas, ct);
+        }
+
         await _repository.SaveChangesAsync(ct);
         
         return Result<bool>.Exitoso(true);

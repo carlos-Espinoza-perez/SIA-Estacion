@@ -22,15 +22,21 @@ interface PersonaBackendDto {
   nombres: string;
   apellidos: string;
   tipoPersona: string;
+  rol?: string;
+  userId?: string;
   carreraOArea?: string;
   correo?: string;
   telefono?: string;
   estado: boolean;
   tieneFotoReferencia: boolean;
+  avatarUrl?: string;
   fechaRegistro: string;
   fotoReferencia?: FotoReferenciaBackendDto | null;
   fotosReferencia?: FotoReferenciaBackendDto[];
 }
+
+const normalizarUrlFoto = (url: string): string =>
+  url.trim().replace(/&amp;/gi, '&').replace(/\\u0026/gi, '&');
 
 export const personaService = {
   getPersonas: async (filtros?: FiltrosPersona): Promise<{ data: Persona[]; paginacion?: PaginacionMetadata }> => {
@@ -51,12 +57,13 @@ export const personaService = {
       nombre: `${p.nombres} ${p.apellidos}`.trim(),
       carnet: p.codigoEstudiantil,
       tipo: (p.tipoPersona === 'Estudiante' ? 'Estudiante' : 'Personal') as TipoPersona,
-      rol: 'Estudiante' as RolPersona,
+      rol: (p.rol || (p.tipoPersona === 'Estudiante' ? 'Estudiante' : p.tipoPersona)) as RolPersona,
       carreraOArea: p.carreraOArea,
       correo: p.correo,
       ultimaActividad: p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString() : 'Hoy',
       estado: p.estado ? 'Activo' : 'Inactivo',
       tieneFotoReferencia: p.tieneFotoReferencia,
+      avatarUrl: p.avatarUrl ? normalizarUrlFoto(p.avatarUrl) : undefined,
       fechaRegistro: p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString() : 'Hoy',
     }));
 
@@ -68,7 +75,24 @@ export const personaService = {
     const p = response.data?.datos;
     if (!p) return null;
 
-    const fotosReferencia = p.fotosReferencia ?? (p.fotoReferencia ? [p.fotoReferencia] : []);
+    let fotosReferencia = (p.fotosReferencia ?? (p.fotoReferencia ? [p.fotoReferencia] : []))
+      .map((foto) => ({ ...foto, url: normalizarUrlFoto(foto.url) }));
+    const fotoConRutaInterna = fotosReferencia[0];
+
+    // La API anterior devolvía la ruta interna del blob. Se conserva este
+    // respaldo mientras las instancias en ejecución se actualizan.
+    if (fotoConRutaInterna && !/^https?:\/\//i.test(fotoConRutaInterna.url)) {
+      try {
+        const fotoResponse = await apiClient.get<RespuestaEnvuelta<string>>(`/personas/${id}/foto`);
+        const urlFirmada = fotoResponse.data?.datos;
+        if (urlFirmada) {
+          fotosReferencia = [{ ...fotoConRutaInterna, url: normalizarUrlFoto(urlFirmada) }];
+        }
+      } catch (error) {
+        console.error('Error al obtener la URL de la fotografía:', error);
+      }
+    }
+
     const fotoPrincipal = fotosReferencia[0];
     const fechaFoto = fotoPrincipal ? new Date(fotoPrincipal.fechaCarga).toLocaleDateString() : '';
 
@@ -77,7 +101,7 @@ export const personaService = {
       nombre: `${p.nombres} ${p.apellidos}`.trim(),
       carnet: p.codigoEstudiantil,
       tipo: (p.tipoPersona === 'Estudiante' ? 'Estudiante' : 'Personal') as TipoPersona,
-      rol: 'Estudiante' as RolPersona,
+      rol: (p.rol || (p.tipoPersona === 'Estudiante' ? 'Estudiante' : p.tipoPersona)) as RolPersona,
       carreraOArea: p.carreraOArea,
       correo: p.correo,
       ultimaActividad: new Date(p.fechaRegistro).toLocaleDateString(),
@@ -89,7 +113,7 @@ export const personaService = {
         ? {
             id: fotoPrincipal.id,
             url: fotoPrincipal.url,
-            estado: 'Cifrada en reposo',
+            estado: 'Foto registrada',
             fechaCaptura: fechaFoto,
             fechaActualizacion: fechaFoto,
             retencion: 'Se elimina al pasar a inactivo',
@@ -189,10 +213,9 @@ export const personaService = {
     };
   },
 
-  toggleEstadoPersona: async (id: string): Promise<Persona> => {
+  cambiarEstadoPersona: async (id: string, estado: Persona['estado']): Promise<Persona> => {
     const getResp = await apiClient.get<RespuestaEnvuelta<PersonaBackendDto>>(`/personas/${id}`);
     const actual = getResp.data.datos!;
-    const nuevoEstado = !actual.estado;
 
     const resp = await apiClient.put<RespuestaEnvuelta<PersonaBackendDto>>(`/personas/${id}`, {
       nombres: actual.nombres,
@@ -200,7 +223,7 @@ export const personaService = {
       tipoPersona: actual.tipoPersona,
       carreraOArea: actual.carreraOArea,
       correo: actual.correo,
-      estado: nuevoEstado,
+      estado: estado === 'Activo',
     });
     
     const p = resp.data.datos!;
@@ -227,6 +250,10 @@ export const personaService = {
     await apiClient.post(`/personas/${id}/foto`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+  },
+
+  eliminarFotoPersona: async (personaId: string, fotoId: string): Promise<void> => {
+    await apiClient.delete(`/personas/${personaId}/fotos/${fotoId}`);
   },
 
   eliminarPersona: async (id: string): Promise<boolean> => {

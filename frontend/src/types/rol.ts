@@ -1,10 +1,32 @@
-export type CategoriaPermiso = 'ACCESOS' | 'ÍTEMS' | 'CATÁLOGOS' | 'ADMINISTRACIÓN' | 'AUDITORÍA';
-
-export interface PermisoDef {
+export interface Privilegio {
+  id: string;
   codigo: string;
   nombre: string;
-  descripcion: string;
-  categoria: CategoriaPermiso;
+  modulo: string;
+  estado: boolean;
+}
+
+export interface NivelPermiso {
+  id: string;
+  codigo: string;
+  nombre: string;
+  orden: number;
+  estado: boolean;
+}
+
+export interface RolPrivilegioDetalle {
+  id: string;
+  privilegioId: string;
+  privilegioCodigo: string;
+  privilegioNombre: string;
+  nivelPermisoId: string;
+  nivelPermisoCodigo: string;
+  nivelPermisoNombre: string;
+}
+
+export interface AsignacionPrivilegioRequest {
+  privilegioId: string;
+  nivelPermisoId: string;
 }
 
 export interface Rol {
@@ -12,7 +34,7 @@ export interface Rol {
   nombre: string;
   descripcion: string;
   personasAsignadas: number;
-  permisos: string[]; // array de códigos de permiso
+  permisos: string[]; // array de códigos de privilegio
   activo?: boolean;
   esSistema?: boolean;
 }
@@ -22,5 +44,6 @@ export interface CrearRolFormData {
   descripcion: string;
   baseRolId?: string;
   activo: boolean;
-  permisos: string[];
+  permisos: string[]; // array de ids o codigos de privilegio
+  nivelPorDefecto?: string; // id de nivel de permiso
 }
