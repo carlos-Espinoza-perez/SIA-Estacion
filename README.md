@@ -274,10 +274,10 @@ erDiagram
         string Nombres
         string Apellidos
         TipoPersona TipoPersona
-        string CarreraOArea
-        string Correo
-        string Telefono
-        string UserId
+        string CarreraOArea "nullable"
+        string Correo "nullable"
+        string Telefono "nullable"
+        string UserId "nullable"
         bool Estado
         DateTimeOffset FechaRegistro
     }
@@ -286,7 +286,7 @@ erDiagram
         Guid Id PK
         Guid EmpresaId FK
         string Nombre
-        string Descripcion
+        string Descripcion "nullable"
         bool RequiereAprobacion
         bool PermiteAgrupacion
         bool Estado
@@ -299,7 +299,7 @@ erDiagram
         Guid EstacionId FK "nullable"
         string CodigoQr
         string Nombre
-        string Observaciones
+        string Observaciones "nullable"
         bool EsAgrupador
         EstadoItem EstadoActual
         bool Estado
@@ -312,14 +312,18 @@ erDiagram
         string Nombre
         string Ubicacion
         Guid EncargadoId FK "nullable"
-        string FirmwareVersion
-        string DireccionIp
+        string FirmwareVersion "nullable"
+        string DireccionIp "nullable"
         string ClientId
         string ClientSecretHash
         bool RequiereIdentificacion
         bool RequiereAprobacion
         bool Estado
-        DateTimeOffset UltimaSincronizacion
+        bool EstaVinculada
+        string MacAddress "nullable"
+        string CodigoVinculacion "nullable"
+        DateTimeOffset FechaVinculacion "nullable"
+        DateTimeOffset UltimaSincronizacion "nullable"
     }
 
     EstacionTipoItem {
@@ -363,12 +367,12 @@ erDiagram
         string Entidad
         Guid EntidadId
         string Accion
-        string Descripcion
+        string Descripcion "nullable"
         string Origen
         Guid EstacionId FK "nullable"
-        string ValoresAnteriores
-        string ValoresNuevos
-        string UserId
+        string ValoresAnteriores "nullable"
+        string ValoresNuevos "nullable"
+        string UserId "nullable"
         DateTimeOffset FechaHora
     }
 
@@ -380,11 +384,11 @@ erDiagram
         DireccionAcceso Direccion
         ModoValidacion ModoValidacion
         ResultadoAcceso Resultado
-        string MotivoDenegacion
-        string FotoEvidenciaUrl
+        string MotivoDenegacion "nullable"
+        string FotoEvidenciaUrl "nullable"
         string CodigoEscaneado
         DateTimeOffset FechaHoraLocal
-        DateTimeOffset FechaSincronizacion
+        DateTimeOffset FechaSincronizacion "nullable"
     }
 
     FotoReferencia {
@@ -395,7 +399,7 @@ erDiagram
         string HashContenido
         bool Estado
         DateTimeOffset FechaCarga
-        DateTimeOffset FechaEliminacion
+        DateTimeOffset FechaEliminacion "nullable"
     }
 
     OperacionItem {
@@ -407,11 +411,11 @@ erDiagram
         Guid EstacionId FK
         TipoOperacionItem TipoOperacion
         EstadoOperacionItem EstadoActual
-        string Observaciones
+        string Observaciones "nullable"
         bool Estado
         DateTimeOffset FechaSolicitud
-        DateTimeOffset FechaCompromisoDevolucion
-        DateTimeOffset FechaDevolucion
+        DateTimeOffset FechaCompromisoDevolucion "nullable"
+        DateTimeOffset FechaDevolucion "nullable"
         Guid AprobadoPorPersonaId FK "nullable"
         byte[] RowVersion
     }
@@ -421,9 +425,9 @@ erDiagram
         Guid EmpresaId FK
         Guid OperacionItemId FK
         Guid ItemId FK
-        CondicionDevolucion CondicionDevolucion
-        DateTimeOffset FechaDevolucion
-        string Observacion
+        CondicionDevolucion CondicionDevolucion "nullable"
+        DateTimeOffset FechaDevolucion "nullable"
+        string Observacion "nullable"
     }
 
     OperacionMovimiento {
@@ -435,7 +439,16 @@ erDiagram
         Guid RegistradoPorPersonaId FK "nullable"
         Guid EstacionId FK "nullable"
         DateTimeOffset FechaHora
-        string Observacion
+        string Observacion "nullable"
+    }
+
+    ApplicationRole {
+        string Id PK
+        string Name
+        string NormalizedName
+        string Descripcion "nullable"
+        bool EsSistema
+        bool Activo
     }
 
     Privilegio {
@@ -456,7 +469,7 @@ erDiagram
 
     RolPrivilegio {
         Guid Id PK
-        string RoleId
+        string RoleId FK
         Guid PrivilegioId FK
         Guid NivelPermisoId FK
         bool Estado
@@ -469,11 +482,15 @@ erDiagram
     Empresa ||--o{ TipoItem : "configura"
     Empresa ||--o{ Item : "posee"
     Empresa ||--o{ Estacion : "administra"
+    Empresa ||--o{ EventoAcceso : "registra"
+    Empresa ||--o{ OperacionItem : "registra"
+    Empresa ||--o{ AuditoriaCambio : "audita"
 
     Persona ||--o{ FotoReferencia : "tiene fotos"
     Persona ||--o{ EventoAcceso : "registra accesos"
     Persona ||--o{ OperacionItem : "realiza/aprueba"
     Persona ||--o{ OperacionMovimiento : "registra movimientos"
+    Persona ||--o{ Estacion : "es encargado"
     
     TipoItem ||--o{ AtributoDefinicion : "define atributos"
     TipoItem ||--o{ Item : "clasifica"
@@ -483,19 +500,20 @@ erDiagram
     Item ||--o{ ItemComposicion : "es componente/agrupador"
     Item ||--o{ OperacionItem : "es operado"
     Item ||--o{ OperacionItemDetalle : "está en detalle"
+    Item }o--o| Estacion : "ubicado en"
 
     Estacion ||--o{ EstacionTipoItem : "habilita"
     Estacion ||--o{ EventoAcceso : "registra"
     Estacion ||--o{ OperacionItem : "gestiona operaciones"
     Estacion ||--o{ OperacionMovimiento : "registra movimientos"
-    Persona ||--o{ Estacion : "es encargado (opcional)"
-    Item }o--o| Estacion : "ubicado en (opcional)"
+    Estacion ||--o{ AuditoriaCambio : "asociada a"
 
     AtributoDefinicion ||--o{ ItemAtributoValor : "define valor de"
 
     OperacionItem ||--o{ OperacionItemDetalle : "contiene detalles"
     OperacionItem ||--o{ OperacionMovimiento : "tiene historial"
 
+    ApplicationRole ||--o{ RolPrivilegio : "posee"
     Privilegio ||--o{ RolPrivilegio : "asignado en"
     NivelPermiso ||--o{ RolPrivilegio : "define nivel de"
 ```
