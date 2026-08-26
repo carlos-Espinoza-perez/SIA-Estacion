@@ -1,0 +1,405 @@
+Project SIA {
+  database_type: 'SQL Server'
+}
+
+Table Empresas {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  Codigo varchar(50) [not null, unique]
+  Nombre varchar(200) [not null]
+  Estado bit [not null, default: 1]
+  FechaRegistro datetimeoffset [not null]
+}
+
+Table Personas {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  CodigoEstudiantil varchar(50) [not null]
+  Nombres varchar(200) [not null]
+  Apellidos varchar(200) [not null]
+  Correo varchar(200) [null]
+  Telefono varchar(30) [null]
+  TipoPersona varchar(50) [not null]
+  CarreraOArea varchar(150) [null]
+  Estado bit [not null, default: 1]
+  FechaRegistro datetimeoffset [not null]
+  UserId varchar(450) [null]
+
+  indexes {
+    (EmpresaId, CodigoEstudiantil) [unique]
+  }
+}
+
+Table FotosReferencia {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  PersonaId uniqueidentifier [not null]
+  Url varchar(500) [not null]
+  HashContenido varchar(128) [not null]
+  Estado bit [not null, default: 1]
+  FechaCarga datetimeoffset [not null]
+  FechaEliminacion datetimeoffset [null]
+
+  indexes {
+    (EmpresaId, PersonaId, Estado)
+  }
+}
+
+Table Estaciones {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  ClientId varchar(100) [not null]
+  ClientSecretHash varchar(500) [not null]
+  Nombre varchar(200) [not null]
+  Ubicacion varchar(500) [not null]
+  MacAddress varchar(50) [null]
+  DireccionIp varchar(50) [null]
+  FirmwareVersion varchar(50) [null]
+  EstaVinculada bit [not null, default: 0]
+  CodigoVinculacion varchar(50) [null]
+  FechaVinculacion datetimeoffset [null]
+  RequiereAprobacion bit [not null, default: 0]
+  RequiereIdentificacion bit [not null, default: 1]
+  Estado bit [not null, default: 1]
+  UltimaSincronizacion datetimeoffset [null]
+  EncargadoId uniqueidentifier [null]
+
+  indexes {
+    (EmpresaId, ClientId) [unique]
+  }
+}
+
+Table EstacionTiposItem {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  EstacionId uniqueidentifier [not null]
+  TipoItemId uniqueidentifier [not null]
+  Estado bit [not null, default: 1]
+
+  indexes {
+    (EmpresaId, EstacionId, TipoItemId) [unique]
+  }
+}
+
+Table TiposItem {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  Nombre varchar(200) [not null]
+  Descripcion varchar(500) [null]
+  RequiereAprobacion bit [not null, default: 0]
+  PermiteAgrupacion bit [not null, default: 0]
+  Estado bit [not null, default: 1]
+
+  indexes {
+    (EmpresaId, Nombre) [unique]
+  }
+}
+
+Table AtributosDefinicion {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  TipoItemId uniqueidentifier [not null]
+  Clave varchar(100) [not null]
+  Etiqueta varchar(200) [not null]
+  TipoDato varchar(50) [not null]
+  Requerido bit [not null, default: 0]
+  Orden int [not null, default: 0]
+  Estado bit [not null, default: 1]
+
+  indexes {
+    (EmpresaId, TipoItemId, Clave) [unique]
+  }
+}
+
+Table Items {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  TipoItemId uniqueidentifier [not null]
+  EstacionId uniqueidentifier [null]
+  CodigoQr varchar(200) [not null]
+  Nombre varchar(200) [not null]
+  EstadoActual varchar(50) [not null, default: 'Disponible']
+  Observaciones varchar(500) [null]
+  EsAgrupador bit [not null, default: 0]
+  Estado bit [not null, default: 1]
+  RowVersion rowversion [not null]
+
+  indexes {
+    (EmpresaId, CodigoQr) [unique]
+    (EmpresaId, TipoItemId, EstadoActual)
+  }
+}
+
+Table ItemAtributoValores {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  ItemId uniqueidentifier [not null]
+  AtributoDefinicionId uniqueidentifier [not null]
+  Valor varchar(1000) [not null]
+
+  indexes {
+    (EmpresaId, ItemId, AtributoDefinicionId) [unique]
+  }
+}
+
+Table ItemComposiciones {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  ItemAgrupadorId uniqueidentifier [not null]
+  ItemComponenteId uniqueidentifier [not null]
+
+  indexes {
+    (EmpresaId, ItemAgrupadorId, ItemComponenteId) [unique]
+  }
+}
+
+Table OperacionesItem {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  Folio varchar(30) [not null]
+  TipoOperacion varchar(50) [not null]
+  PersonaId uniqueidentifier [not null]
+  ItemEscaneadoId uniqueidentifier [not null]
+  EstacionId uniqueidentifier [not null]
+  AprobadoPorPersonaId uniqueidentifier [null]
+  FechaSolicitud datetimeoffset [not null]
+  FechaCompromisoDevolucion datetimeoffset [null]
+  FechaDevolucion datetimeoffset [null]
+  EstadoActual varchar(50) [not null]
+  Observaciones varchar(1000) [null]
+  Estado bit [not null, default: 1]
+  RowVersion rowversion [not null]
+
+  indexes {
+    (EmpresaId, Folio) [unique]
+    (EmpresaId, PersonaId, EstadoActual)
+    (EmpresaId, ItemEscaneadoId, EstadoActual)
+  }
+}
+
+Table OperacionItemDetalles {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  OperacionItemId uniqueidentifier [not null]
+  ItemId uniqueidentifier [not null]
+  FechaDevolucion datetimeoffset [null]
+  CondicionDevolucion varchar(50) [null]
+  Observacion varchar(1000) [null]
+
+  indexes {
+    (EmpresaId, OperacionItemId, ItemId) [unique]
+  }
+}
+
+Table OperacionMovimientos {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  OperacionItemId uniqueidentifier [not null]
+  EstacionId uniqueidentifier [null]
+  RegistradoPorPersonaId uniqueidentifier [null]
+  EstadoAnterior varchar(50) [not null]
+  EstadoNuevo varchar(50) [not null]
+  FechaHora datetimeoffset [not null]
+  Observacion varchar(1000) [null]
+
+  indexes {
+    (EmpresaId, OperacionItemId, FechaHora)
+  }
+}
+
+Table EventosAcceso {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  EstacionId uniqueidentifier [not null]
+  PersonaId uniqueidentifier [null]
+  CodigoEscaneado varchar(500) [not null]
+  ModoValidacion varchar(50) [not null]
+  Resultado varchar(50) [not null]
+  MotivoDenegacion varchar(200) [null]
+  FotoEvidenciaUrl varchar(500) [null]
+  Direccion varchar(50) [not null]
+  FechaHoraLocal datetimeoffset [not null]
+  FechaSincronizacion datetimeoffset [null]
+
+  indexes {
+    (EmpresaId, EstacionId, FechaHoraLocal)
+    (EmpresaId, PersonaId, FechaHoraLocal)
+  }
+}
+
+Table AuditoriaCambios {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  EmpresaId uniqueidentifier [not null]
+  UserId varchar(450) [null]
+  EstacionId uniqueidentifier [null]
+  Entidad varchar(200) [not null]
+  EntidadId uniqueidentifier [not null]
+  Accion varchar(50) [not null]
+  ValoresAnteriores nvarchar(max) [null]
+  ValoresNuevos nvarchar(max) [null]
+  Origen varchar(50) [not null]
+  FechaHora datetimeoffset [not null]
+  Descripcion varchar(500) [null]
+
+  indexes {
+    (EmpresaId, FechaHora)
+    (EmpresaId, Entidad, EntidadId)
+  }
+}
+
+Table AspNetRoles {
+  Id varchar(450) [pk]
+  Name varchar(256) [null]
+  NormalizedName varchar(256) [null]
+  Descripcion nvarchar(max) [null]
+  EsSistema bit [not null, default: 0]
+  Activo bit [not null, default: 1]
+  ConcurrencyStamp nvarchar(max) [null]
+}
+
+Table Privilegios {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  Codigo varchar(100) [not null, unique]
+  Nombre varchar(200) [not null]
+  Modulo varchar(100) [not null]
+  Estado bit [not null, default: 1]
+}
+
+Table NivelesPermiso {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  Codigo varchar(50) [not null, unique]
+  Nombre varchar(100) [not null]
+  Orden int [not null]
+  Estado bit [not null, default: 1]
+}
+
+Table RolPrivilegios {
+  Id uniqueidentifier [pk, default: `NEWSEQUENTIALID()`]
+  RoleId varchar(450) [not null]
+  PrivilegioId uniqueidentifier [not null]
+  NivelPermisoId uniqueidentifier [not null]
+  FechaAsignacion datetimeoffset [not null]
+  Estado bit [not null, default: 1]
+
+  indexes {
+    (RoleId, PrivilegioId, NivelPermisoId) [unique]
+  }
+}
+
+Table AspNetUsers {
+  Id varchar(450) [pk]
+  UserName varchar(256) [null]
+  NormalizedUserName varchar(256) [null]
+  Email varchar(256) [null]
+  NormalizedEmail varchar(256) [null]
+  EmailConfirmed bit [not null]
+  PasswordHash nvarchar(max) [null]
+  SecurityStamp nvarchar(max) [null]
+  ConcurrencyStamp nvarchar(max) [null]
+  PhoneNumber nvarchar(max) [null]
+  PhoneNumberConfirmed bit [not null]
+  TwoFactorEnabled bit [not null]
+  LockoutEnd datetimeoffset [null]
+  LockoutEnabled bit [not null]
+  AccessFailedCount int [not null]
+}
+
+Table AspNetUserRoles {
+  UserId varchar(450) [not null]
+  RoleId varchar(450) [not null]
+
+  indexes {
+    (UserId, RoleId) [pk]
+  }
+}
+
+Ref: Personas.EmpresaId > Empresas.Id
+Ref: FotosReferencia.EmpresaId > Empresas.Id
+Ref: FotosReferencia.PersonaId > Personas.Id
+
+Ref: Estaciones.EmpresaId > Empresas.Id
+Ref: Estaciones.EncargadoId > Personas.Id
+Ref: EstacionTiposItem.EmpresaId > Empresas.Id
+Ref: EstacionTiposItem.EstacionId > Estaciones.Id
+Ref: EstacionTiposItem.TipoItemId > TiposItem.Id
+
+Ref: TiposItem.EmpresaId > Empresas.Id
+Ref: AtributosDefinicion.EmpresaId > Empresas.Id
+Ref: AtributosDefinicion.TipoItemId > TiposItem.Id
+
+Ref: Items.EmpresaId > Empresas.Id
+Ref: Items.TipoItemId > TiposItem.Id
+Ref: Items.EstacionId > Estaciones.Id
+
+Ref: ItemAtributoValores.EmpresaId > Empresas.Id
+Ref: ItemAtributoValores.ItemId > Items.Id
+Ref: ItemAtributoValores.AtributoDefinicionId > AtributosDefinicion.Id
+
+Ref: ItemComposiciones.EmpresaId > Empresas.Id
+Ref: ItemComposiciones.ItemAgrupadorId > Items.Id
+Ref: ItemComposiciones.ItemComponenteId > Items.Id
+
+Ref: OperacionesItem.EmpresaId > Empresas.Id
+Ref: OperacionesItem.PersonaId > Personas.Id
+Ref: OperacionesItem.ItemEscaneadoId > Items.Id
+Ref: OperacionesItem.EstacionId > Estaciones.Id
+Ref: OperacionesItem.AprobadoPorPersonaId > Personas.Id
+
+Ref: OperacionItemDetalles.EmpresaId > Empresas.Id
+Ref: OperacionItemDetalles.OperacionItemId > OperacionesItem.Id
+Ref: OperacionItemDetalles.ItemId > Items.Id
+
+Ref: OperacionMovimientos.EmpresaId > Empresas.Id
+Ref: OperacionMovimientos.OperacionItemId > OperacionesItem.Id
+Ref: OperacionMovimientos.EstacionId > Estaciones.Id
+Ref: OperacionMovimientos.RegistradoPorPersonaId > Personas.Id
+
+Ref: EventosAcceso.EmpresaId > Empresas.Id
+Ref: EventosAcceso.EstacionId > Estaciones.Id
+Ref: EventosAcceso.PersonaId > Personas.Id
+Ref: AuditoriaCambios.EmpresaId > Empresas.Id
+
+Ref: RolPrivilegios.RoleId > AspNetRoles.Id
+Ref: RolPrivilegios.PrivilegioId > Privilegios.Id
+Ref: RolPrivilegios.NivelPermisoId > NivelesPermiso.Id
+
+Ref: AspNetUserRoles.UserId > AspNetUsers.Id
+Ref: AspNetUserRoles.RoleId > AspNetRoles.Id
+
+TableGroup Personas {
+  Empresas
+  Personas
+  FotosReferencia
+}
+
+TableGroup Estaciones {
+  Estaciones
+  EstacionTiposItem
+}
+
+TableGroup Items {
+  TiposItem
+  AtributosDefinicion
+  Items
+  ItemAtributoValores
+  ItemComposiciones
+}
+
+TableGroup Operaciones {
+  OperacionesItem
+  OperacionItemDetalles
+  OperacionMovimientos
+}
+
+TableGroup Logs {
+  EventosAcceso
+  AuditoriaCambios
+}
+
+TableGroup Auth {
+  AspNetRoles
+  Privilegios
+  NivelesPermiso
+  RolPrivilegios
+  AspNetUsers
+  AspNetUserRoles
+}

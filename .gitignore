@@ -130,3 +130,12 @@ dist/
 
 # Tareas
 TareaSeguimientoPaquetes
+
+# Especificaciones / Backend spec
+*backend_spec*
+BACKEND_SPEC.md
+
+# Carpetas de tests
+[Tt]est/
+[Tt]ests/
+
