@@ -63,6 +63,7 @@ export const ItemsPage: React.FC = () => {
       itemService.getTiposItem(),
       estacionService.getEstaciones(),
     ]).then(([tipos, ests]) => {
+      setTiposItem(tipos);
       setTipoOptions([
         { value: '', label: 'Tipo: Todos' },
         ...tipos.map((t) => ({ value: t.nombre, label: t.nombre })),

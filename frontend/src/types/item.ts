@@ -6,7 +6,9 @@ export interface Item {
   codigo: string;
   nombre: string;
   tipo: string;
+  tipoItemId?: string;
   estacion: string;
+  estacionId?: string;
   estado: EstadoItem;
   unidades?: number;
   observaciones?: string;

@@ -272,6 +272,17 @@ public static class SiaDbContextSeed
             await context.SaveChangesAsync();
         }
 
+        // Sanitizar ítems eliminados que no hayan liberado el código QR único para evitar colisiones
+        var itemsEliminados = await context.Items.IgnoreQueryFilters().Where(i => !i.Estado && !i.CodigoQr.Contains("_ELIMINADO_")).ToListAsync();
+        if (itemsEliminados.Any())
+        {
+            foreach (var itemEliminado in itemsEliminados)
+            {
+                itemEliminado.CodigoQr = $"{itemEliminado.CodigoQr}_ELIMINADO_{Guid.NewGuid():N}";
+            }
+            await context.SaveChangesAsync();
+        }
+
         // Personas iniciales adicionales
         if (!await context.Personas.IgnoreQueryFilters().AnyAsync(p => p.CodigoEstudiantil == "EST-2026-001"))
         {

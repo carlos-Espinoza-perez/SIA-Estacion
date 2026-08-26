@@ -188,7 +188,18 @@ public class ServicioItems
     {
         Item? existente = await _repository.ObtenerItemPorQrAsync(request.CodigoQr, ct);
         if (existente is not null)
-            return Result<ItemResponse>.Fallido("ITEM_DUPLICADO", $"Ya existe un ítem registrado con el código '{request.CodigoQr}'");
+        {
+            if (!existente.Estado)
+            {
+                // Si existía un ítem eliminado previamente con este código, liberamos su código QR para permitir la reutilización
+                existente.CodigoQr = $"{existente.CodigoQr}_ELIMINADO_{Guid.NewGuid():N}";
+                await _repository.SaveChangesAsync(ct);
+            }
+            else
+            {
+                return Result<ItemResponse>.Fallido("ITEM_DUPLICADO", $"Ya existe un ítem registrado con el código '{request.CodigoQr}'");
+            }
+        }
 
         var item = new Item
         {
@@ -260,6 +271,7 @@ public class ServicioItems
             throw new EntidadNoEncontradaException(nameof(Item), id);
             
         item.Estado = false;
+        item.CodigoQr = $"{item.CodigoQr}_ELIMINADO_{Guid.NewGuid():N}";
         await _repository.SaveChangesAsync(ct);
         return Result<bool>.Exitoso(true);
     }

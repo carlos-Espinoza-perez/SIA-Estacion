@@ -13,7 +13,8 @@ import { RespuestaEnvuelta } from '../types/api';
 
 interface ItemBackendDto {
   id: string;
-  codigo: string;
+  codigoQr?: string;
+  codigo?: string;
   nombre: string;
   tipoItemId: string;
   tipoItemNombre?: string;
@@ -37,7 +38,7 @@ export const itemService = {
     const response = await apiClient.get<RespuestaEnvuelta<ItemBackendDto[]>>('/items');
     let lista: Item[] = (response.data?.datos || []).map((it) => ({
       id: it.id,
-      codigo: it.codigo,
+      codigo: it.codigoQr || it.codigo || '',
       nombre: it.nombre,
       tipo: it.tipoItemNombre || it.tipoItemId,
       estacion: it.estacionNombre || 'General',
@@ -119,7 +120,7 @@ export const itemService = {
     const itemBackend = response.data.datos!;
     return {
       id: itemBackend.id,
-      codigo: itemBackend.codigo || data.codigo,
+      codigo: itemBackend.codigoQr || itemBackend.codigo || data.codigo,
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || data.tipo,
       estacion: itemBackend.estacionNombre || data.estacion,
@@ -130,12 +131,11 @@ export const itemService = {
   },
 
   actualizarItem: async (id: string, data: Partial<Item>): Promise<Item> => {
-    if (data.nombre || data.codigo) {
+    if (data.nombre || data.observaciones || data.estado) {
       await apiClient.put(`/items/${id}`, {
-        codigoInterno: data.codigo,
         nombre: data.nombre,
-        descripcion: data.observaciones,
-        cantidadDisponible: data.unidades,
+        observaciones: data.observaciones,
+        estadoActual: data.estado,
       });
     }
 
@@ -144,7 +144,7 @@ export const itemService = {
 
     return {
       id: itemBackend.id,
-      codigo: itemBackend.codigo,
+      codigo: itemBackend.codigoQr || itemBackend.codigo || '',
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || itemBackend.tipoItemId,
       estacion: itemBackend.estacionNombre || 'General',
@@ -155,13 +155,12 @@ export const itemService = {
   },
 
   cambiarEstadoItem: async (id: string, _estado: Item['estado']): Promise<Item> => {
-    // Ideally this hits a backend endpoint to change status
     const response = await apiClient.get<RespuestaEnvuelta<ItemBackendDto>>(`/items/${id}`);
     const itemBackend = response.data.datos!;
     
     return {
       id: itemBackend.id,
-      codigo: itemBackend.codigo,
+      codigo: itemBackend.codigoQr || itemBackend.codigo || '',
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || itemBackend.tipoItemId,
       estacion: itemBackend.estacionNombre || 'General',

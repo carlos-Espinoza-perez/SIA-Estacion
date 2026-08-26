@@ -19,8 +19,7 @@ public class GeneralProfile : Profile
             .ForMember(d => d.TieneFotoReferencia, o => o.MapFrom(s => s.FotosReferencia.Any(f => f.Estado)));
 
         CreateMap<Persona, PersonaDetalleResponse>()
-            .ForMember(d => d.TipoPersona, o => o.MapFrom(s => s.TipoPersona.ToString()))
-            .ForMember(d => d.TieneFotoReferencia, o => o.MapFrom(s => s.FotosReferencia.Any(f => f.Estado)));
+            .IncludeBase<Persona, PersonaResponse>();
 
         CreateMap<FotoReferencia, FotoReferenciaResponse>();
 
@@ -34,6 +33,9 @@ public class GeneralProfile : Profile
             .ForMember(d => d.TipoItemNombre, o => o.MapFrom(s => s.TipoItem.Nombre))
             .ForMember(d => d.EstacionNombre, o => o.MapFrom(s => s.Estacion != null ? s.Estacion.Nombre : null))
             .ForMember(d => d.EstadoActual, o => o.MapFrom(s => s.EstadoActual.ToString()));
+
+        CreateMap<Item, ItemDetalleResponse>()
+            .IncludeBase<Item, ItemResponse>();
 
         CreateMap<Estacion, EstacionResponse>()
             .ForMember(d => d.EncargadoNombre, o => o.MapFrom(s => s.Encargado != null ? $"{s.Encargado.Nombres} {s.Encargado.Apellidos}".Trim() : null));
