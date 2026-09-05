@@ -26,10 +26,10 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restaurar dependencias NuGet
-        run: dotnet restore API/Sia.sln
+        run: dotnet restore API/src/Sia.Api/Sia.Api.csproj
 
-      - name: Compilar solución (Release)
-        run: dotnet build API/Sia.sln --configuration Release --no-restore
+      - name: Compilar Sia.Api (Release)
+        run: dotnet build API/src/Sia.Api/Sia.Api.csproj --configuration Release --no-restore
 
       - name: Generar appsettings.json base
         run: cp API/src/Sia.Api/appsettings.Development.json.example API/src/Sia.Api/appsettings.json
