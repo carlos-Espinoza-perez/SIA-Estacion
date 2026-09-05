@@ -143,3 +143,30 @@ BACKEND_SPEC.md
 [Tt]ests/
 
 trabajos-clases
+
+# =========================
+# PlatformIO / Firmware (Embebidos)
+# =========================
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.a
+*.d
+
+# =========================
+# Python / Entornos Virtuales
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/

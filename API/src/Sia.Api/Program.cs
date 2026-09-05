@@ -97,6 +97,8 @@ builder.Services.AddSingleton<IServicioHashSecreto, ServicioHashSecreto>();
 builder.Services.AddSingleton<IServicioJwt, ServicioJwt>();
 builder.Services.AddSingleton<IServicioAlmacenamiento, ServicioAlmacenamientoBlob>();
 builder.Services.AddSingleton<IServicioReconocimientoFacial, ServicioReconocimientoFacial>();
+builder.Services.AddSingleton<IPairingCoordinator, PairingCoordinator>();
+
 
 builder.Services.AddScoped<IItemsRepository, ItemsRepository>();
 builder.Services.AddScoped<IPersonasRepository, PersonasRepository>();

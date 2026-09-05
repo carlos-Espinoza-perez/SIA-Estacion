@@ -15,13 +15,20 @@ public class ServicioEstaciones
     private readonly IMapper _mapper;
     private readonly IServicioHashSecreto _hashService;
     private readonly IContextoEmpresa _contextoEmpresa;
+    private readonly IPairingCoordinator _pairingCoordinator;
 
-    public ServicioEstaciones(IEstacionesRepository repository, IMapper mapper, IServicioHashSecreto hashService, IContextoEmpresa contextoEmpresa)
+    public ServicioEstaciones(
+        IEstacionesRepository repository, 
+        IMapper mapper, 
+        IServicioHashSecreto hashService, 
+        IContextoEmpresa contextoEmpresa,
+        IPairingCoordinator pairingCoordinator)
     {
         _repository = repository;
         _mapper = mapper;
         _hashService = hashService;
         _contextoEmpresa = contextoEmpresa;
+        _pairingCoordinator = pairingCoordinator;
     }
 
     public async Task<Result<List<EstacionResponse>>> ObtenerTodasAsync(CancellationToken ct)
@@ -169,6 +176,8 @@ public class ServicioEstaciones
                 $"El dispositivo físico '{codigoLimpio}' ya se encuentra vinculado a la estación '{otraEstacionConMismaMac.Nombre}'. Desvinclúlelo primero.");
         }
 
+        string nuevoSecreto = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        estacion.ClientSecretHash = _hashService.Hash(nuevoSecreto);
         estacion.MacAddress = codigoLimpio;
         estacion.EstaVinculada = true;
         estacion.CodigoVinculacion = null;
@@ -176,6 +185,18 @@ public class ServicioEstaciones
         estacion.UltimaSincronizacion = DateTimeOffset.UtcNow;
 
         await _repository.SaveChangesAsync(ct);
+
+        // Notificar al coordinador en tiempo real para despertar el long-polling del ESP32
+        var configProvisionada = new ConfiguracionEstacionProvisionadaResponse
+        {
+            EstacionId = estacion.Id,
+            EstacionNombre = estacion.Nombre,
+            ClientId = estacion.ClientId,
+            ClientSecret = nuevoSecreto,
+            RequiereIdentificacion = estacion.RequiereIdentificacion,
+            RequiereAprobacion = estacion.RequiereAprobacion
+        };
+        _pairingCoordinator.NotificarVinculacion(codigoLimpio, configProvisionada);
 
         Estacion? estacionActualizada = await _repository.ObtenerPorIdAsync(id, ct);
         return Result<EstacionResponse>.Exitoso(_mapper.Map<EstacionResponse>(estacionActualizada ?? estacion));
@@ -229,4 +250,41 @@ public class ServicioEstaciones
             ClientId = estacion.ClientId
         });
     }
+
+    public async Task<Result<EstacionConfiguracionResponse>> ObtenerConfiguracionEstacionAsync(Guid estacionId, CancellationToken ct)
+    {
+        Estacion? estacion = await _repository.ObtenerPorIdAsync(estacionId, ct);
+        if (estacion is null)
+            throw new EntidadNoEncontradaException(nameof(Estacion), estacionId);
+
+        return Result<EstacionConfiguracionResponse>.Exitoso(new EstacionConfiguracionResponse
+        {
+            EstacionId = estacion.Id,
+            Nombre = estacion.Nombre,
+            Ubicacion = estacion.Ubicacion,
+            RequiereIdentificacion = estacion.RequiereIdentificacion,
+            RequiereAprobacion = estacion.RequiereAprobacion,
+            Estado = estacion.Estado
+        });
+    }
+
+    public async Task<Result<bool>> RegistrarHeartbeatAsync(Guid estacionId, HeartbeatEstacionRequest? request, CancellationToken ct)
+    {
+        Estacion? estacion = await _repository.ObtenerPorIdAsync(estacionId, ct);
+        if (estacion is null)
+            throw new EntidadNoEncontradaException(nameof(Estacion), estacionId);
+
+        estacion.UltimaSincronizacion = DateTimeOffset.UtcNow;
+        if (request != null)
+        {
+            if (!string.IsNullOrWhiteSpace(request.FirmwareVersion))
+                estacion.FirmwareVersion = request.FirmwareVersion;
+            if (!string.IsNullOrWhiteSpace(request.DireccionIp))
+                estacion.DireccionIp = request.DireccionIp;
+        }
+
+        await _repository.SaveChangesAsync(ct);
+        return Result<bool>.Exitoso(true);
+    }
 }
+

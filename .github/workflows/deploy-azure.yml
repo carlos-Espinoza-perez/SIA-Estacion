@@ -1,0 +1,45 @@
+name: Despliegue Continuo API SIA en Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'API/**'
+      - '.github/workflows/deploy-azure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restaurar dependencias NuGet
+        run: dotnet restore API/Sia.sln
+
+      - name: Compilar solución (Release)
+        run: dotnet build API/Sia.sln --configuration Release --no-restore
+
+      - name: Generar appsettings.json base
+        run: cp API/src/Sia.Api/appsettings.Development.json.example API/src/Sia.Api/appsettings.json
+
+      - name: Publicar Sia.Api
+        run: dotnet publish API/src/Sia.Api/Sia.Api.csproj --configuration Release --no-build --output ./publish-api
+
+      - name: Desplegar a Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'sia-api-app'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: './publish-api'
