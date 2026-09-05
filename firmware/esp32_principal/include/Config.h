@@ -8,8 +8,8 @@
 #define DEFAULT_WIFI_PASSWORD   "SiaSecure2026"
 #define DEFAULT_AP_SSID         "SIA-ESTACION-CAM"
 #define DEFAULT_AP_PASSWORD     "SiaSecure2026"
-#define DEFAULT_API_BASE_URL    "http://192.168.1.100:5000"
-#define DEFAULT_PAIRING_WEB_URL "http://app.sia.local/estaciones/vincular?mac="
+#define DEFAULT_API_BASE_URL    "https://sia-api-app.azurewebsites.net"
+#define DEFAULT_PAIRING_WEB_URL "https://sia-api-app.azurewebsites.net/estaciones/vincular?mac="
 
 
 // CYD UART (Serial2)
