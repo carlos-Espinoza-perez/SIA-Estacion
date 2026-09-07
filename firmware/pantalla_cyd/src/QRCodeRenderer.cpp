@@ -9,17 +9,26 @@ namespace QR {
             return false;
         }
 
-        // Buffer estático de QR Versión 3 (soporta hasta 77 caracteres alfanuméricos en ECC_LOW)
-        constexpr uint8_t QR_VERSION = 3;
-        QRCode qrcode;
-        uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
+        size_t len = strlen(text);
+        uint8_t qrVersion = 3;
+        if (len > 50) qrVersion = 5;
+        if (len > 100) qrVersion = 7;
 
-        int8_t status = qrcode_initText(&qrcode, qrcodeData, QR_VERSION, ECC_LOW, text);
+        QRCode qrcode;
+        uint8_t qrcodeData[qrcode_getBufferSize(qrVersion)];
+
+        int8_t status = qrcode_initText(&qrcode, qrcodeData, qrVersion, ECC_LOW, text);
         if (status != 0) {
-            return false;
+            if (qrVersion < 7) {
+                qrVersion = 7;
+                uint8_t qrcodeData2[qrcode_getBufferSize(qrVersion)];
+                status = qrcode_initText(&qrcode, qrcodeData2, qrVersion, ECC_LOW, text);
+                if (status != 0) return false;
+            } else {
+                return false;
+            }
         }
 
-        // Dibujar contenedor blanco con esquinas redondeadas
         tft.fillRoundRect(boxX, boxY, boxSize, boxSize, 12, TFT_WHITE);
 
         int16_t qrAreaSize = boxSize - (2 * margin);

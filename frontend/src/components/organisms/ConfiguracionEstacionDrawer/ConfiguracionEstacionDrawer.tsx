@@ -623,7 +623,16 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                         type="text"
                         placeholder="Ej. PAIR-A8492 o MAC A4:CF:..."
                         value={codigoPairingInput}
-                        onChange={(e) => setCodigoPairingInput(e.target.value)}
+                        onChange={(e) => {
+                          let val = e.target.value;
+                          if (val.toLowerCase().includes('mac=')) {
+                            const match = val.match(/mac=([a-fA-F0-9:]{12,17})/i);
+                            if (match && match[1]) {
+                              val = match[1].replace(/[:\-\s]/g, '').toUpperCase();
+                            }
+                          }
+                          setCodigoPairingInput(val);
+                        }}
                         style={{
                           flex: 1,
                           height: '36px',

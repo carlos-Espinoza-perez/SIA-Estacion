@@ -169,6 +169,22 @@ public class ServicioEstaciones
         if (string.IsNullOrEmpty(codigoLimpio))
             return Result<EstacionResponse>.Fallido("DATOS_INVALIDOS", "Debe ingresar el código QR o dirección MAC del dispositivo físico.");
 
+        // Si viene en formato URL (ej: https://.../vincular?mac=B4BFE9C88E78)
+        if (codigoLimpio.Contains("MAC="))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(codigoLimpio, @"MAC=([A-F0-9:]{12,17})", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                codigoLimpio = match.Groups[1].Value.ToUpperInvariant();
+            }
+        }
+
+        // Si es una dirección MAC, normalizar quitando dos puntos, guiones y espacios
+        if (!codigoLimpio.StartsWith("PAIR-", StringComparison.OrdinalIgnoreCase))
+        {
+            codigoLimpio = codigoLimpio.Replace(":", "").Replace("-", "").Replace(" ", "");
+        }
+
         Estacion? otraEstacionConMismaMac = await _repository.ObtenerPorMacAsync(codigoLimpio, ct);
         if (otraEstacionConMismaMac is not null && otraEstacionConMismaMac.Id != id && otraEstacionConMismaMac.EstaVinculada)
         {

@@ -40,7 +40,7 @@ Orquesta lectores de credenciales (RFID RC522 y escaner GM65), rele de apertura,
 
 ## Servidor de Camara (Telefono como Camara)
 
-Segun las decisiones D-06 y D-07 de Notion, el telefono sustituye temporalmente a la camara fisica (ESP32-CAM):
+El telefono puede utilizarse como camara web para la estacion:
 
 1. El ESP32 Principal levanta simultaneamente:
    - Modo Estacion (STA): Conectado al WiFi local para comunicarse con el backend .NET 9.

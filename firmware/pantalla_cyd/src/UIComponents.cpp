@@ -1,18 +1,12 @@
 #include "UIComponents.h"
 #include "Config.h"
+#include <math.h>
 
 namespace UI {
-
     void initDisplay(TFT_eSPI& tft) {
         tft.init();
         tft.setRotation(SCREEN_ROTATION);
-        tft.fillScreen(Theme::COLOR_BG);
-        tft.setTextWrap(false, false);
-        
-        #if defined(TFT_BL) && (TFT_BL >= 0)
-            pinMode(TFT_BL, OUTPUT);
-            digitalWrite(TFT_BL, HIGH);
-        #endif
+        clearScreen(tft);
     }
 
     void clearScreen(TFT_eSPI& tft) {
@@ -21,12 +15,14 @@ namespace UI {
 
     void drawHeader(TFT_eSPI& tft, const char* title, const char* subtitle) {
         tft.setTextDatum(TL_DATUM);
-        tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-        tft.setTextFont(2);
-        tft.drawString(title, 24, 14);
+        tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
+        tft.setTextFont(4);
+        tft.drawString(title, 20, 16);
 
         if (subtitle != nullptr && subtitle[0] != '\0') {
-            tft.drawString(subtitle, 24, 32);
+            tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
+            tft.setTextFont(2);
+            tft.drawString(subtitle, 20, 42);
         }
     }
 
@@ -34,11 +30,10 @@ namespace UI {
                         uint16_t color, int16_t dashLen, int16_t gapLen, 
                         int16_t radius, int16_t thickness) {
         for (int16_t t = 0; t < thickness; ++t) {
-            tft.drawRoundRect(x + t, y + t, w - 2 * t, h - 2 * t, radius, color);
+            tft.drawRoundRect(x + t, y + t, w - (2 * t), h - (2 * t), radius, color);
         }
 
         int16_t step = dashLen + gapLen;
-        
         for (int16_t dx = radius; dx < w - radius - gapLen; dx += step) {
             int16_t gStart = dx + dashLen;
             int16_t gWidth = (gStart + gapLen > w - radius) ? (w - radius - gStart) : gapLen;
@@ -66,20 +61,17 @@ namespace UI {
 
         tft.fillCircle(x + 18, y + h / 2, 4, accentColor);
 
-        // Título con fuente 2 nítida
         tft.setTextDatum(TL_DATUM);
         tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_CARD);
         tft.setTextFont(2);
         tft.drawString(title, x + 34, y + 6);
 
-        // Subtítulo con fuente 2 limpia
         if (subtitle != nullptr && subtitle[0] != '\0') {
             tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_CARD);
             tft.setTextFont(2);
             tft.drawString(subtitle, x + 34, y + 24);
         }
 
-        // Acción a la derecha
         if (actionText != nullptr && actionText[0] != '\0') {
             tft.setTextDatum(TR_DATUM);
             tft.setTextColor(accentColor, Theme::COLOR_CARD);
@@ -147,7 +139,6 @@ namespace UI {
                 break;
         }
 
-        // Badge
         if (badgeText != nullptr && badgeText[0] != '\0') {
             tft.setTextDatum(TC_DATUM);
             tft.setTextColor(badgeColor, Theme::COLOR_BG);
@@ -155,7 +146,6 @@ namespace UI {
             tft.drawString(badgeText, centerX, 164);
         }
 
-        // Título Principal (Font 4: 26px bold limpia)
         if (titleText != nullptr && titleText[0] != '\0') {
             tft.setTextDatum(TC_DATUM);
             tft.setTextColor(titleColor, Theme::COLOR_BG);
@@ -163,7 +153,6 @@ namespace UI {
             tft.drawString(titleText, centerX, 192);
         }
 
-        // Subtítulo (Font 2: 16px limpia)
         if (subtitleText != nullptr && subtitleText[0] != '\0') {
             tft.setTextDatum(TC_DATUM);
             tft.setTextColor(subtitleColor, Theme::COLOR_BG);
@@ -184,7 +173,7 @@ namespace UI {
             tft.drawLine(x0, y0 + i, x1, y1 + i, color);
             tft.drawLine(x1, y1 + i, x2, y2 + i, color);
             tft.drawLine(x0 + i, y0, x1 + i, y1, color);
-            tft.drawLine(x1 + i, y1, x2 + i, y2, color);
+            tft.drawLine(x1 + i, y1, x2, y2 + i, color);
         }
     }
 

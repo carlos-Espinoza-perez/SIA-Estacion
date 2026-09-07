@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <SPI.h>
-#include <XPT2046_Touchscreen.h>
+#include <TFT_eSPI.h>
 #include "Config.h"
 
 struct TouchArea {
@@ -15,22 +14,24 @@ struct TouchArea {
 
 class TouchManager {
 public:
-    TouchManager();
+    explicit TouchManager(TFT_eSPI& tft);
 
     void init();
-    
-    // Sondeo de pulsación con debouncing y mapeo a coordenadas 480x320
-    bool poll(int16_t& outX, int16_t& outY);
-
-    // Registra áreas interactivas para la vista actual
+    const char* pollAction(int16_t& outX, int16_t& outY);
     void setAreas(const TouchArea* areas, size_t count);
-
-    // Comprueba si las coordenadas coinciden con un botón interactivo
     const char* checkHit(int16_t x, int16_t y);
+    void runCalibration();
 
 private:
-    XPT2046_Touchscreen _touch;
-    uint32_t _lastTouchTime;
+    TFT_eSPI& _tft;
     const TouchArea* _currentAreas;
     size_t _areaCount;
+
+    bool _isPressed;
+    bool _isDragging;
+    int16_t _startX;
+    int16_t _startY;
+    int16_t _lastX;
+    int16_t _lastY;
+    uint32_t _pressStartTime;
 };

@@ -181,8 +181,19 @@ export const estacionService = {
   },
 
   vincularEstacion: async (id: string, codigoVinculacionOMac: string): Promise<Estacion> => {
+    let cleanCode = codigoVinculacionOMac.trim();
+    if (cleanCode.toLowerCase().includes('mac=')) {
+      const match = cleanCode.match(/mac=([a-fA-F0-9:]{12,17})/i);
+      if (match && match[1]) {
+        cleanCode = match[1];
+      }
+    }
+    if (!cleanCode.toUpperCase().startsWith('PAIR-')) {
+      cleanCode = cleanCode.replace(/[:\-\s]/g, '').toUpperCase();
+    }
+
     const response = await apiClient.post<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}/vincular`, {
-      codigoVinculacionOMac,
+      codigoVinculacionOMac: cleanCode,
     });
     const e = response.data.datos!;
     return {
