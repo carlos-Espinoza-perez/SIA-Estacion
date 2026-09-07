@@ -1,0 +1,10 @@
+notas pdf/
+stl/
+renders/
+API/
+firmware/
+scripts/
+trabajos-clases/
+.git/
+.agents/
+.claude/
