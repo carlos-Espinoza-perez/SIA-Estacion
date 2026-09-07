@@ -8,21 +8,19 @@
 ApiClient Api;
 
 static uint32_t lastWifiAttempt = 0;
+static WiFiClientSecure globalSecureClient;
+static WiFiClient globalPlainClient;
 
 static bool sendHttpRequest(HTTPClient& http, const String& url, const char* method,
                             const String& body, const String& token, int timeoutMs,
                             int& outCode, String& outPayload) {
-    WiFiClientSecure secure;
-    WiFiClient plain;
     bool isHttps = url.startsWith("https://");
 
     if (isHttps) {
-        secure.setInsecure();
-        secure.setTimeout((timeoutMs / 1000) + 5);
-        if (!http.begin(secure, url)) return false;
+        globalSecureClient.setInsecure();
+        if (!http.begin(globalSecureClient, url)) return false;
     } else {
-        plain.setTimeout((timeoutMs / 1000) + 5);
-        if (!http.begin(plain, url)) return false;
+        if (!http.begin(globalPlainClient, url)) return false;
     }
 
     http.setTimeout(timeoutMs);
@@ -42,6 +40,9 @@ static bool sendHttpRequest(HTTPClient& http, const String& url, const char* met
         outPayload = http.getString();
     }
     http.end();
+    if (isHttps) globalSecureClient.stop();
+    else globalPlainClient.stop();
+
     return outCode > 0;
 }
 
@@ -74,12 +75,12 @@ bool ApiClient::connectWifi() {
     }
 
     if (isConnected()) {
-        ip_addr_t dns1, dns2;
-        IP_ADDR4(&dns1, 8, 8, 8, 8);
-        IP_ADDR4(&dns2, 1, 1, 1, 1);
-        dns_setserver(0, &dns1);
-        dns_setserver(1, &dns2);
-        Serial.printf("[WiFi] Conectado. IP: %s (DNS fallback configurado: 8.8.8.8, 1.1.1.1)\n", WiFi.localIP().toString().c_str());
+        WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), 
+                    IPAddress(8, 8, 8, 8), IPAddress(1, 1, 1, 1));
+
+        Serial.printf("[WiFi] Conectado. IP: %s | Gateway: %s\n",
+                      WiFi.localIP().toString().c_str(),
+                      WiFi.gatewayIP().toString().c_str());
     } else {
         Serial.println("[WiFi] No se pudo conectar.");
     }
@@ -120,7 +121,8 @@ PollStatus ApiClient::pollProvisioning(const String& mac, StationConfig& out) {
 
     if (code == 200) {
         JsonDocument doc;
-        if (!deserializeJson(doc, payload) && doc["exitoso"].as<bool>()) {
+        DeserializationError err = deserializeJson(doc, payload);
+        if (!err && !doc["datos"].isNull()) {
             JsonObject data = doc["datos"];
             out.clientId = data["clientId"].as<String>();
             out.clientSecret = data["clientSecret"].as<String>();
@@ -131,7 +133,7 @@ PollStatus ApiClient::pollProvisioning(const String& mac, StationConfig& out) {
                           out.name.c_str(), out.clientId.c_str());
             return PollStatus::Success;
         }
-        Serial.println("[API] Error deserializando payload de vinculacion");
+        Serial.printf("[API] Error deserializando payload de vinculacion: %s\n", err.c_str());
         return PollStatus::Error;
     }
 
@@ -160,9 +162,11 @@ bool ApiClient::authenticate(const String& clientId, const String& clientSecret)
 
     if (code == 200) {
         JsonDocument res;
-        if (!deserializeJson(res, payload) && res["exitoso"].as<bool>()) {
+        DeserializationError err = deserializeJson(res, payload);
+        if (!err && !res["datos"].isNull()) {
             _token = res["datos"]["accessToken"].as<String>();
             _tokenTime = millis();
+            Serial.printf("[API] Token JWT obtenido con exito (longitud %d)\n", _token.length());
             return true;
         }
     }
@@ -228,7 +232,8 @@ bool ApiClient::validateAccess(const String& personCode, const String& itemCode,
 
     if (code == 200) {
         JsonDocument res;
-        if (!deserializeJson(res, payload) && res["exitoso"].as<bool>()) {
+        DeserializationError err = deserializeJson(res, payload);
+        if (!err && !res["datos"].isNull()) {
             JsonObject data = res["datos"];
             String resStr = data["resultado"].as<String>();
             result.authorized = (resStr == "Concedido");

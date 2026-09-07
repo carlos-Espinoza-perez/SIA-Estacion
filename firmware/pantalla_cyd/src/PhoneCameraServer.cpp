@@ -3,6 +3,7 @@
 #include "StorageManager.h"
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include <lwip/netif.h>
 
 PhoneCameraServer CameraServer;
 
@@ -465,13 +466,16 @@ static const char WIFI_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 void PhoneCameraServer::begin() {
+    int channel = (WiFi.status() == WL_CONNECTED) ? WiFi.channel() : 1;
+    if (channel <= 0) channel = 1;
+
     WiFi.mode(WIFI_AP_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
-    // SoftAP ABIERTO sin contraseña en canal 1 para máxima compatibilidad
-    bool apOk = WiFi.softAP(DEFAULT_AP_SSID, nullptr, 1, 0, 4);
+    // SoftAP en el mismo canal que la red Wi-Fi para evitar desconexiones de radio
+    bool apOk = WiFi.softAP(DEFAULT_AP_SSID, nullptr, channel, 0, 4);
     if (apOk) {
-        Serial.printf("[AP] Red abierta creada: %s | IP: %s\n", DEFAULT_AP_SSID, WiFi.softAPIP().toString().c_str());
+        Serial.printf("[AP] Red abierta creada: %s | Canal: %d | IP: %s\n", DEFAULT_AP_SSID, channel, WiFi.softAPIP().toString().c_str());
     } else {
         Serial.println("[AP] Error al crear SoftAP");
     }

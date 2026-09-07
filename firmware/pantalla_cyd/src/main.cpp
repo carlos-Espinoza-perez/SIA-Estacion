@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
+#include <esp_task_wdt.h>
 #include "Config.h"
 #include "Theme.h"
 #include "UIComponents.h"
@@ -126,9 +127,13 @@ void setup() {
     bootStartTime = millis();
     lastPerfReport = millis();
     currentState = StationState::Boot;
+
+    esp_task_wdt_init(30, true);
+    esp_task_wdt_add(NULL);
 }
 
 void loop() {
+    esp_task_wdt_reset();
     loopIterations++;
     screens.update();
     CameraServer.update();
@@ -262,6 +267,7 @@ void loop() {
         }
 
         case StationState::Unpaired: {
+            esp_task_wdt_reset();
             if (Api.isConnected()) {
                 StationConfig cfg;
                 PollStatus status = Api.pollProvisioning(Storage.getCleanMac(), cfg);
@@ -275,10 +281,11 @@ void loop() {
                     currentState = StationState::Standby;
                     enterStandbyView();
                 } else if (status == PollStatus::Error) {
-                    delay(500);
+                    screens.update();
+                    delay(1000);
                 }
             } else {
-                if (millis() - lastStaRetry >= 15000) {
+                if (millis() - lastStaRetry >= 10000) {
                     lastStaRetry = millis();
                     Api.connectWifi();
                 }

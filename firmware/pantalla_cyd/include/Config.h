@@ -34,6 +34,6 @@ constexpr uint16_t TS_MAXY = 3800;
 constexpr uint32_t SERIAL_BAUD             = 115200;
 constexpr uint32_t TOUCH_DEBOUNCE_MS       = 120;
 constexpr uint32_t HEARTBEAT_INTERVAL_MS   = 30000;
-constexpr uint32_t LONG_POLL_TIMEOUT_MS    = 32000;
+constexpr uint32_t LONG_POLL_TIMEOUT_MS    = 15000;
 constexpr uint32_t RESULT_FEEDBACK_TIME_MS = 3500;
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 8000;
