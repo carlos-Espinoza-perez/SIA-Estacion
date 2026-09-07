@@ -88,7 +88,8 @@ void ScreenManager::init() {
 }
 
 void ScreenManager::transitionTo(ScreenState newState, const char* param1, const char* param2) {
-    bool wasLvgl = (_currentState == ScreenState::SELECT_WIFI || 
+    bool wasLvgl = (_currentState == ScreenState::BOOT ||
+                    _currentState == ScreenState::SELECT_WIFI || 
                     _currentState == ScreenState::WIFI_PASSWORD ||
                     _currentState == ScreenState::PROCESSING ||
                     _currentState == ScreenState::WAITING ||
@@ -97,7 +98,8 @@ void ScreenManager::transitionTo(ScreenState newState, const char* param1, const
                     _currentState == ScreenState::DENIED ||
                     _currentState == ScreenState::LINKED);
 
-    bool willBeLvgl = (newState == ScreenState::SELECT_WIFI || 
+    bool willBeLvgl = (newState == ScreenState::BOOT ||
+                      newState == ScreenState::SELECT_WIFI || 
                       newState == ScreenState::WIFI_PASSWORD ||
                       newState == ScreenState::PROCESSING ||
                       newState == ScreenState::WAITING ||
@@ -208,16 +210,7 @@ void ScreenManager::update() {
         Lvgl.update();
     }
 
-    if (_currentState == ScreenState::BOOT) {
-        if (millis() - _lastAnimTime > 35) {
-            _lastAnimTime = millis();
-            if (_bootProgress < 1.0f) {
-                _bootProgress += 0.025f;
-                if (_bootProgress > 1.0f) _bootProgress = 1.0f;
-                UI::drawProgressBar(_tft, 140, 210, 200, 6, _bootProgress, Theme::COLOR_BLUE);
-            }
-        }
-    } else if (_currentState == ScreenState::SELECT_WIFI) {
+    if (_currentState == ScreenState::SELECT_WIFI) {
         static int lastScanStatus = -999;
         int currentScanStatus = WiFi.scanComplete();
         if (currentScanStatus != lastScanStatus) {
@@ -228,18 +221,13 @@ void ScreenManager::update() {
 }
 
 void ScreenManager::renderBoot() {
-    UI::drawHeader(_tft, "SIA");
+    const char* title = (_param1[0] != '\0') ? _param1 : "Iniciando";
+    const char* subtitle = (_param2[0] != '\0') ? _param2 : "Conectando al sistema...";
+    Lvgl.showBoot(title, subtitle);
+}
 
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Iniciando", SCREEN_WIDTH / 2, 148);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Conectando a la red", SCREEN_WIDTH / 2, 180);
-
-    UI::drawProgressBar(_tft, 140, 210, 200, 6, _bootProgress, Theme::COLOR_BLUE);
+void ScreenManager::updateBootStatus(const char* subtitle) {
+    Lvgl.updateBootStatus(subtitle);
 }
 
 void ScreenManager::renderUnconfigured() {

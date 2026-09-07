@@ -49,11 +49,21 @@ export const EstacionesPage: React.FC = () => {
       tipoRecurso: tipoRecursoFiltro,
       estado: estadoFiltro,
     };
-    estacionService.getEstaciones(filtros).then(setEstaciones);
+    estacionService.getEstaciones(filtros).then((lista) => {
+      setEstaciones(lista);
+      setSelectedEstacion((actual) => {
+        if (!actual) return null;
+        return lista.find((e) => e.id === actual.id) || actual;
+      });
+    });
   };
 
   useEffect(() => {
     cargarEstaciones();
+    const interval = setInterval(() => {
+      cargarEstaciones();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [busqueda, tipoRecursoFiltro, estadoFiltro]);
 
   const handleCrearEstacion = async (formData: CrearEstacionFormData): Promise<Estacion> => {

@@ -18,6 +18,11 @@ public class EstacionResponse
     public string? CodigoVinculacion { get; set; }
     public DateTimeOffset? FechaVinculacion { get; set; }
     public DateTimeOffset? UltimaSincronizacion { get; set; }
+    public bool IsOnline
+    {
+        get => EstaVinculada && Estado && UltimaSincronizacion.HasValue && (DateTimeOffset.UtcNow - UltimaSincronizacion.Value).TotalSeconds <= 90;
+        set { }
+    }
 }
 
 public class CrearEstacionRequest

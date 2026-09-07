@@ -38,6 +38,18 @@ static uint32_t lastPerfReport = 0;
 static uint32_t loopIterations = 0;
 static uint8_t  wifiScanRetries = 0;
 
+static bool wifiConnectAttempted = false;
+static bool authTaskStarted = false;
+static volatile bool authTaskFinished = false;
+static volatile bool authTaskSuccess = false;
+
+static void authBackgroundTask(void* pv) {
+    StationConfig cfg = Storage.getConfig();
+    authTaskSuccess = Api.authenticate(cfg.clientId, cfg.clientSecret);
+    authTaskFinished = true;
+    vTaskDelete(NULL);
+}
+
 static void startWifiScan();
 static void onCameraCapture(const String& code, const String& imageBase64);
 static void onWifiConfigReceived(const String& ssid, const String& password);
@@ -214,24 +226,44 @@ void loop() {
 
     switch (currentState) {
         case StationState::Boot: {
-            if (millis() - bootStartTime > 1800) {
+            if (millis() - bootStartTime > 1200) {
                 if (Storage.hasWifiConfig()) {
-                    bool ok = Api.connectWifi();
-                    if (ok) {
-                        if (Storage.isProvisioned()) {
-                            StationConfig cfg = Storage.getConfig();
-                            Api.authenticate(cfg.clientId, cfg.clientSecret);
+                    if (!wifiConnectAttempted) {
+                        wifiConnectAttempted = true;
+                        screens.updateBootStatus("Conectando a la red WiFi...");
+                        bool ok = Api.connectWifi();
+                        if (!ok) {
+                            wifiScanRetries = 0;
+                            startWifiScan();
+                            currentState = StationState::SelectWifi;
+                            screens.transitionTo(ScreenState::SELECT_WIFI);
+                            break;
+                        }
+                    }
+
+                    if (Storage.isProvisioned()) {
+                        if (!authTaskStarted) {
+                            authTaskStarted = true;
+                            authTaskFinished = false;
+                            screens.updateBootStatus("Autenticando con el servidor...");
+                            xTaskCreatePinnedToCore(authBackgroundTask, "auth_bg", 8192, NULL, 1, NULL, 0);
+                        }
+
+                        if (authTaskFinished) {
+                            if (authTaskSuccess) {
+                                screens.updateBootStatus("Autenticado con exito");
+                            } else {
+                                screens.updateBootStatus("Modo fuera de linea");
+                            }
+                            screens.update();
+                            delay(600);
+                            authTaskStarted = false;
                             currentState = StationState::Standby;
                             enterStandbyView();
-                        } else {
-                            currentState = StationState::Unpaired;
-                            showPairingView();
                         }
                     } else {
-                        wifiScanRetries = 0;
-                        startWifiScan();
-                        currentState = StationState::SelectWifi;
-                        screens.transitionTo(ScreenState::SELECT_WIFI);
+                        currentState = StationState::Unpaired;
+                        showPairingView();
                     }
                 } else {
                     Serial.println("[BOOT] Sin credenciales WiFi. Iniciando escaneo de redes...");
@@ -359,8 +391,16 @@ static bool attemptWifiConnection(const String& ssid, const String& pass) {
         }
 
         if (Storage.isProvisioned()) {
-            StationConfig cfg = Storage.getConfig();
-            Api.authenticate(cfg.clientId, cfg.clientSecret);
+            screens.transitionTo(ScreenState::PROCESSING, "Autenticando", "Conectando al servidor...");
+            authTaskStarted = true;
+            authTaskFinished = false;
+            xTaskCreatePinnedToCore(authBackgroundTask, "auth_bg", 8192, NULL, 1, NULL, 0);
+            while (!authTaskFinished) {
+                screens.update();
+                esp_task_wdt_reset();
+                delay(20);
+            }
+            authTaskStarted = false;
             currentState = StationState::Standby;
             enterStandbyView();
         } else {

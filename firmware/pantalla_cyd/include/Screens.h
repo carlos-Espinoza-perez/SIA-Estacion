@@ -65,6 +65,7 @@ public:
     void onAdminExit(std::function<void()> cb) { _onAdminExitCb = cb; }
     void showWifiSuccess(const char* ssid, const char* ip);
     void showWifiError(const char* reason, const char* hint);
+    void updateBootStatus(const char* subtitle);
 
 private:
     TFT_eSPI& _tft;

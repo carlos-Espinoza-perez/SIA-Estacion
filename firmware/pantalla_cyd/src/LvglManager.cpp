@@ -1,4 +1,5 @@
 #include "LvglManager.h"
+#include "Config.h"
 #include <WiFi.h>
 
 LvglManager Lvgl;
@@ -8,6 +9,7 @@ static lv_disp_draw_buf_t _drawBuf;
 static lv_color_t _buf1[480 * 20]; // 19.2 KB draw buffer
 static lv_disp_drv_t _dispDrv;
 static lv_indev_drv_t _indevDrv;
+static lv_obj_t* _bootSubtitleLabel = nullptr;
 
 static std::function<void(int)> _onSelectCb = nullptr;
 static std::function<void()> _onRefreshCb = nullptr;
@@ -103,6 +105,7 @@ void LvglManager::clear() {
         _onOtherCb = nullptr;
         _onConnectCb = nullptr;
         _onBackCb = nullptr;
+        _bootSubtitleLabel = nullptr;
     }
 }
 
@@ -454,6 +457,75 @@ void LvglManager::showWifiPassword(const char* ssid,
             if (buttons) lv_obj_clear_flag(buttons, LV_OBJ_FLAG_HIDDEN);
         }
     }, LV_EVENT_ALL, NULL);
+}
+
+void LvglManager::showBoot(const char* title, const char* subtitle) {
+    if (!_initialized) return;
+    _active = true;
+
+    lv_obj_clean(lv_scr_act());
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x0a1118), LV_PART_MAIN);
+
+    // Encabezado superior SIA
+    lv_obj_t* hdr = lv_label_create(lv_scr_act());
+    lv_label_set_text(hdr, "SIA");
+    lv_obj_set_style_text_color(hdr, lv_color_hex(0x38bdf8), LV_PART_MAIN);
+    lv_obj_set_style_text_font(hdr, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_align(hdr, LV_ALIGN_TOP_LEFT, 24, 16);
+
+    // Badge de versión en esquina superior derecha
+    lv_obj_t* v_badge = lv_label_create(lv_scr_act());
+    lv_label_set_text(v_badge, "v" FIRMWARE_VERSION);
+    lv_obj_set_style_text_color(v_badge, lv_color_hex(0x64748b), LV_PART_MAIN);
+    lv_obj_set_style_text_font(v_badge, &lv_font_montserrat_12, LV_PART_MAIN);
+    lv_obj_align(v_badge, LV_ALIGN_TOP_RIGHT, -24, 16);
+
+    // Tarjeta central estilo dark card
+    lv_obj_t* card = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(card, 432, 230);
+    lv_obj_align(card, LV_ALIGN_CENTER, 0, 15);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0x0f172a), LV_PART_MAIN);
+    lv_obj_set_style_border_color(card, lv_color_hex(0x1e293b), LV_PART_MAIN);
+    lv_obj_set_style_border_width(card, 1, LV_PART_MAIN);
+    lv_obj_set_style_radius(card, 16, LV_PART_MAIN);
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Spinner animado continuo (1000ms de periodo, arco de 60 grados)
+    lv_obj_t* spinner = lv_spinner_create(card, 1000, 60);
+    lv_obj_set_size(spinner, 68, 68);
+    lv_obj_align(spinner, LV_ALIGN_CENTER, 0, -36);
+    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x1e293b), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(spinner, 5, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x00d2ff), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(spinner, 5, LV_PART_INDICATOR);
+
+    // Título principal
+    lv_obj_t* lbl_title = lv_label_create(card);
+    lv_label_set_text(lbl_title, (title && title[0]) ? title : "Iniciando estacion");
+    lv_obj_set_style_text_color(lbl_title, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl_title, &lv_font_montserrat_18, LV_PART_MAIN);
+    lv_obj_align(lbl_title, LV_ALIGN_CENTER, 0, 28);
+
+    // Subtítulo dinámico
+    _bootSubtitleLabel = lv_label_create(card);
+    lv_label_set_text(_bootSubtitleLabel, (subtitle && subtitle[0]) ? subtitle : "Cargando componentes...");
+    lv_obj_set_style_text_color(_bootSubtitleLabel, lv_color_hex(0x94a3b8), LV_PART_MAIN);
+    lv_obj_set_style_text_font(_bootSubtitleLabel, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_align(_bootSubtitleLabel, LV_ALIGN_CENTER, 0, 58);
+
+    // Pie de tarjeta institucional
+    lv_obj_t* lbl_footer = lv_label_create(card);
+    lv_label_set_text(lbl_footer, "Sistema de Identificacion Automatica");
+    lv_obj_set_style_text_color(lbl_footer, lv_color_hex(0x475569), LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl_footer, &lv_font_montserrat_12, LV_PART_MAIN);
+    lv_obj_align(lbl_footer, LV_ALIGN_BOTTOM_MID, 0, -6);
+}
+
+void LvglManager::updateBootStatus(const char* subtitle) {
+    if (!_active || !_bootSubtitleLabel) return;
+    if (subtitle && subtitle[0]) {
+        lv_label_set_text(_bootSubtitleLabel, subtitle);
+    }
 }
 
 void LvglManager::showProcessing(const char* title, const char* subtitle) {

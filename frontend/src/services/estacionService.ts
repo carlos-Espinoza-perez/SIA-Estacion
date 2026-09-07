@@ -1,5 +1,6 @@
 import {
   Estacion,
+  EstadoEstacion,
   CrearEstacionFormData,
   FiltrosEstacion,
 } from '../types/estacion';
@@ -24,36 +25,59 @@ interface EstacionBackendDto {
   codigoVinculacion?: string;
   fechaVinculacion?: string;
   ultimaSincronizacion?: string;
+  isOnline?: boolean;
+}
+
+const HEARTBEAT_TIMEOUT_SECONDS = 90; // Tolerancia de 3 latidos (30s cada uno)
+
+export function mapBackendDtoToEstacion(e: EstacionBackendDto): Estacion {
+  let estadoCalculado: EstadoEstacion = 'Offline';
+
+  if (!e.estado) {
+    estadoCalculado = 'Mantenimiento';
+  } else if (!e.estaVinculada) {
+    estadoCalculado = 'Offline';
+  } else if (e.isOnline !== undefined) {
+    estadoCalculado = e.isOnline ? 'En línea' : 'Offline';
+  } else if (e.ultimaSincronizacion) {
+    const syncTime = new Date(e.ultimaSincronizacion).getTime();
+    if (!isNaN(syncTime)) {
+      const diffSegundos = (Date.now() - syncTime) / 1000;
+      estadoCalculado = diffSegundos <= HEARTBEAT_TIMEOUT_SECONDS ? 'En línea' : 'Offline';
+    }
+  }
+
+  return {
+    id: e.id,
+    nombre: e.nombre,
+    ubicacion: e.ubicacion,
+    tipoRecurso: 'Control de acceso',
+    flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
+    ultimaSincronizacion: e.ultimaSincronizacion
+      ? new Date(e.ultimaSincronizacion).toLocaleString()
+      : '—',
+    estado: estadoCalculado,
+    encargadoId: e.encargadoId,
+    encargado: e.encargadoNombre || 'Sin asignar',
+    estaVinculada: e.estaVinculada ?? false,
+    macAddress: e.macAddress,
+    codigoVinculacion: e.codigoVinculacion,
+    fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
+    identificadorDispositivo: e.clientId,
+    modoOffline: true,
+    firmware: e.firmwareVersion || 'v1.0.3',
+    accesosHoy: 0,
+    operacionesHoy: 0,
+    latenciaQrPromedio: '—',
+    latenciaFacialPromedio: '—',
+    actividadReciente: [],
+  };
 }
 
 export const estacionService = {
   getEstaciones: async (filtros?: FiltrosEstacion): Promise<Estacion[]> => {
     const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto[]>>('/estaciones');
-    let lista: Estacion[] = (response.data?.datos || []).map((e) => ({
-      id: e.id,
-      nombre: e.nombre,
-      ubicacion: e.ubicacion,
-      tipoRecurso: 'Control de acceso',
-      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: e.ultimaSincronizacion
-        ? new Date(e.ultimaSincronizacion).toLocaleString()
-        : '—',
-      estado: e.estado ? 'En línea' : 'Offline',
-      encargadoId: e.encargadoId,
-      encargado: e.encargadoNombre || 'Sin asignar',
-      estaVinculada: e.estaVinculada ?? false,
-      macAddress: e.macAddress,
-      codigoVinculacion: e.codigoVinculacion,
-      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
-      identificadorDispositivo: e.clientId,
-      modoOffline: true,
-      firmware: e.firmwareVersion || 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    }));
+    let lista: Estacion[] = (response.data?.datos || []).map(mapBackendDtoToEstacion);
 
     if (filtros) {
       const q = filtros.busqueda?.trim().toLowerCase() || '';
@@ -81,32 +105,7 @@ export const estacionService = {
     const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}`);
     const e = response.data?.datos;
     if (!e) return undefined;
-
-    return {
-      id: e.id,
-      nombre: e.nombre,
-      ubicacion: e.ubicacion,
-      tipoRecurso: 'Control de acceso',
-      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: e.ultimaSincronizacion
-        ? new Date(e.ultimaSincronizacion).toLocaleString()
-        : '—',
-      estado: e.estado ? 'En línea' : 'Offline',
-      encargadoId: e.encargadoId,
-      encargado: e.encargadoNombre || 'Sin asignar',
-      estaVinculada: e.estaVinculada ?? false,
-      macAddress: e.macAddress,
-      codigoVinculacion: e.codigoVinculacion,
-      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
-      identificadorDispositivo: e.clientId,
-      modoOffline: true,
-      firmware: e.firmwareVersion || 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    };
+    return mapBackendDtoToEstacion(e);
   },
 
   crearEstacion: async (data: CrearEstacionFormData): Promise<Estacion> => {
@@ -119,27 +118,7 @@ export const estacionService = {
     });
 
     const eb = response.data.datos!;
-    return {
-      id: eb.id,
-      nombre: eb.nombre,
-      ubicacion: eb.ubicacion,
-      tipoRecurso: data.tipoRecurso,
-      flujo: eb.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: 'Ahora',
-      estado: 'En línea',
-      encargadoId: eb.encargadoId,
-      encargado: eb.encargadoNombre || data.encargado,
-      estaVinculada: eb.estaVinculada ?? false,
-      macAddress: eb.macAddress,
-      identificadorDispositivo: eb.clientId || data.identificadorDispositivo,
-      modoOffline: data.modoOffline,
-      firmware: 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    };
+    return mapBackendDtoToEstacion(eb);
   },
 
   actualizarEstacion: async (id: string, data: Partial<Estacion>): Promise<Estacion> => {
@@ -148,36 +127,11 @@ export const estacionService = {
       ubicacion: data.ubicacion,
       encargadoId: data.encargadoId || null,
       requiereAprobacion: data.flujo === 'Aprobación',
-      estado: data.estado === 'En línea',
     });
 
     const response = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}`);
     const e = response.data.datos!;
-    return {
-      id: e.id,
-      nombre: e.nombre,
-      ubicacion: e.ubicacion,
-      tipoRecurso: 'Control de acceso',
-      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: e.ultimaSincronizacion
-        ? new Date(e.ultimaSincronizacion).toLocaleString()
-        : '—',
-      estado: e.estado ? 'En línea' : 'Offline',
-      encargadoId: e.encargadoId,
-      encargado: e.encargadoNombre || 'Sin asignar',
-      estaVinculada: e.estaVinculada ?? false,
-      macAddress: e.macAddress,
-      codigoVinculacion: e.codigoVinculacion,
-      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
-      identificadorDispositivo: e.clientId,
-      modoOffline: true,
-      firmware: e.firmwareVersion || 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    };
+    return mapBackendDtoToEstacion(e);
   },
 
   vincularEstacion: async (id: string, codigoVinculacionOMac: string): Promise<Estacion> => {
@@ -196,31 +150,7 @@ export const estacionService = {
       codigoVinculacionOMac: cleanCode,
     });
     const e = response.data.datos!;
-    return {
-      id: e.id,
-      nombre: e.nombre,
-      ubicacion: e.ubicacion,
-      tipoRecurso: 'Control de acceso',
-      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: e.ultimaSincronizacion
-        ? new Date(e.ultimaSincronizacion).toLocaleString()
-        : '—',
-      estado: e.estado ? 'En línea' : 'Offline',
-      encargadoId: e.encargadoId,
-      encargado: e.encargadoNombre || 'Sin asignar',
-      estaVinculada: e.estaVinculada ?? true,
-      macAddress: e.macAddress,
-      codigoVinculacion: e.codigoVinculacion,
-      fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : 'Ahora',
-      identificadorDispositivo: e.clientId,
-      modoOffline: true,
-      firmware: e.firmwareVersion || 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    };
+    return mapBackendDtoToEstacion(e);
   },
 
   desvincularEstacion: async (id: string): Promise<boolean> => {
@@ -241,31 +171,7 @@ export const estacionService = {
 
     const responseNuevo = await apiClient.get<RespuestaEnvuelta<EstacionBackendDto>>(`/estaciones/${id}`);
     const e = responseNuevo.data.datos!;
-    
-    return {
-      id: e.id,
-      nombre: e.nombre,
-      ubicacion: e.ubicacion,
-      tipoRecurso: 'Control de acceso',
-      flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
-      ultimaSincronizacion: e.ultimaSincronizacion
-        ? new Date(e.ultimaSincronizacion).toLocaleString()
-        : '—',
-      estado: e.estado ? 'En línea' : 'Offline',
-      encargadoId: e.encargadoId,
-      encargado: e.encargadoNombre || 'Sin asignar',
-      estaVinculada: e.estaVinculada ?? false,
-      macAddress: e.macAddress,
-      codigoVinculacion: e.codigoVinculacion,
-      identificadorDispositivo: e.clientId,
-      modoOffline: true,
-      firmware: e.firmwareVersion || 'v1.0.3',
-      accesosHoy: 0,
-      operacionesHoy: 0,
-      latenciaQrPromedio: '—',
-      latenciaFacialPromedio: '—',
-      actividadReciente: [],
-    };
+    return mapBackendDtoToEstacion(e);
   },
 
   eliminarEstacion: async (id: string): Promise<boolean> => {

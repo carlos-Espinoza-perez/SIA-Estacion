@@ -1,9 +1,11 @@
 #include "ApiClient.h"
 #include "Config.h"
+#include "LvglManager.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <lwip/dns.h>
+#include <esp_task_wdt.h>
 
 ApiClient Api;
 
@@ -16,11 +18,21 @@ static bool sendHttpRequest(HTTPClient& http, const String& url, const char* met
                             int& outCode, String& outPayload) {
     bool isHttps = url.startsWith("https://");
 
+    Serial.printf("[HTTP] %s %s (RAM libre: %d KB)\n",
+                  method, url.c_str(), ESP.getFreeHeap() / 1024);
+
     if (isHttps) {
         globalSecureClient.setInsecure();
-        if (!http.begin(globalSecureClient, url)) return false;
+        globalSecureClient.setHandshakeTimeout(8);
+        if (!http.begin(globalSecureClient, url)) {
+            Serial.println("[HTTP] Error en http.begin(globalSecureClient)");
+            return false;
+        }
     } else {
-        if (!http.begin(globalPlainClient, url)) return false;
+        if (!http.begin(globalPlainClient, url)) {
+            Serial.println("[HTTP] Error en http.begin(globalPlainClient)");
+            return false;
+        }
     }
 
     http.setTimeout(timeoutMs);
@@ -30,11 +42,16 @@ static bool sendHttpRequest(HTTPClient& http, const String& url, const char* met
         http.addHeader("Authorization", "Bearer " + token);
     }
 
+    uint32_t t0 = millis();
     if (strcmp(method, "POST") == 0) {
         outCode = http.POST(body);
     } else {
         outCode = http.GET();
     }
+    uint32_t elapsed = millis() - t0;
+
+    Serial.printf("[HTTP] Respuesta %d en %d ms (RAM libre: %d KB)\n",
+                  outCode, (int)elapsed, ESP.getFreeHeap() / 1024);
 
     if (outCode > 0) {
         outPayload = http.getString();
@@ -71,16 +88,28 @@ bool ApiClient::connectWifi() {
 
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED && (millis() - start < WIFI_CONNECT_TIMEOUT_MS)) {
-        delay(200);
+        if (Lvgl.isActive()) {
+            Lvgl.update();
+        }
+        esp_task_wdt_reset();
+        delay(20);
     }
 
     if (isConnected()) {
-        WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), 
-                    IPAddress(8, 8, 8, 8), IPAddress(1, 1, 1, 1));
+        ip_addr_t dns0, dns1;
+        ipaddr_aton("8.8.8.8", &dns0);
+        ipaddr_aton("1.1.1.1", &dns1);
+        dns_setserver(0, &dns0);
+        dns_setserver(1, &dns1);
 
-        Serial.printf("[WiFi] Conectado. IP: %s | Gateway: %s\n",
+        Serial.printf("[WiFi] Conectado. IP: %s | Gateway: %s | DNS Primario: %s | DNS Secundario: %s | RSSI: %d dBm\n",
                       WiFi.localIP().toString().c_str(),
-                      WiFi.gatewayIP().toString().c_str());
+                      WiFi.gatewayIP().toString().c_str(),
+                      WiFi.dnsIP(0).toString().c_str(),
+                      WiFi.dnsIP(1).toString().c_str(),
+                      WiFi.RSSI());
+
+        Serial.printf("[API] Destino base: %s\n", Storage.getApiUrl().c_str());
     } else {
         Serial.println("[WiFi] No se pudo conectar.");
     }
@@ -145,6 +174,9 @@ bool ApiClient::authenticate(const String& clientId, const String& clientSecret)
         return false;
     }
 
+    Serial.printf("[AUTH] Solicitando token JWT para ClientId '%s'... (RAM libre: %d KB)\n",
+                  clientId.c_str(), ESP.getFreeHeap() / 1024);
+
     String url = buildUrl("/api/connect/token");
     JsonDocument req;
     req["clientId"] = clientId;
@@ -156,7 +188,8 @@ bool ApiClient::authenticate(const String& clientId, const String& clientSecret)
     int code = -1;
     String payload;
 
-    if (!sendHttpRequest(http, url, "POST", body, "", 10000, code, payload)) {
+    if (!sendHttpRequest(http, url, "POST", body, "", 5000, code, payload)) {
+        Serial.printf("[AUTH] Fallo de comunicacion con /api/connect/token (code=%d)\n", code);
         return false;
     }
 
@@ -166,9 +199,14 @@ bool ApiClient::authenticate(const String& clientId, const String& clientSecret)
         if (!err && !res["datos"].isNull()) {
             _token = res["datos"]["accessToken"].as<String>();
             _tokenTime = millis();
-            Serial.printf("[API] Token JWT obtenido con exito (longitud %d)\n", _token.length());
+            Serial.printf("[AUTH] Token JWT obtenido con exito (longitud %d) | RAM restante: %d KB\n",
+                          _token.length(), ESP.getFreeHeap() / 1024);
             return true;
         }
+        Serial.printf("[AUTH] Error deserializando respuesta: %s\n", err.c_str());
+    } else {
+        Serial.printf("[AUTH] Servidor rechazo autenticacion: HTTP %d | Payload: %s\n",
+                      code, payload.c_str());
     }
     return false;
 }

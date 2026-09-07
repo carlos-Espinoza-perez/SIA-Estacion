@@ -29,6 +29,8 @@ public:
                           std::function<void(const char*)> onConnect,
                           std::function<void()> onBack);
 
+    void showBoot(const char* title = nullptr, const char* subtitle = nullptr);
+    void updateBootStatus(const char* subtitle);
     void showProcessing(const char* title, const char* subtitle = nullptr);
     void showStatusMessage(bool success, const char* badge, const char* title, const char* subtitle = nullptr);
     void showWaiting(const char* title, const char* subtitle, std::function<void()> onAdminClick);

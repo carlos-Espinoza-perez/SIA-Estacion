@@ -181,7 +181,7 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
     }
   };
 
-  const isOnline = !!estacion?.estaVinculada;
+  const isOnline = estacion?.estado === 'En línea';
 
   return (
     <>
