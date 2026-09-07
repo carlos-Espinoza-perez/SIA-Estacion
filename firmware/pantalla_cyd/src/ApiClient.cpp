@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <lwip/dns.h>
 
 ApiClient Api;
 
@@ -17,12 +18,15 @@ static bool sendHttpRequest(HTTPClient& http, const String& url, const char* met
 
     if (isHttps) {
         secure.setInsecure();
+        secure.setTimeout((timeoutMs / 1000) + 5);
         if (!http.begin(secure, url)) return false;
     } else {
+        plain.setTimeout((timeoutMs / 1000) + 5);
         if (!http.begin(plain, url)) return false;
     }
 
     http.setTimeout(timeoutMs);
+    http.setConnectTimeout(timeoutMs);
     http.addHeader("Content-Type", "application/json");
     if (token.length() > 0) {
         http.addHeader("Authorization", "Bearer " + token);
@@ -70,7 +74,12 @@ bool ApiClient::connectWifi() {
     }
 
     if (isConnected()) {
-        Serial.printf("[WiFi] Conectado. IP: %s\n", WiFi.localIP().toString().c_str());
+        ip_addr_t dns1, dns2;
+        IP_ADDR4(&dns1, 8, 8, 8, 8);
+        IP_ADDR4(&dns2, 1, 1, 1, 1);
+        dns_setserver(0, &dns1);
+        dns_setserver(1, &dns2);
+        Serial.printf("[WiFi] Conectado. IP: %s (DNS fallback configurado: 8.8.8.8, 1.1.1.1)\n", WiFi.localIP().toString().c_str());
     } else {
         Serial.println("[WiFi] No se pudo conectar.");
     }
@@ -101,9 +110,13 @@ PollStatus ApiClient::pollProvisioning(const String& mac, StationConfig& out) {
     int code = -1;
     String payload;
 
+    Serial.printf("[API] Consultando vinculacion para MAC %s...\n", mac.c_str());
     if (!sendHttpRequest(http, url, "GET", "", "", LONG_POLL_TIMEOUT_MS, code, payload)) {
+        Serial.printf("[API] Error de conexion HTTP / DNS al consultar aprovisionamiento (code=%d)\n", code);
         return PollStatus::Error;
     }
+
+    Serial.printf("[API] Respuesta aprovisionamiento: HTTP %d\n", code);
 
     if (code == 200) {
         JsonDocument doc;
@@ -114,8 +127,11 @@ PollStatus ApiClient::pollProvisioning(const String& mac, StationConfig& out) {
             out.name = data["estacionNombre"].as<String>();
             out.requireAuth = data["requiereIdentificacion"].as<bool>();
             out.requireApproval = data["requiereAprobacion"].as<bool>();
+            Serial.printf("[API] Vinculacion exitosa! Estacion: '%s' (ClientId: %s)\n",
+                          out.name.c_str(), out.clientId.c_str());
             return PollStatus::Success;
         }
+        Serial.println("[API] Error deserializando payload de vinculacion");
         return PollStatus::Error;
     }
 

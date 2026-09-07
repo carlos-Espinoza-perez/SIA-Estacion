@@ -266,6 +266,32 @@ public class ServicioEstaciones
             ClientId = estacion.ClientId
         });
     }
+ 
+    public async Task<ConfiguracionEstacionProvisionadaResponse?> ObtenerConfiguracionSiVinculadaAsync(string macAddress, CancellationToken ct)
+    {
+        string macLimpia = macAddress.Trim().ToUpperInvariant().Replace(":", "").Replace("-", "").Replace(" ", "");
+        Estacion? estacion = await _repository.ObtenerPorMacAsync(macLimpia, ct);
+
+        if (estacion is null || !estacion.EstaVinculada)
+        {
+            return null;
+        }
+
+        string nuevoSecreto = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        estacion.ClientSecretHash = _hashService.Hash(nuevoSecreto);
+        estacion.UltimaSincronizacion = DateTimeOffset.UtcNow;
+        await _repository.SaveChangesAsync(ct);
+
+        return new ConfiguracionEstacionProvisionadaResponse
+        {
+            EstacionId = estacion.Id,
+            EstacionNombre = estacion.Nombre,
+            ClientId = estacion.ClientId,
+            ClientSecret = nuevoSecreto,
+            RequiereIdentificacion = estacion.RequiereIdentificacion,
+            RequiereAprobacion = estacion.RequiereAprobacion
+        };
+    }
 
     public async Task<Result<EstacionConfiguracionResponse>> ObtenerConfiguracionEstacionAsync(Guid estacionId, CancellationToken ct)
     {

@@ -63,7 +63,8 @@ public class PairingCoordinator : IPairingCoordinator
         return true;
     }
 
-    private static string NormalizarClave(string valor) => valor?.Trim().ToUpperInvariant() ?? string.Empty;
+    private static string NormalizarClave(string valor) => 
+        valor?.Trim().ToUpperInvariant().Replace(":", "").Replace("-", "").Replace(" ", "") ?? string.Empty;
 
     private void LimpiarExpirados()
     {

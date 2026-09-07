@@ -40,8 +40,18 @@ public partial class EstacionApiController : SiaControllerBase
         if (string.IsNullOrWhiteSpace(identificador))
             return BadRequest(RespuestaEnvuelta<object>.ConError("DATOS_INVALIDOS", "El identificador (MAC address) es requerido."));
 
+        string macLimpia = identificador.Trim().ToUpperInvariant().Replace(":", "").Replace("-", "").Replace(" ", "");
+
+        // 1. Si la estación ya está vinculada en la base de datos, reaprovisionar de inmediato
+        var configExistente = await _servicioEstaciones.ObtenerConfiguracionSiVinculadaAsync(macLimpia, ct);
+        if (configExistente is not null)
+        {
+            return Ok(RespuestaEnvuelta<ConfiguracionEstacionProvisionadaResponse>.Exitosa(configExistente));
+        }
+
+        // 2. Si aún no está vinculada, esperar en tiempo real (long-polling) a que el usuario complete la vinculación
         var config = await _pairingCoordinator.EsperarConfiguracionAsync(
-            identificador.Trim().ToUpperInvariant(), 
+            macLimpia, 
             TimeSpan.FromSeconds(30), 
             ct);
 

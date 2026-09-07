@@ -38,9 +38,14 @@ public class EstacionesRepository : IEstacionesRepository
 
     public async Task<Estacion?> ObtenerPorMacAsync(string macAddress, CancellationToken ct)
     {
+        string limpia = macAddress.Replace(":", "").Replace("-", "").Replace(" ", "").ToUpperInvariant();
         return await _db.Estaciones
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(e => e.MacAddress == macAddress && e.Estado, ct);
+            .FirstOrDefaultAsync(e => 
+                (e.MacAddress == macAddress || 
+                 e.MacAddress == limpia || 
+                 (e.MacAddress != null && e.MacAddress.Replace(":", "").Replace("-", "") == limpia)) 
+                && e.Estado, ct);
     }
 
     public async Task<Estacion?> ObtenerPorCodigoVinculacionAsync(string codigo, CancellationToken ct)
