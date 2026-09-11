@@ -164,39 +164,48 @@ public class ServicioReportes
         });
     }
 
+    private static readonly Dictionary<EstadoItem, string> ColoresEstadoItem = new()
+    {
+        [EstadoItem.Disponible] = "#A0BCE8",
+        [EstadoItem.Prestado] = "#6BE6D3",
+        [EstadoItem.Mantenimiento] = "#ADADFB",
+        [EstadoItem.Perdido] = "#F2A6A6"
+    };
+
     public async Task<Result<DashboardMetricsResponse>> ObtenerMetricasDashboardAsync(CancellationToken ct)
     {
-        // 1. Contadores principales (para el dashboard interno, respetando el tenant si aplica)
-        // Para simplificar la demo, haremos conteos en memoria para algunas cosas o usaremos métodos existentes.
-        
-        // As a quick implementation, we can query all for the tenant and do aggregation in memory
-        // Similar to the frontend, but on the backend. This is much faster than sending it all over the network.
         var totalPersonas = await _personasRepository.ContarPersonasAsync(null, null, false, null, null, ct);
         var estaciones = await _estacionesRepository.ObtenerTodasAsync(ct);
-        
-        // Assuming we need Items, we might need a method to get all items. 
-        // We'll use a mocked metric if we don't have all the repos, or we can just fetch what we can.
+        var items = await _itemsRepository.ObtenerItemsAsync(null, null, null, ct);
+        var operaciones = await _operacionesRepository.ObtenerTodasAsync(null, null, null, null, ct);
+
         var today = DateTimeOffset.UtcNow.Date;
         var hace30Dias = today.AddDays(-30);
         var accesos = await _eventosRepository.ObtenerHistorialAccesoAsync(hace30Dias, DateTimeOffset.UtcNow, ct);
-        
+
         var response = new DashboardMetricsResponse
         {
             TotalPersonas = totalPersonas,
             TotalEstaciones = estaciones.Count,
             TotalAccesosHoy = accesos.Count(a => a.FechaHoraLocal.Date == today),
-            TotalOperaciones = 20, // Mocked for now to avoid extending all repos
-            
-            ItemsPorEstado = new List<ItemEstadoDto>
-            {
-                new ItemEstadoDto { Label = "Disponible", Count = 15, Color = "#A0BCE8" },
-                new ItemEstadoDto { Label = "Prestado", Count = 5, Color = "#6BE6D3" }
-            },
-            
+            TotalOperaciones = operaciones.Count,
+
+            ItemsPorEstado = items
+                .GroupBy(i => i.EstadoActual)
+                .Select(g => new ItemEstadoDto
+                {
+                    Label = g.Key.ToString(),
+                    Count = g.Count(),
+                    Color = ColoresEstadoItem.TryGetValue(g.Key, out var color) ? color : "#A0BCE8"
+                })
+                .ToList(),
+
             ResultadosAcceso = new ResultadosAccesoDto
             {
                 Concedido = accesos.Count(a => a.Resultado == ResultadoAcceso.Concedido),
                 Denegado = accesos.Count(a => a.Resultado == ResultadoAcceso.Denegado),
+                // El backend aún no distingue eventos sincronizados desde la cola offline
+                // del firmware ni resultados fuera de Concedido/Denegado, por eso siempre es 0.
                 Offline = 0,
                 Otro = 0
             }
@@ -213,21 +222,28 @@ public class ServicioReportes
             });
         }
 
-        // Mock remaining trends to avoid compiling errors
         string[] MESES = { "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic" };
-        var currentMonthIdx = DateTime.Now.Month - 1;
-        
+        var anioActual = DateTime.Now.Year;
+        var anioAnterior = anioActual - 1;
+        string[] paletaColores = { "#A0BCE8", "#7DBBFF", "#ADADFB", "#6BE6D3" };
+
         for (int i = 0; i < 12; i++)
         {
-            response.TendenciaAccesos.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = i == currentMonthIdx ? response.TotalAccesosHoy : 0, PreviousYear = 0 });
-            response.TendenciaOperaciones.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = i == currentMonthIdx ? response.TotalOperaciones : 0, PreviousYear = 0 });
-            response.TendenciaEstaciones.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = i == currentMonthIdx ? response.TotalEstaciones : 0, PreviousYear = 0 });
-            
-            string[] paletaColores = { "#A0BCE8", "#7DBBFF", "#ADADFB", "#6BE6D3" };
-            response.OperacionesMensuales.Add(new OperacionesMensualesDto { 
-                Month = MESES[i], 
-                Value = i == currentMonthIdx ? response.TotalOperaciones : 0, 
-                Color = paletaColores[i % paletaColores.Length] 
+            int mes = i + 1;
+            int accesosMesActual = accesos.Count(a => a.FechaHoraLocal.Year == anioActual && a.FechaHoraLocal.Month == mes);
+            int operacionesMesActual = operaciones.Count(o => o.FechaSolicitud.Year == anioActual && o.FechaSolicitud.Month == mes);
+            int operacionesMesAnterior = operaciones.Count(o => o.FechaSolicitud.Year == anioAnterior && o.FechaSolicitud.Month == mes);
+
+            response.TendenciaAccesos.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = accesosMesActual, PreviousYear = 0 });
+            response.TendenciaOperaciones.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = operacionesMesActual, PreviousYear = operacionesMesAnterior });
+            // No se lleva un historial de altas/bajas de estaciones por mes; se muestra el total vigente en el mes actual.
+            response.TendenciaEstaciones.Add(new MonthlyPointDto { Month = MESES[i], CurrentYear = i == DateTime.Now.Month - 1 ? response.TotalEstaciones : 0, PreviousYear = 0 });
+
+            response.OperacionesMensuales.Add(new OperacionesMensualesDto
+            {
+                Month = MESES[i],
+                Value = operacionesMesActual,
+                Color = paletaColores[i % paletaColores.Length]
             });
         }
 
