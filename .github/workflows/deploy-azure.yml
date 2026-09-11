@@ -62,13 +62,19 @@ jobs:
           
           echo "Conectando al servicio SCM en: $URL con usuario: $USER"
           
-          echo "=== Iniciando subida de api-deployment.zip via /api/zipdeploy?isAsync=true ==="
-          HTTP_STATUS=$(curl -s -w "%{http_code}" -o upload_response.txt -X POST -u "$USER:$PASS" \
+          echo "=== Consultando App Settings de la Web App en Kudu ==="
+          curl -s -u "$USER:$PASS" "https://$URL/api/settings" | jq . || true
+
+          echo "=== Iniciando subida de api-deployment.zip via /api/zipdeploy ==="
+          HTTP_STATUS=$(curl -v -s -w "\n%{http_code}" -o upload_response.txt -X POST -u "$USER:$PASS" \
             -H "Content-Type: application/zip" \
             --data-binary @"./api-deployment.zip" \
-            "https://$URL/api/zipdeploy?isAsync=true")
+            "https://$URL/api/zipdeploy" 2>&1 | tee curl_debug.log | tail -n 1)
           
           echo "Código HTTP de subida: $HTTP_STATUS"
+          echo "--- Detalle de la conexión y respuesta (curl_debug.log) ---"
+          cat curl_debug.log | grep -E '^<|^>|HTTP/' || true
+          echo "--- Cuerpo de respuesta de error ---"
           cat upload_response.txt
           echo ""
 
