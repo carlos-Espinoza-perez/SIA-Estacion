@@ -253,40 +253,6 @@ public class ServicioEstaciones
         return Result<bool>.Exitoso(true);
     }
 
-    public async Task<Result<SolicitarPairingResponse>> SolicitarPairingAsync(SolicitarPairingRequest request, CancellationToken ct)
-    {
-        string macLimpia = request.MacAddress.Trim().ToUpperInvariant();
-        string codigo = $"PAIR-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
-
-        return await Task.FromResult(Result<SolicitarPairingResponse>.Exitoso(new SolicitarPairingResponse
-        {
-            CodigoVinculacion = codigo,
-            MacAddress = macLimpia,
-            ExpiraEnMinutos = 15
-        }));
-    }
-
-    public async Task<Result<VerificarPairingResponse>> VerificarPairingAsync(VerificarPairingRequest request, CancellationToken ct)
-    {
-        string macLimpia = request.MacAddress.Trim().ToUpperInvariant();
-        Estacion? estacion = await _repository.ObtenerPorMacAsync(macLimpia, ct);
-
-        if (estacion is null || !estacion.EstaVinculada)
-        {
-            return Result<VerificarPairingResponse>.Exitoso(new VerificarPairingResponse
-            {
-                Vinculada = false
-            });
-        }
-
-        return Result<VerificarPairingResponse>.Exitoso(new VerificarPairingResponse
-        {
-            Vinculada = true,
-            EstacionNombre = estacion.Nombre,
-            ClientId = estacion.ClientId
-        });
-    }
- 
     public async Task<ConfiguracionEstacionProvisionadaResponse?> ObtenerConfiguracionSiVinculadaAsync(string macAddress, CancellationToken ct)
     {
         string macLimpia = macAddress.Trim().ToUpperInvariant().Replace(":", "").Replace("-", "").Replace(" ", "");

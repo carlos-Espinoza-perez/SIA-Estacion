@@ -289,6 +289,9 @@ public class ServicioOperaciones
         });
     }
 
+    // No hay ningun endpoint del frontend que llame a esta ruta de un solo item; el flujo de
+    // prestamo usa CrearOperacionLoteAsync, que si respeta estacion.RequiereAprobacion. Este
+    // metodo se deja sin tocar (aprueba siempre) por ser codigo inalcanzable desde la UI actual.
     public async Task<Result<OperacionResponse>> CrearOperacionAsync(CrearOperacionRequest request, CancellationToken ct)
     {
         Item? item = await _repository.ObtenerItemConComponentesAsync(request.ItemEscaneadoId, ct);

@@ -67,30 +67,3 @@ public class VincularEstacionRequest
     public string CodigoVinculacionOMac { get; set; } = string.Empty;
 }
 
-public class SolicitarPairingRequest
-{
-    public string MacAddress { get; set; } = string.Empty;
-    public string? FirmwareVersion { get; set; }
-    public string? DireccionIp { get; set; }
-}
-
-public class SolicitarPairingResponse
-{
-    public string CodigoVinculacion { get; set; } = string.Empty;
-    public string MacAddress { get; set; } = string.Empty;
-    public int ExpiraEnMinutos { get; set; } = 15;
-}
-
-public class VerificarPairingRequest
-{
-    public string MacAddress { get; set; } = string.Empty;
-    public string CodigoVinculacion { get; set; } = string.Empty;
-}
-
-public class VerificarPairingResponse
-{
-    public bool Vinculada { get; set; }
-    public string? EstacionNombre { get; set; }
-    public string? ClientId { get; set; }
-    public string? ClientSecret { get; set; }
-}

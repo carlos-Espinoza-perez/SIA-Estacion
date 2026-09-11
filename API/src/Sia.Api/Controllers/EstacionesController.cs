@@ -108,19 +108,4 @@ public class EstacionesController : SiaControllerBase
         return HandleResult(resultado);
     }
 
-    [HttpPost("solicitar-pairing")]
-    [AllowAnonymous]
-    public async Task<IActionResult> SolicitarPairing([FromBody] SolicitarPairingRequest request, CancellationToken ct)
-    {
-        var resultado = await _servicio.SolicitarPairingAsync(request, ct);
-        return HandleResult(resultado);
-    }
-
-    [HttpPost("verificar-pairing")]
-    [AllowAnonymous]
-    public async Task<IActionResult> VerificarPairing([FromBody] VerificarPairingRequest request, CancellationToken ct)
-    {
-        var resultado = await _servicio.VerificarPairingAsync(request, ct);
-        return HandleResult(resultado);
-    }
 }
