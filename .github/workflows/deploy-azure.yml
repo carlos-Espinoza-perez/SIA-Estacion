@@ -77,6 +77,17 @@ jobs:
           echo ""
 
           if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ]; then
+            echo "=== Diagnostico de Error 400 en Kudu ==="
+            echo "--- Listando archivos de traza Kudu ---"
+            curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/" | jq -r '.[-3:] | .[].name' || true
+            LATEST_TRACE=$(curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/" | jq -r '.[-1].name // empty')
+            if [ -n "$LATEST_TRACE" ]; then
+              echo "--- Contenido de la última traza ($LATEST_TRACE) ---"
+              curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/$LATEST_TRACE" | tail -n 50
+            fi
+            echo ""
+            echo "--- Listando espacio y archivos en /site ---"
+            curl -s -u "$USER:$PASS" "https://$URL/api/vfs/site/" | jq -r '.[] | "\(.name) - \(.size) bytes"' || true
             echo "Error en el despliegue a Azure Web App. Código HTTP: $HTTP_STATUS"
             exit 1
           fi
