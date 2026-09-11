@@ -11,6 +11,7 @@ public class Estacion
     public string? DireccionIp { get; set; }
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecretHash { get; set; } = string.Empty;
+    public string? CodigoAdminHash { get; set; }
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
     public bool Estado { get; set; } = true;

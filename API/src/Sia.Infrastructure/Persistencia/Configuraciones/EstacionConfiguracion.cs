@@ -17,6 +17,7 @@ public class EstacionConfiguracion : IEntityTypeConfiguration<Estacion>
         builder.Property(e => e.DireccionIp).HasMaxLength(50);
         builder.Property(e => e.ClientId).HasMaxLength(100).IsRequired();
         builder.Property(e => e.ClientSecretHash).HasMaxLength(500).IsRequired();
+        builder.Property(e => e.CodigoAdminHash).HasMaxLength(500);
         builder.Property(e => e.MacAddress).HasMaxLength(50);
         builder.Property(e => e.CodigoVinculacion).HasMaxLength(50);
 

@@ -47,6 +47,10 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
   const [isUnpairing, setIsUnpairing] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
+  // Codigo QR de administracion (se muestra una sola vez al generarlo)
+  const [isGenerandoCodigoAdmin, setIsGenerandoCodigoAdmin] = useState(false);
+  const [codigoAdminGenerado, setCodigoAdminGenerado] = useState('');
+
   const [guardadoExitoso, setGuardadoExitoso] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -178,6 +182,22 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
       showToast(msg, 'error');
     } finally {
       setIsPairing(false);
+    }
+  };
+
+  const handleGenerarCodigoAdmin = async () => {
+    if (!estacion) return;
+    setIsGenerandoCodigoAdmin(true);
+    try {
+      const codigo = await estacionService.regenerarCodigoAdmin(estacion.id);
+      setCodigoAdminGenerado(codigo);
+      showToast(`Nuevo código admin generado para "${estacion.nombre}"`, 'success');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
+      const msg = axiosErr?.response?.data?.error?.mensaje ?? 'No se pudo generar el código admin.';
+      showToast(msg, 'error');
+    } finally {
+      setIsGenerandoCodigoAdmin(false);
     }
   };
 
@@ -693,6 +713,105 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Sección Código QR de Administración (unico por estación, confirmado por el servidor) */}
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(168, 85, 247, 0.05)',
+                  border: '1px solid rgba(168, 85, 247, 0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C084FC" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
+                    Código QR de Administración
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
+                  Código único de esta estación. Al escanearlo en la pantalla física se abre el panel de
+                  administración — el servidor lo verifica, nunca se valida solo por texto en el dispositivo.
+                </p>
+
+                {codigoAdminGenerado ? (
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#E9D5FF', wordBreak: 'break-all' }}>
+                      {codigoAdminGenerado}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(codigoAdminGenerado);
+                        showToast('Código copiado al portapapeles', 'success');
+                      }}
+                      style={{
+                        flexShrink: 0,
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        color: '#FFFFFF',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                ) : null}
+
+                {codigoAdminGenerado && (
+                  <p style={{ fontSize: '11px', color: '#FACC15', margin: 0 }}>
+                    Guárdalo o conviértelo en QR ahora: no se volverá a mostrar. Genera uno nuevo para invalidar este.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleGenerarCodigoAdmin}
+                  disabled={isGenerandoCodigoAdmin || !estacion.estaVinculada}
+                  title={!estacion.estaVinculada ? 'Vincula primero el dispositivo físico' : undefined}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(168, 85, 247, 0.4)',
+                    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+                    color: '#C084FC',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: !estacion.estaVinculada ? 'not-allowed' : 'pointer',
+                    opacity: !estacion.estaVinculada ? 0.5 : 1,
+                  }}
+                >
+                  {isGenerandoCodigoAdmin
+                    ? 'Generando...'
+                    : codigoAdminGenerado
+                    ? 'Generar otro código (invalida el anterior)'
+                    : 'Generar código admin'}
+                </button>
               </div>
 
               {/* Botones de Acción en la sección */}

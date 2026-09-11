@@ -511,8 +511,8 @@ static void processPendingCapture() {
     AccessResult res;
     bool ok = Api.validateAccess(code, "", "ACCESO", res, imageBase64);
 
-    if (ok && (res.isAdmin || code.startsWith("ADMIN") || code == "ADMIN_PASS")) {
-        Serial.println("[AUTH] Credencial administrativa detectada");
+    if (ok && res.isAdmin) {
+        Serial.println("[AUTH] Credencial administrativa detectada (verificada por el servidor)");
         screens.transitionTo(ScreenState::ADMIN_DETECTED);
         CameraServer.notifyResult(true, "Administrador", "Acceso Administrativo");
         currentState = StationState::Admin;

@@ -132,6 +132,20 @@ public class ServicioEstaciones
         return Result<string>.Exitoso(nuevoSecreto);
     }
 
+    public async Task<Result<string>> RegenerarCodigoAdminAsync(Guid id, CancellationToken ct)
+    {
+        Estacion? estacion = await _repository.ObtenerPorIdAsync(id, ct);
+        if (estacion is null)
+            throw new EntidadNoEncontradaException(nameof(Estacion), id);
+
+        // Codigo corto (mas comodo para un QR pequeno que un secreto de 32 bytes en Base64)
+        string nuevoCodigo = $"ADMIN-{Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8))}";
+        estacion.CodigoAdminHash = _hashService.Hash(nuevoCodigo);
+        await _repository.SaveChangesAsync(ct);
+
+        return Result<string>.Exitoso(nuevoCodigo);
+    }
+
     public async Task<Result<List<TipoItemResponse>>> ObtenerTiposItemAsync(Guid estacionId, CancellationToken ct)
     {
         List<EstacionTipoItem> asignaciones = await _repository.ObtenerAsignacionesTiposItemAsync(estacionId, ct);

@@ -178,4 +178,9 @@ export const estacionService = {
     await apiClient.delete(`/estaciones/${id}`);
     return true;
   },
+
+  regenerarCodigoAdmin: async (id: string): Promise<string> => {
+    const response = await apiClient.post<RespuestaEnvuelta<string>>(`/estaciones/${id}/regenerar-codigo-admin`);
+    return response.data.datos!;
+  },
 };

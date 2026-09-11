@@ -306,7 +306,9 @@ bool ApiClient::validateAccess(const String& personCode, const String& itemCode,
             JsonObject data = res["datos"];
             String resStr = data["resultado"].as<String>();
             result.authorized = (resStr == "Concedido" || resStr == "Acceso Permitido");
-            result.isAdmin = data["esAdmin"].as<bool>() || (data["rol"].as<String>() == "Admin") || (resStr == "Admin") || (data["tipo"].as<String>() == "ADMIN");
+            // El servidor es la unica fuente de verdad para EsAdmin (verifica el codigo QR
+            // especial de la estacion contra su hash almacenado). Nunca se confia en texto local.
+            result.isAdmin = data["esAdmin"].as<bool>();
             result.personName = data["nombrePersona"].as<String>();
             result.message = data["mensaje"].as<String>();
             result.itemName = itemCode;

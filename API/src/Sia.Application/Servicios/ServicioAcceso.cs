@@ -15,6 +15,7 @@ public class ServicioAcceso
     private readonly IServicioReconocimientoFacial _reconocimientoFacial;
     private readonly IContextoUsuario _contextoUsuario;
     private readonly IServicioAlmacenamiento _almacenamiento;
+    private readonly IServicioHashSecreto _hashService;
 
     public ServicioAcceso(
         IEventosRepository eventosRepository,
@@ -22,7 +23,8 @@ public class ServicioAcceso
         IPersonasRepository personasRepository,
         IServicioReconocimientoFacial reconocimientoFacial,
         IContextoUsuario contextoUsuario,
-        IServicioAlmacenamiento almacenamiento)
+        IServicioAlmacenamiento almacenamiento,
+        IServicioHashSecreto hashService)
     {
         _eventosRepository = eventosRepository;
         _estacionesRepository = estacionesRepository;
@@ -30,6 +32,7 @@ public class ServicioAcceso
         _reconocimientoFacial = reconocimientoFacial;
         _contextoUsuario = contextoUsuario;
         _almacenamiento = almacenamiento;
+        _hashService = hashService;
     }
 
     public async Task<Result<ValidarAccesoResponse>> ValidarAsync(ValidarAccesoRequest request, CancellationToken ct)
@@ -46,6 +49,16 @@ public class ServicioAcceso
         Estacion? estacion = await _estacionesRepository.ObtenerPorIdAsync(estacionId, ct);
         if (estacion is null || !estacion.Estado)
             return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, DireccionAcceso.Ingreso, "Error", "Estación no encontrada o inactiva.", timer.ElapsedMilliseconds));
+
+        // Codigo QR especial de administracion de ESTA estacion, generado desde el panel web
+        // y confirmado aqui por el servidor (nunca por el firmware comparando texto localmente).
+        if (!string.IsNullOrEmpty(estacion.CodigoAdminHash) && _hashService.Verificar(request.CodigoEscaneado, estacion.CodigoAdminHash))
+        {
+            await RegistrarEventoAsync(empresaId, estacionId, null, "ADMIN", DireccionAcceso.Ingreso, ModoValidacion.Manual, ResultadoAcceso.Concedido, "Codigo de administracion de la estacion", ahora, ct);
+            var respuestaAdmin = CrearRespuesta(ResultadoAcceso.Concedido, DireccionAcceso.Ingreso, "Acceso Administrativo", "Codigo de administracion verificado.", timer.ElapsedMilliseconds);
+            respuestaAdmin.EsAdmin = true;
+            return Result<ValidarAccesoResponse>.Exitoso(respuestaAdmin);
+        }
 
         Persona? persona = await _personasRepository.ObtenerPorCodigoAsync(request.CodigoEscaneado, ct);
 

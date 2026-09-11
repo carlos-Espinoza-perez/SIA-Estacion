@@ -68,6 +68,14 @@ public class EstacionesController : SiaControllerBase
         return HandleResult(resultado);
     }
 
+    [HttpPost("{id:guid}/regenerar-codigo-admin")]
+    [RequierePrivilegio("EST", "E")]
+    public async Task<IActionResult> RegenerarCodigoAdmin(Guid id, CancellationToken ct)
+    {
+        var resultado = await _servicio.RegenerarCodigoAdminAsync(id, ct);
+        return HandleResult(resultado);
+    }
+
     [HttpGet("{id:guid}/tipos-item")]
     [RequierePrivilegio("EST", "L")]
     public async Task<IActionResult> ObtenerTiposItem(Guid id, CancellationToken ct)

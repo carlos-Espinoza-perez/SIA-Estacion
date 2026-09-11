@@ -14,6 +14,7 @@ public class ValidarAccesoResponse
     public string Titulo { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
     public string NombrePersona { get; set; } = string.Empty;
+    public bool EsAdmin { get; set; }
     public int DuracionMs { get; set; } = 3000;
 }
 
