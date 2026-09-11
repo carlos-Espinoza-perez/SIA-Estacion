@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { Estacion, FlujoEstacion } from '../../../types/estacion';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { QrScannerModal } from '../QrScannerModal/QrScannerModal';
@@ -50,6 +51,7 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
   // Codigo QR de administracion (se muestra una sola vez al generarlo)
   const [isGenerandoCodigoAdmin, setIsGenerandoCodigoAdmin] = useState(false);
   const [codigoAdminGenerado, setCodigoAdminGenerado] = useState('');
+  const [qrAdminDataUrl, setQrAdminDataUrl] = useState('');
 
   const [guardadoExitoso, setGuardadoExitoso] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,6 +82,8 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
       setModoOffline(estacion.modoOffline !== false);
       setCodigoPairingInput('');
       setGuardadoExitoso(false);
+      setCodigoAdminGenerado('');
+      setQrAdminDataUrl('');
     }
   }, [estacion, isOpen]);
 
@@ -191,6 +195,12 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
     try {
       const codigo = await estacionService.regenerarCodigoAdmin(estacion.id);
       setCodigoAdminGenerado(codigo);
+      const dataUrl = await QRCode.toDataURL(codigo, {
+        width: 320,
+        margin: 2,
+        color: { dark: '#000000FF', light: '#FFFFFFFF' },
+      });
+      setQrAdminDataUrl(dataUrl);
       showToast(`Nuevo código admin generado para "${estacion.nombre}"`, 'success');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { mensaje?: string } } } };
@@ -199,6 +209,16 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
     } finally {
       setIsGenerandoCodigoAdmin(false);
     }
+  };
+
+  const handleDescargarQrAdmin = () => {
+    if (!qrAdminDataUrl || !estacion) return;
+    const link = document.createElement('a');
+    link.href = qrAdminDataUrl;
+    link.download = `qr-admin-${estacion.nombre.replace(/\s+/g, '-').toLowerCase()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const isOnline = estacion?.estado === 'En línea';
@@ -744,41 +764,92 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                 </p>
 
                 {codigoAdminGenerado ? (
-                  <div
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(168, 85, 247, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '10px',
-                    }}
-                  >
-                    <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#E9D5FF', wordBreak: 'break-all' }}>
-                      {codigoAdminGenerado}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(codigoAdminGenerado);
-                        showToast('Código copiado al portapapeles', 'success');
-                      }}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div
                       style={{
-                        flexShrink: 0,
-                        padding: '4px 10px',
+                        padding: '10px 12px',
                         borderRadius: '6px',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        color: '#FFFFFF',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(168, 85, 247, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
                       }}
                     >
-                      Copiar
-                    </button>
+                      <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#E9D5FF', wordBreak: 'break-all' }}>
+                        {codigoAdminGenerado}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(codigoAdminGenerado);
+                          showToast('Código copiado al portapapeles', 'success');
+                        }}
+                        style={{
+                          flexShrink: 0,
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: '#FFFFFF',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Copiar
+                      </button>
+                    </div>
+
+                    {qrAdminDataUrl && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '14px',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                      >
+                        <img
+                          src={qrAdminDataUrl}
+                          alt={`Código QR de administración de ${estacion.nombre}`}
+                          style={{ width: '110px', height: '110px', flexShrink: 0, display: 'block' }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                          <span style={{ fontSize: '11px', color: 'rgba(0, 0, 0, 0.6)', lineHeight: 1.4 }}>
+                            Escanea este QR con la cámara del teléfono apuntando a la estación para abrir su panel de administración.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleDescargarQrAdmin}
+                            style={{
+                              alignSelf: 'flex-start',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: '#7C3AED',
+                              color: '#FFFFFF',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="7 10 12 15 17 10" />
+                              <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                            Descargar QR (PNG)
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
