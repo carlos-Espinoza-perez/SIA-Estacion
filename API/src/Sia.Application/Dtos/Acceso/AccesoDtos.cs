@@ -3,7 +3,6 @@ namespace Sia.Application.Dtos.Acceso;
 public class ValidarAccesoRequest
 {
     public string CodigoEscaneado { get; set; } = string.Empty;
-    public string Direccion { get; set; } = string.Empty;
     public DateTimeOffset FechaHoraLocal { get; set; }
     public byte[]? Imagen { get; set; }
 }
@@ -11,6 +10,7 @@ public class ValidarAccesoRequest
 public class ValidarAccesoResponse
 {
     public string Resultado { get; set; } = string.Empty;
+    public string Direccion { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
     public int DuracionMs { get; set; } = 3000;

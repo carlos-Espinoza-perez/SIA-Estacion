@@ -11,11 +11,13 @@ enum class PollStatus {
 };
 
 struct AccessResult {
-    bool authorized;
+    bool authorized = false;
+    bool isAdmin = false;
     String message;
     String personName;
     String itemName;
     String operationId;
+    String direction = "Ingreso"; // "Ingreso" o "Egreso", decidido por el backend
 };
 
 class ApiClient {
@@ -26,8 +28,9 @@ public:
     PollStatus pollProvisioning(const String& mac, StationConfig& out);
     bool authenticate(const String& clientId, const String& clientSecret);
     bool sendHeartbeat();
-    bool validateAccess(const String& personCode, const String& itemCode, 
-                        const String& operationType, AccessResult& result, const String& imageBase64 = "");
+    bool validateAccess(const String& personCode, const String& itemCode,
+                        const String& operationType, AccessResult& result,
+                        const String& imageBase64 = "");
 
     bool hasToken() const;
 

@@ -13,17 +13,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>SIA · Camara de Estacion</title>
+<title>SIA · Cámara de Estación</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 16px;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 14px;
   }
-  header { width: 100%; max-width: 480px; text-align: center; margin-bottom: 12px; }
-  header h1 { font-size: 1.25rem; font-weight: 700; color: #f8fafc; letter-spacing: -0.02em; }
-  header p { font-size: 0.82rem; color: #94a3b8; margin-top: 2px; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: #05966922; color: #34d399; margin-top: 6px; border: 1px solid #05966944; }
+  header { width: 100%; max-width: 480px; text-align: center; margin-bottom: 10px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; color: #f8fafc; letter-spacing: -0.02em; }
+  header p { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: #05966922; color: #34d399; margin-top: 5px; border: 1px solid #05966944; }
   .badge-dot { width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399; }
 
   .viewfinder-card {
@@ -48,13 +49,32 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     100% { top: calc(50% + 105px); opacity: 0.4; }
   }
 
-  .controls { width: 100%; max-width: 480px; margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+  /* Loading Overlay para evitar doble envío */
+  .loading-overlay {
+    position: absolute; inset: 0; background: rgba(2, 6, 23, 0.88); backdrop-filter: blur(5px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 25; border-radius: 20px; padding: 20px; text-align: center; gap: 12px;
+    transition: opacity 0.2s ease;
+  }
+  .spinner {
+    width: 48px; height: 48px; border: 4px solid #334155; border-top-color: #38bdf8;
+    border-radius: 50%; animation: spin 0.85s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .loading-title { font-size: 1.05rem; font-weight: 700; color: #f8fafc; }
+  .loading-desc { font-size: 0.8rem; color: #94a3b8; max-width: 260px; line-height: 1.35; }
+  .loading-badge {
+    font-size: 0.72rem; padding: 3px 10px; border-radius: 999px; background: #0284c722;
+    color: #38bdf8; border: 1px solid #0284c744; font-weight: 600;
+  }
+
+  .controls { width: 100%; max-width: 480px; margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
   
   .mode-switch-card {
     display: flex; align-items: center; justify-content: space-between;
     background: #1e293b; padding: 10px 14px; border-radius: 12px; border: 1px solid #334155;
   }
-  .mode-label { font-size: 0.88rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
+  .mode-label { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
   .toggle { position: relative; display: inline-block; width: 46px; height: 26px; }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .slider {
@@ -72,26 +92,20 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   .input-group label { font-size: 0.75rem; color: #94a3b8; font-weight: 500; }
   .input-group input {
     background: #1e293b; border: 1px solid #334155; color: #fff; padding: 10px 12px;
-    border-radius: 10px; font-size: 0.95rem; outline: none;
+    border-radius: 10px; font-size: 0.95rem; outline: none; transition: border-color 0.2s;
   }
   .input-group input:focus { border-color: #38bdf8; }
 
   .btn-row { display: flex; gap: 10px; }
   button {
-    flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 0.95rem; font-weight: 600;
+    flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 0.92rem; font-weight: 600;
     cursor: pointer; transition: all 0.15s ease;
   }
   .btn-primary { background: #0284c7; color: #fff; }
   .btn-primary:active { background: #0369a1; transform: scale(0.98); }
+  .btn-primary:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; transform: none; }
   .btn-secondary { background: #334155; color: #e2e8f0; }
   .btn-secondary:active { background: #475569; }
-
-  #result-banner {
-    width: 100%; max-width: 480px; margin-top: 12px; padding: 14px; border-radius: 12px;
-    font-size: 0.88rem; display: none; text-align: center;
-  }
-  .banner-success { background: #064e3b; border: 1px solid #059669; color: #6ee7b7; }
-  .banner-error { background: #7f1d1d; border: 1px solid #dc2626; color: #fca5a5; }
 
   .chrome-guide-card {
     width: 100%; max-width: 480px; margin-top: 14px; padding: 14px 16px;
@@ -115,7 +129,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
 <header>
   <h1>SIA · Estación de Identificación</h1>
-  <p>Cámara de Reconocimiento Facial</p>
+  <p>Cámara de Reconocimiento y Escáner QR</p>
   <div class="badge"><span class="badge-dot"></span> Pantalla CYD Conectada</div>
 </header>
 
@@ -123,11 +137,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <video id="video" autoplay playsinline muted></video>
   <div class="overlay-guide"></div>
   <div class="laser-line" id="laser"></div>
+  
+  <!-- Loading overlay para bloquear reenvíos duplicados -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+    <div class="loading-title" id="loading-title">Enviando código...</div>
+    <div class="loading-desc" id="loading-desc">La estación validará el acceso</div>
+    <span class="loading-badge" id="loading-badge">Revisa el resultado en la pantalla</span>
+  </div>
 </div>
 
 <div class="controls">
   <div class="mode-switch-card">
-    <span class="mode-label">⚡ Escaneo Automático Continuo</span>
+    <span class="mode-label">⚡ Validación Automática al Escanear QR</span>
     <label class="toggle">
       <input type="checkbox" id="toggle-auto" checked>
       <span class="slider"></span>
@@ -135,8 +157,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </div>
 
   <div class="input-group">
-    <label for="code-input">Código QR / Carnet Manual (Opcional):</label>
-    <input type="text" id="code-input" placeholder="Escanea código o ingresa carnet">
+    <label for="code-input">Código QR / Carnet Manual (o presiona Enter):</label>
+    <input type="text" id="code-input" placeholder="Apunta la cámara al QR o escribe carnet">
   </div>
 
   <div class="btn-row">
@@ -144,8 +166,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <button class="btn-primary" id="btn-capture" type="button">Validar Ahora</button>
   </div>
 </div>
-
-<div id="result-banner"></div>
 
 <div class="chrome-guide-card" id="chrome-guide" style="display:none;">
   <h3>📷 Permiso de Cámara en Android (Chrome)</h3>
@@ -170,7 +190,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   let currentStream = null;
   let facingMode = "user";
   let isProcessing = false;
-  let autoScanTimer = null;
+  let lastScannedCode = "";
+  let lastScanTime = 0;
+  const COOLDOWN_SAME_CODE_MS = 3500; // Evita re-enviar la misma persona si el QR sigue frente a la lente
 
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
@@ -179,9 +201,27 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   const btnSwitch = document.getElementById('btn-switch');
   const toggleAuto = document.getElementById('toggle-auto');
   const codeInput = document.getElementById('code-input');
-  const resultBanner = document.getElementById('result-banner');
   const chromeGuide = document.getElementById('chrome-guide');
   const fallbackFile = document.getElementById('fallback-file');
+  const loadingOverlay = document.getElementById('loading-overlay');
+  const loadingTitle = document.getElementById('loading-title');
+  const loadingDesc = document.getElementById('loading-desc');
+
+  function showLoading(show, title = "", desc = "") {
+    if (show) {
+      loadingTitle.textContent = title || "Enviando código...";
+      loadingDesc.textContent = desc || "La estación validará el acceso";
+      loadingOverlay.style.display = 'flex';
+      laser.style.display = 'none';
+      btnCapture.disabled = true;
+      btnCapture.textContent = 'Enviando...';
+    } else {
+      loadingOverlay.style.display = 'none';
+      btnCapture.disabled = false;
+      btnCapture.textContent = 'Validar Ahora';
+      updateLaser();
+    }
+  }
 
   async function startCamera() {
     if (currentStream) {
@@ -200,17 +240,99 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       video.style.display = 'block';
       chromeGuide.style.display = 'none';
       updateLaser();
-      initAutoScan();
+      startQrScanner();
     } catch (err) {
       console.warn("getUserMedia fallo:", err);
       video.style.display = 'none';
       chromeGuide.style.display = 'block';
-      showResult(false, "Cámara no disponible", "Sigue las instrucciones abajo para habilitar el visor en Chrome.");
     }
   }
 
+  let qrDetector = null;
+  if ('BarcodeDetector' in window) {
+    try {
+      qrDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'data_matrix'] });
+    } catch(e) {
+      console.warn("BarcodeDetector:", e);
+    }
+  }
+
+  function extractStudentCode(raw) {
+    if (!raw) return "";
+    let code = raw.trim();
+    if (code.includes('?')) code = code.split('?')[0].trim();
+    if (code.includes('#')) code = code.split('#')[0].trim();
+    if (code.includes('/')) {
+      const parts = code.split('/').filter(p => p.length > 0);
+      if (parts.length > 0) code = parts[parts.length - 1].trim();
+    }
+    return code;
+  }
+
+  let qrScanInterval = null;
+  function startQrScanner() {
+    if (qrScanInterval) clearInterval(qrScanInterval);
+
+    qrScanInterval = setInterval(async () => {
+      // Si ya se está procesando una validación o la cámara no está lista, ignorar
+      if (isProcessing || !video.videoWidth || video.style.display === 'none') return;
+      
+      let rawVal = "";
+
+      // 1. Intentar con BarcodeDetector nativo (rápido por hardware)
+      if (qrDetector) {
+        try {
+          const barcodes = await qrDetector.detect(video);
+          if (barcodes && barcodes.length > 0) {
+            rawVal = barcodes[0].rawValue || "";
+          }
+        } catch (err) {}
+      }
+
+      // 2. Si no hay BarcodeDetector o no detectó nada, usar jsQR (universal para cualquier navegador/iPhone/Android)
+      if (!rawVal && window.jsQR) {
+        try {
+          const w = Math.min(video.videoWidth, 360);
+          const h = Math.round((video.videoHeight * w) / video.videoWidth);
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(video, 0, 0, w, h);
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const result = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+          if (result && result.data) {
+            rawVal = result.data;
+          }
+        } catch (err) {}
+      }
+
+      // 3. Procesar código si se encontró
+      if (rawVal) {
+        const clean = extractStudentCode(rawVal);
+        const now = Date.now();
+
+        if (clean.length > 0) {
+          if (clean === lastScannedCode && (now - lastScanTime) < COOLDOWN_SAME_CODE_MS) {
+            return;
+          }
+
+          console.log("QR Detectado automáticamente:", clean);
+          codeInput.value = clean;
+          lastScannedCode = clean;
+          lastScanTime = now;
+
+          if (navigator.vibrate) navigator.vibrate(60);
+
+          if (toggleAuto.checked && !isProcessing) {
+            triggerValidation(clean);
+          }
+        }
+      }
+    }, 250);
+  }
+
   function updateLaser() {
-    if (toggleAuto.checked && video.style.display !== 'none') {
+    if (toggleAuto.checked && video.style.display !== 'none' && !isProcessing) {
       laser.style.display = 'block';
     } else {
       laser.style.display = 'none';
@@ -219,89 +341,91 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
   toggleAuto.addEventListener('change', () => {
     updateLaser();
-    initAutoScan();
   });
-
-  function initAutoScan() {
-    if (autoScanTimer) {
-      clearInterval(autoScanTimer);
-      autoScanTimer = null;
-    }
-    if (toggleAuto.checked) {
-      autoScanTimer = setInterval(() => {
-        if (!isProcessing && video.videoWidth > 0) {
-          captureAndSend(true);
-        }
-      }, 2000);
-    }
-  }
 
   btnSwitch.addEventListener('click', () => {
     facingMode = facingMode === "user" ? "environment" : "user";
     startCamera();
   });
 
-  async function sendCapture(base64Data, codeVal, isAutoScan = false) {
+  // Disparar envío (captura de foto + código + loading). La estación decide y muestra
+  // el resultado (concedido/denegado, entrada/salida) en su propia pantalla.
+  function triggerValidation(codeVal) {
+    if (isProcessing) return; // Candado estricto anti-duplicados
     isProcessing = true;
-    if (!isAutoScan) {
-      showResult(null, "Verificando...", "Enviando imagen a la estación...");
-      btnCapture.disabled = true;
+
+    showLoading(true, "Enviando código...", `Código: ${codeVal || '(sin código)'}`);
+
+    // Capturar frame del video
+    let base64 = "";
+    if (video.videoWidth > 0 && video.style.display !== 'none') {
+      const maxDim = 320;
+      let w = video.videoWidth;
+      let h = video.videoHeight;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.38);
+      base64 = dataUrl.split(',')[1];
     }
 
+    sendCapture(base64, codeVal);
+  }
+
+  // Envía el código a la estación y solo espera la confirmación de recepción (ack).
+  // No espera ni muestra el resultado de la validación: eso lo hace la pantalla SIA.
+  async function sendCapture(base64Data, codeVal) {
     try {
-      const res = await fetch('/api/upload', {
+      await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: codeVal || "",
-          image: base64Data
+          image: base64Data || ""
         })
       });
-      const data = await res.json();
-      if (data.ok) {
-        showResult(true, data.title || "Acceso Concedido", data.message || "Identidad verificada con exito.");
-        if (toggleAuto.checked) {
-          clearInterval(autoScanTimer);
-          setTimeout(() => { initAutoScan(); }, 4000);
-        }
-      } else {
-        if (!isAutoScan || data.message !== "pending") {
-          showResult(false, data.title || "Acceso Denegado", data.message || "Rostro no reconocido.");
-        }
-      }
+      if (navigator.vibrate) navigator.vibrate(80);
+      loadingTitle.textContent = "Código enviado";
+      loadingDesc.textContent = "Revisa el resultado en la pantalla de la estación";
+      setTimeout(() => showLoading(false), 900);
     } catch (e) {
-      if (!isAutoScan) {
-        showResult(false, "Error de Conexión", "No se pudo comunicar con la estación.");
-      }
+      if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
+      loadingTitle.textContent = "Error de conexión";
+      loadingDesc.textContent = "No se pudo comunicar con la estación. Intenta de nuevo.";
+      setTimeout(() => showLoading(false), 1600);
     } finally {
-      isProcessing = false;
-      btnCapture.disabled = false;
+      setTimeout(() => {
+        isProcessing = false;
+        codeInput.value = '';
+      }, 1800);
     }
   }
 
-  function captureAndSend(isAutoScan = false) {
-    if (!video.videoWidth) {
-      if (!isAutoScan) showResult(false, "Cámara no lista", "Espera un momento a que inicie el video.");
-      return;
+  // Si el usuario escribe o usa un lector físico que presiona Enter
+  codeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const clean = extractStudentCode(codeInput.value);
+      if (clean.length > 0 && !isProcessing) {
+        lastScannedCode = clean;
+        lastScanTime = Date.now();
+        triggerValidation(clean);
+      }
     }
-    const maxDim = 480;
-    let w = video.videoWidth;
-    let h = video.videoHeight;
-    if (w > maxDim || h > maxDim) {
-      if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-      else { w = Math.round((w * maxDim) / h); h = maxDim; }
-    }
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, w, h);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.60);
-    const base64 = dataUrl.split(',')[1];
-    sendCapture(base64, codeInput.value.trim(), isAutoScan);
-  }
+  });
 
+  // Botón manual de validación
   btnCapture.addEventListener('click', () => {
-    captureAndSend(false);
+    if (isProcessing) return;
+    const clean = extractStudentCode(codeInput.value);
+    lastScannedCode = clean;
+    lastScanTime = Date.now();
+    triggerValidation(clean);
   });
 
   fallbackFile.addEventListener('change', (e) => {
@@ -311,7 +435,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     reader.onload = function(evt) {
       const img = new Image();
       img.onload = function() {
-        const maxDim = 480;
+        const maxDim = 320;
         let w = img.width;
         let h = img.height;
         if (w > maxDim || h > maxDim) {
@@ -322,36 +446,23 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.60);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.38);
         const base64 = dataUrl.split(',')[1];
-        sendCapture(base64, codeInput.value.trim(), false);
+        
+        const clean = extractStudentCode(codeInput.value);
+        isProcessing = true;
+        showLoading(true);
+        sendCapture(base64, clean);
       };
       img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
   });
 
-  function showResult(success, title, msg) {
-    resultBanner.style.display = 'block';
-    if (success === null) {
-      resultBanner.className = '';
-      resultBanner.style.background = '#1e293b';
-      resultBanner.style.color = '#38bdf8';
-      resultBanner.innerHTML = `<strong>${title}</strong><br>${msg}`;
-    } else if (success) {
-      resultBanner.className = 'banner-success';
-      resultBanner.innerHTML = `<strong>✓ ${title}</strong><br>${msg}`;
-    } else {
-      resultBanner.className = 'banner-error';
-      resultBanner.innerHTML = `<strong>✗ ${title}</strong><br>${msg}`;
-    }
-  }
-
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     startCamera();
   } else {
     chromeGuide.style.display = 'block';
-    showResult(false, "Permiso requerido", "Configura la regla de seguridad en Chrome para activar el visor continuo.");
   }
 </script>
 </body>
@@ -470,7 +581,7 @@ void PhoneCameraServer::begin() {
     if (channel <= 0) channel = 1;
 
     WiFi.mode(WIFI_AP_STA);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
 
     // SoftAP en el mismo canal que la red Wi-Fi para evitar desconexiones de radio
     bool apOk = WiFi.softAP(DEFAULT_AP_SSID, nullptr, channel, 0, 4);
@@ -621,31 +732,33 @@ void PhoneCameraServer::handleUpload() {
 
     String code = doc["code"].as<String>();
     String imageBase64 = doc["image"].as<String>();
+    doc.clear();
+
+    code.trim();
+    if (code.indexOf('?') >= 0) code = code.substring(0, code.indexOf('?'));
+    if (code.indexOf('#') >= 0) code = code.substring(0, code.indexOf('#'));
+    code.trim();
+    int lastSlash = code.lastIndexOf('/');
+    if (lastSlash >= 0 && lastSlash < (int)code.length() - 1) {
+        code = code.substring(lastSlash + 1);
+        code.trim();
+    }
+
+    Serial.printf("[HTTP-CAM] POST /api/upload recibido. Codigo='%s' | Base64=%u bytes | IP origen: %s\n",
+                  code.c_str(), (unsigned int)imageBase64.length(), _server.client().remoteIP().toString().c_str());
 
     if (imageBase64.length() == 0 && code.length() == 0) {
+        Serial.println("[HTTP-CAM] Rechazado: ni codigo ni imagen proporcionados.");
         _server.send(400, "application/json", "{\"ok\":false,\"message\":\"Debe proporcionar imagen o codigo\"}");
         return;
     }
 
+    // Solo se confirma la recepcion (ack). La validacion real ocurre en el bucle
+    // principal de forma asincrona y el resultado se muestra en la pantalla de la
+    // estacion, no en el telefono.
     if (_captureCb) {
         _captureCb(code, imageBase64);
     }
 
-    // Esperar hasta 5 segundos a que el bucle principal procese la validación
-    uint32_t waitStart = millis();
-    while (millis() - waitStart < 5000) {
-        if (_lastResultTime >= waitStart) {
-            break;
-        }
-        delay(50);
-    }
-
-    JsonDocument resp;
-    resp["ok"] = _lastResultSuccess;
-    resp["title"] = _lastResultTitle.length() > 0 ? _lastResultTitle : (_lastResultSuccess ? "Acceso Concedido" : "Acceso Denegado");
-    resp["message"] = _lastResultMessage.length() > 0 ? _lastResultMessage : "Procesado por la estacion";
-
-    String out;
-    serializeJson(resp, out);
-    _server.send(_lastResultSuccess ? 200 : 403, "application/json", out);
+    _server.send(200, "application/json", "{\"ok\":true,\"message\":\"Codigo recibido por la estacion\"}");
 }

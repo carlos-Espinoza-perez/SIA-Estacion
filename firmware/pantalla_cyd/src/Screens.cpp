@@ -1,116 +1,35 @@
 #include "Screens.h"
-#include "UIComponents.h"
-#include "QRCodeRenderer.h"
 #include "Theme.h"
 #include "Config.h"
-#include "LvglManager.h"
 #include <WiFi.h>
-
-static const TouchArea TOUCH_SELECT_WIFI[] = {
-    { 20, 44,  440, 60, "BTN_WIFI_0" },
-    { 20, 108, 440, 60, "BTN_WIFI_1" },
-    { 20, 172, 440, 60, "BTN_WIFI_2" },
-    { 15, 235, 190, 75, "BTN_WIFI_REFRESH" },
-    { 270, 235, 195, 75, "BTN_WIFI_OTHER" }
-};
-
-static const TouchArea TOUCH_WIFI_PASSWORD[] = {
-    { 10, 5,   140, 40, "BTN_WIFI_BACK" },
-    { 20, 85,  330, 60, "BTN_INPUT_PASS" },
-    { 350, 85, 115, 60, "BTN_TOGGLE_PASS" },
-    { 15, 235, 185, 75, "BTN_WIFI_BACK" },
-    { 270, 235, 195, 75, "BTN_WIFI_CONNECT" }
-};
-
-static const TouchArea TOUCH_SCAN_ITEM[] = {
-    { 340, 250, 108, 38, "BTN_VIEW_ITEMS" }
-};
-
-static const TouchArea TOUCH_ITEM_ADDED[] = {
-    { 32,  250, 202, 38, "BTN_VIEW_ITEMS" },
-    { 246, 250, 202, 38, "BTN_CONTINUE_SCAN" }
-};
-
-static const TouchArea TOUCH_ITEM_SUMMARY[] = {
-    { 32,  252, 202, 38, "BTN_CONTINUE_SCAN" },
-    { 246, 252, 202, 38, "BTN_COMPLETE_LOAN" },
-    { 350, 100, 90,  46, "BTN_REMOVE_ITEM_1" },
-    { 350, 154, 90,  46, "BTN_REMOVE_ITEM_2" }
-};
-
-static const TouchArea TOUCH_UNCONFIGURED[] = {
-    { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, "BTN_START_CONFIG" }
-};
-
-static const TouchArea TOUCH_ADMIN_PANEL[] = {
-    { 32, 78,  416, 44, "BTN_ADMIN_SYNC" },
-    { 32, 130, 416, 44, "BTN_ADMIN_DATA" },
-    { 32, 182, 416, 44, "BTN_ADMIN_SETTINGS" },
-    { 32, 234, 416, 44, "BTN_ADMIN_EXIT" }
-};
+#include "LvglManager.h"
+#include "StorageManager.h"
+#include "UIComponents.h"
 
 ScreenManager::ScreenManager(TFT_eSPI& tft, TouchManager& touch)
-    : _tft(tft),
-      _touch(touch),
-      _currentState(ScreenState::BOOT),
-      _bootProgress(0.15f),
-      _lastAnimTime(0),
-      _scanAnimStep(0),
-      _lastScanAnimTime(0),
-      _wifiScrollOffset(0) {
+    : _tft(tft), _touch(touch), _currentState(ScreenState::BOOT),
+      _bootProgress(0.0f), _lastAnimTime(0),
+      _scanAnimStep(0), _lastScanAnimTime(0), _wifiScrollOffset(0),
+      _showPassword(false),
+      _onWifiSelectCb(nullptr), _onWifiRefreshCb(nullptr), _onWifiOtherCb(nullptr),
+      _onWifiConnectCb(nullptr), _onWifiBackCb(nullptr),
+      _onAdminClickCb(nullptr), _onAdminWifiCb(nullptr), _onAdminSyncCb(nullptr),
+      _onAdminStorageCb(nullptr), _onAdminExitCb(nullptr) {
     _param1[0] = '\0';
     _param2[0] = '\0';
     _passwordInput[0] = '\0';
-    _showPassword = false;
-}
-
-void ScreenManager::scrollWifiUp() {
-    if (_wifiScrollOffset > 0) {
-        _wifiScrollOffset--;
-        UI::clearScreen(_tft);
-        renderSelectWifi();
-    }
-}
-
-void ScreenManager::scrollWifiDown() {
-    int numNetworks = WiFi.scanComplete();
-    if (_wifiScrollOffset + 3 < numNetworks) {
-        _wifiScrollOffset++;
-        UI::clearScreen(_tft);
-        renderSelectWifi();
-    }
 }
 
 void ScreenManager::init() {
     UI::initDisplay(_tft);
+    _touch.init();
+    pinMode(27, OUTPUT);
+    digitalWrite(27, HIGH);
     Lvgl.init(&_tft);
     transitionTo(ScreenState::BOOT);
 }
 
 void ScreenManager::transitionTo(ScreenState newState, const char* param1, const char* param2) {
-    bool wasLvgl = (_currentState == ScreenState::BOOT ||
-                    _currentState == ScreenState::SELECT_WIFI || 
-                    _currentState == ScreenState::WIFI_PASSWORD ||
-                    _currentState == ScreenState::PROCESSING ||
-                    _currentState == ScreenState::WAITING ||
-                    _currentState == ScreenState::ADMIN_PANEL ||
-                    _currentState == ScreenState::GRANTED ||
-                    _currentState == ScreenState::DENIED ||
-                    _currentState == ScreenState::LINKED);
-
-    bool willBeLvgl = (newState == ScreenState::BOOT ||
-                      newState == ScreenState::SELECT_WIFI || 
-                      newState == ScreenState::WIFI_PASSWORD ||
-                      newState == ScreenState::PROCESSING ||
-                      newState == ScreenState::WAITING ||
-                      newState == ScreenState::ADMIN_PANEL ||
-                      newState == ScreenState::GRANTED ||
-                      newState == ScreenState::DENIED ||
-                      newState == ScreenState::LINKED);
-
-    if (wasLvgl && !willBeLvgl) {
-        Lvgl.clear();
-    }
     _currentState = newState;
 
     if (param1 != nullptr) {
@@ -127,14 +46,15 @@ void ScreenManager::transitionTo(ScreenState newState, const char* param1, const
         _param2[0] = '\0';
     }
 
-    if (!willBeLvgl) {
-        UI::clearScreen(_tft);
-    }
-    _touch.setAreas(nullptr, 0);
-
     switch (_currentState) {
         case ScreenState::BOOT:
             renderBoot();
+            break;
+        case ScreenState::CONNECTING:
+            renderConnecting();
+            break;
+        case ScreenState::BOOT_NO_NETWORK:
+            renderBootNoNetwork();
             break;
         case ScreenState::WAITING:
             renderWaiting();
@@ -196,6 +116,21 @@ void ScreenManager::transitionTo(ScreenState newState, const char* param1, const
         case ScreenState::ADMIN_PANEL:
             renderAdminPanel();
             break;
+        case ScreenState::ADMIN_SYNC:
+            renderAdminSync();
+            break;
+        case ScreenState::ADMIN_STORAGE:
+            renderAdminStorage();
+            break;
+        case ScreenState::ADMIN_CONFIG:
+            renderAdminConfig();
+            break;
+        case ScreenState::ADMIN_FACE_VERIFY:
+            renderAdminFaceVerify();
+            break;
+        case ScreenState::ADMIN_DETECTED:
+            renderAdminDetected();
+            break;
         case ScreenState::SELECT_WIFI:
             renderSelectWifi();
             break;
@@ -230,57 +165,29 @@ void ScreenManager::updateBootStatus(const char* subtitle) {
     Lvgl.updateBootStatus(subtitle);
 }
 
+void ScreenManager::renderConnecting() {
+    const char* ssid = (_param1[0] != '\0') ? _param1 : "Red Wi-Fi";
+    Lvgl.showConnecting(ssid);
+}
+
+void ScreenManager::renderBootNoNetwork() {
+    const char* ssid = (_param1[0] != '\0') ? _param1 : "SIA-LAB";
+    Lvgl.showBootNoNetwork(ssid, _onWifiRefreshCb, _onWifiOtherCb);
+}
+
 void ScreenManager::renderUnconfigured() {
-    UI::drawHeader(_tft, "SIA");
-    _touch.setAreas(TOUCH_UNCONFIGURED, 1);
-
-    _tft.fillCircle(SCREEN_WIDTH / 2, 96, 48, Theme::COLOR_CARD);
-    _tft.fillRect(SCREEN_WIDTH / 2 - 28, 86, 56, 4, Theme::COLOR_TEXT_MUTED);
-    _tft.fillCircle(SCREEN_WIDTH / 2 - 12, 88, 6, Theme::COLOR_TEXT_WHITE);
-
-    _tft.fillRect(SCREEN_WIDTH / 2 - 28, 98, 56, 4, Theme::COLOR_TEXT_MUTED);
-    _tft.fillCircle(SCREEN_WIDTH / 2 + 10, 100, 6, Theme::COLOR_TEXT_WHITE);
-
-    _tft.fillRect(SCREEN_WIDTH / 2 - 28, 110, 56, 4, Theme::COLOR_TEXT_MUTED);
-    _tft.fillCircle(SCREEN_WIDTH / 2 - 2, 112, 6, Theme::COLOR_TEXT_WHITE);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Estacion sin configurar", SCREEN_WIDTH / 2, 168);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Este equipo aun no esta vinculado al sistema", SCREEN_WIDTH / 2, 200);
-
-    _tft.setTextColor(Theme::COLOR_BLUE, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Toca la pantalla para comenzar", SCREEN_WIDTH / 2, 250);
+    Lvgl.showUnconfigured([this]() {
+        transitionTo(ScreenState::LINK_CODE);
+    });
 }
 
 void ScreenManager::renderLinkCode() {
-    UI::drawHeader(_tft, "SIA");
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Vincular estacion", SCREEN_WIDTH / 2, 24);
-
-    const char* qrContent = (_param1[0] != '\0') ? _param1 : "A4CF128B9E70";
-    const char* labelContent = (_param2[0] != '\0') ? _param2 : qrContent;
-
-    QR::draw(_tft, qrContent, 165, 54, 150, 10);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Escanee este codigo QR o ingrese el identificador:", SCREEN_WIDTH / 2, 214);
-
-    _tft.fillRoundRect(60, 240, 360, 36, 10, Theme::COLOR_CARD);
-    _tft.setTextDatum(MC_DATUM);
-    _tft.setTextColor(Theme::COLOR_BLUE, Theme::COLOR_CARD);
-    _tft.setTextFont(4);
-    _tft.drawString(labelContent, SCREEN_WIDTH / 2, 258);
+    String code = Storage.getCleanMac();
+    const char* c = (_param1[0] != '\0') ? _param1 : code.c_str();
+    // El QR codifica SOLO el MAC limpio — el backend lo acepta y normaliza directamente
+    Lvgl.showLinkCode(c, c, [this]() {
+        transitionTo(ScreenState::SELECT_WIFI);
+    });
 }
 
 void ScreenManager::renderLinked() {
@@ -290,8 +197,8 @@ void ScreenManager::renderLinked() {
 }
 
 void ScreenManager::renderWaiting() {
-    const char* stationTitle = (_param1[0] != '\0') ? _param1 : "Estacion Lista";
-    const char* subTitle = (_param2[0] != '\0') ? _param2 : "Abre la camara web del telefono para validar";
+    const char* stationTitle = (_param1[0] != '\0') ? _param1 : "Entrada Principal";
+    const char* subTitle = (_param2[0] != '\0') ? _param2 : "Estacion lista";
     Lvgl.showWaiting(stationTitle, subTitle, _onAdminClickCb);
 }
 
@@ -313,183 +220,119 @@ void ScreenManager::renderDenied() {
 }
 
 void ScreenManager::renderOffline() {
-    UI::drawHeader(_tft, "SIA");
-
-    _tft.fillCircle(SCREEN_WIDTH / 2 - 75, 94, 5, Theme::COLOR_TURQUOISE);
-    _tft.setTextDatum(TL_DATUM);
-    _tft.setTextColor(Theme::COLOR_TURQUOISE, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Modo sin conexion", SCREEN_WIDTH / 2 - 62, 86);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Acerca tu codigo QR", SCREEN_WIDTH / 2, 148);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Validando solo contra la copia local", SCREEN_WIDTH / 2, 178);
+    Lvgl.showOfflineMode(_onAdminClickCb);
 }
 
 void ScreenManager::renderError() {
-    const char* errCode = (_param1[0] != '\0') ? _param1 : "QR no reconocido";
-
-    UI::drawHeader(_tft, "SIA");
-    UI::drawStatusView(_tft, IconType::WARNING,
-                       "ERROR", Theme::COLOR_PURPLE,
-                       errCode, Theme::COLOR_TEXT_WHITE,
-                       nullptr, 0,
-                       Theme::COLOR_HALO_PURPLE);
+    const char* errTitle = (_param1[0] != '\0') ? _param1 : "QR no reconocido";
+    const char* errSub = (_param2[0] != '\0') ? _param2 : "Intente acercar el codigo nuevamente";
+    Lvgl.showError(errTitle, errSub);
 }
 
 void ScreenManager::renderIdentityDetected() {
-    UI::drawHeader(_tft, "SIA");
-    UI::drawStatusView(_tft, IconType::CAMERA,
-                       nullptr, 0,
-                       "Identidad detectada", Theme::COLOR_TEXT_WHITE,
-                       "Mira hacia la camara", Theme::COLOR_BLUE,
-                       Theme::COLOR_HALO_BLUE);
+    const char* name = (_param1[0] != '\0') ? _param1 : "Usuario detectado";
+    const char* sub = (_param2[0] != '\0') ? _param2 : "Mira hacia la camara";
+    Lvgl.showIdentityDetected(name, sub);
 }
 
 void ScreenManager::renderOutOfService() {
-    UI::drawHeader(_tft, "SIA");
-    UI::drawStatusView(_tft, IconType::WARNING,
-                       nullptr, 0,
-                       "Estacion fuera de servicio", Theme::COLOR_TEXT_WHITE,
-                       "Contacta al encargado del laboratorio", Theme::COLOR_TEXT_MUTED,
-                       Theme::COLOR_HALO_YELLOW);
+    const char* reason = (_param1[0] != '\0') ? _param1 : "Estacion fuera de servicio";
+    const char* hint = (_param2[0] != '\0') ? _param2 : "Contacta al encargado del laboratorio";
+    Lvgl.showOutOfService(reason, hint);
 }
 
 void ScreenManager::renderScanCard() {
-    UI::drawHeader(_tft, "SIA");
-    UI::drawDashedRect(_tft, 170, 60, 140, 140, Theme::COLOR_BLUE, 10, 8, 16, 3);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Escanea tu carnet", SCREEN_WIDTH / 2, 222);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Estacion de gestion de items", SCREEN_WIDTH / 2, 252);
+    const char* station = (_param1[0] != '\0') ? _param1 : "Laboratorio SIA";
+    Lvgl.showItemScanCard(station);
 }
 
 void ScreenManager::renderScanItem() {
-    const char* greeting = (_param1[0] != '\0') ? _param1 : "Carlos Espinoza";
-    char headerText[64];
-    snprintf(headerText, sizeof(headerText), "Hola, %s", greeting);
-    UI::drawHeader(_tft, headerText);
-
-    UI::drawDashedRect(_tft, 170, 60, 140, 140, Theme::COLOR_BLUE, 10, 8, 16, 3);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Ahora escanea el item", SCREEN_WIDTH / 2, 222);
-
-    UI::drawButton(_tft, 330, 250, 126, 38, "Ver items (2)", Theme::COLOR_BLUE, true);
-    _touch.setAreas(TOUCH_SCAN_ITEM, 1);
+    const char* person = (_param1[0] != '\0') ? _param1 : "Carlos";
+    Lvgl.showItemScanNext(person, 2, [this]() {
+        transitionTo(ScreenState::ITEM_SUMMARY);
+    });
 }
 
 void ScreenManager::renderItemAdded() {
-    const char* greeting = (_param1[0] != '\0') ? _param1 : "Carlos Espinoza";
-    char headerText[64];
-    snprintf(headerText, sizeof(headerText), "Hola, %s", greeting);
-    UI::drawHeader(_tft, headerText);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_GREEN, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Item agregado", SCREEN_WIDTH / 2, 86);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString((_param2[0] != '\0') ? _param2 : "Multimetro digital", SCREEN_WIDTH / 2, 122);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Puedes seguir escaneando mas items.", SCREEN_WIDTH / 2, 154);
-
-    UI::drawButton(_tft, 32, 250, 202, 38, "Ver items (2)", Theme::COLOR_BLUE, false);
-    UI::drawButton(_tft, 246, 250, 202, 38, "Continuar escaneando", Theme::COLOR_BLUE, true);
-
-    _touch.setAreas(TOUCH_ITEM_ADDED, 2);
+    const char* itemName = (_param1[0] != '\0') ? _param1 : "Multimetro digital";
+    const char* itemCode = (_param2[0] != '\0') ? _param2 : "ELEC-042";
+    Lvgl.showItemAdded(itemName, itemCode, 2, 
+        [this]() { transitionTo(ScreenState::SCAN_ITEM); },
+        [this]() { transitionTo(ScreenState::ITEM_SUMMARY); });
 }
 
 void ScreenManager::renderItemSummary() {
-    UI::drawHeader(_tft, "Hola, Carlos");
-
-    _tft.setTextDatum(TL_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Items seleccionados", 32, 46);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("2 items", 32, 72);
-
-    UI::drawCard(_tft, 32, 100, 416, 46, "Multimetro digital", "Codigo: ELEC-042", "Quitar", Theme::COLOR_BLUE);
-    UI::drawCard(_tft, 32, 154, 416, 46, "Juego de destornilladores", "Codigo: HERR-018", "Quitar", Theme::COLOR_BLUE);
-
-    UI::drawButton(_tft, 32, 252, 202, 38, "Continuar escaneando", Theme::COLOR_BLUE, false);
-    UI::drawButton(_tft, 246, 252, 202, 38, "Completar", Theme::COLOR_BLUE, true);
-
-    _touch.setAreas(TOUCH_ITEM_SUMMARY, 4);
+    static const ItemSummaryEntry demoItems[] = {
+        {"Multimetro digital", "ELEC-042"},
+        {"Juego de destornilladores", "HERR-018"}
+    };
+    Lvgl.showItemSummary(demoItems, 2,
+        [this]() { transitionTo(ScreenState::SCAN_ITEM); },
+        [this]() { transitionTo(ScreenState::VALIDATING); });
 }
 
 void ScreenManager::renderValidating() {
-    UI::drawHeader(_tft, "SIA");
-
-    _tft.fillCircle(SCREEN_WIDTH / 2, 110, 40, Theme::COLOR_HALO_BLUE);
-    UI::drawSpinner(_tft, SCREEN_WIDTH / 2, 110, 26, Theme::COLOR_BLUE);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Validando solicitud", SCREEN_WIDTH / 2, 168);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Estamos verificando los items y tu solicitud.", SCREEN_WIDTH / 2, 198);
+    const char* title = (_param1[0] != '\0') ? _param1 : "Validando solicitud";
+    const char* subtitle = (_param2[0] != '\0') ? _param2 : "Estamos verificando los items y tu solicitud.";
+    Lvgl.showItemValidating(title, subtitle);
 }
 
 void ScreenManager::renderLoanCompleted() {
-    UI::drawHeader(_tft, "Hola, Carlos");
-    UI::drawStatusView(_tft, IconType::CHECKMARK,
-                       nullptr, 0,
-                       "Prestamo realizado", Theme::COLOR_TEXT_WHITE,
-                       "Tu prestamo se realizo correctamente.", Theme::COLOR_TEXT_MUTED,
-                       Theme::COLOR_HALO_GREEN);
+    const char* title = (_param1[0] != '\0') ? _param1 : "Prestamo realizado";
+    const char* subtitle = (_param2[0] != '\0') ? _param2 : "Tu prestamo se realizo correctamente.";
+    Lvgl.showLoanCompleted(title, subtitle);
 }
 
 void ScreenManager::renderApprovalSent() {
-    UI::drawHeader(_tft, "Hola, Carlos");
-
-    _tft.fillCircle(SCREEN_WIDTH / 2, 90, 45, Theme::COLOR_HALO_BLUE);
-    UI::drawSpinner(_tft, SCREEN_WIDTH / 2, 90, 24, Theme::COLOR_BLUE);
-
-    _tft.setTextDatum(TC_DATUM);
-    _tft.setTextColor(Theme::COLOR_TEXT_WHITE, Theme::COLOR_BG);
-    _tft.setTextFont(4);
-    _tft.drawString("Solicitud enviada", SCREEN_WIDTH / 2, 148);
-
-    _tft.setTextColor(Theme::COLOR_TEXT_MUTED, Theme::COLOR_BG);
-    _tft.setTextFont(2);
-    _tft.drawString("Tu prestamo fue enviado a aprobacion.", SCREEN_WIDTH / 2, 178);
-    _tft.drawString("Te notificaremos cuando sea aprobada.", SCREEN_WIDTH / 2, 204);
+    const char* detail = (_param1[0] != '\0') ? _param1 : "Tu prestamo fue enviado a aprobacion.";
+    Lvgl.showLoanApprovalSent(detail);
 }
 
 void ScreenManager::renderLoanRejected() {
-    UI::drawHeader(_tft, "Hola, Carlos");
-    UI::drawStatusView(_tft, IconType::WARNING,
-                       nullptr, 0,
-                       "Solicitud no aceptada", Theme::COLOR_TEXT_WHITE,
-                       "El prestamo no pudo completarse.", Theme::COLOR_TEXT_MUTED,
-                       Theme::COLOR_HALO_RED);
+    const char* reason = (_param1[0] != '\0') ? _param1 : "El prestamo no pudo completarse.";
+    Lvgl.showLoanRejected(reason);
 }
 
 void ScreenManager::renderAdminPanel() {
-    Lvgl.showAdminPanel(_onAdminWifiCb, _onAdminSyncCb, _onAdminExitCb);
+    const char* name = (_param1[0] != '\0') ? _param1 : "Laboratorio de Electronica";
+    bool online = (WiFi.status() == WL_CONNECTED);
+    Lvgl.showAdminPanel(3, name, online,
+        [this]() { transitionTo(ScreenState::ADMIN_SYNC); },
+        [this]() { transitionTo(ScreenState::ADMIN_STORAGE); },
+        [this]() { transitionTo(ScreenState::ADMIN_CONFIG); },
+        _onAdminExitCb);
+}
+
+void ScreenManager::renderAdminSync() {
+    bool online = (WiFi.status() == WL_CONNECTED);
+    Lvgl.showAdminSync(3, online, _onAdminSyncCb, [this]() {
+        transitionTo(ScreenState::ADMIN_PANEL);
+    });
+}
+
+void ScreenManager::renderAdminStorage() {
+    Lvgl.showAdminStorage(3, "Hoy - 10:42", _onAdminStorageCb, [this]() {
+        transitionTo(ScreenState::ADMIN_PANEL);
+    });
+}
+
+void ScreenManager::renderAdminConfig() {
+    const char* name = (_param1[0] != '\0') ? _param1 : "Laboratorio SIA";
+    Lvgl.showAdminConfig(name, WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.macAddress().c_str(), 
+        _onAdminWifiCb, 
+        [this]() { transitionTo(ScreenState::ADMIN_PANEL); });
+}
+
+void ScreenManager::renderAdminFaceVerify() {
+    Lvgl.showAdminFaceVerify([this]() {
+        transitionTo(ScreenState::ADMIN_PANEL);
+    });
+}
+
+void ScreenManager::renderAdminDetected() {
+    Lvgl.showAdminDetected([this]() {
+        transitionTo(ScreenState::ADMIN_PANEL);
+    });
 }
 
 void ScreenManager::renderSelectWifi() {

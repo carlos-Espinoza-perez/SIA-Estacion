@@ -7,6 +7,8 @@
 
 enum class ScreenState {
     BOOT,
+    CONNECTING,
+    BOOT_NO_NETWORK,
     WAITING,
     PROCESSING,
     GRANTED,
@@ -27,6 +29,11 @@ enum class ScreenState {
     LOAN_REJECTED,
     OUT_OF_SERVICE,
     ADMIN_PANEL,
+    ADMIN_SYNC,
+    ADMIN_STORAGE,
+    ADMIN_CONFIG,
+    ADMIN_FACE_VERIFY,
+    ADMIN_DETECTED,
     SELECT_WIFI,
     WIFI_PASSWORD
 };
@@ -62,6 +69,7 @@ public:
     void onAdminClick(std::function<void()> cb) { _onAdminClickCb = cb; }
     void onAdminWifi(std::function<void()> cb) { _onAdminWifiCb = cb; }
     void onAdminSync(std::function<void()> cb) { _onAdminSyncCb = cb; }
+    void onAdminStorage(std::function<void()> cb) { _onAdminStorageCb = cb; }
     void onAdminExit(std::function<void()> cb) { _onAdminExitCb = cb; }
     void showWifiSuccess(const char* ssid, const char* ip);
     void showWifiError(const char* reason, const char* hint);
@@ -91,9 +99,12 @@ private:
     std::function<void()> _onAdminClickCb;
     std::function<void()> _onAdminWifiCb;
     std::function<void()> _onAdminSyncCb;
+    std::function<void()> _onAdminStorageCb;
     std::function<void()> _onAdminExitCb;
 
     void renderBoot();
+    void renderConnecting();
+    void renderBootNoNetwork();
     void renderWaiting();
     void renderProcessing();
     void renderGranted();
@@ -114,6 +125,11 @@ private:
     void renderLoanRejected();
     void renderOutOfService();
     void renderAdminPanel();
+    void renderAdminSync();
+    void renderAdminStorage();
+    void renderAdminConfig();
+    void renderAdminFaceVerify();
+    void renderAdminDetected();
     void renderSelectWifi();
     void renderWifiPassword();
 };

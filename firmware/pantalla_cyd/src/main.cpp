@@ -52,12 +52,17 @@ static void authBackgroundTask(void* pv) {
 
 static void startWifiScan();
 static void onCameraCapture(const String& code, const String& imageBase64);
+static void processPendingCapture();
 static void onWifiConfigReceived(const String& ssid, const String& password);
 static void handleSerialCli();
 static void enterStandbyView();
 static void showPairingView();
 static bool attemptWifiConnection(const String& ssid, const String& pass);
 static void reportPerformance(bool force = false);
+
+static bool   pendingCaptureReady = false;
+static String pendingCaptureCode;
+static String pendingCaptureImage;
 
 static void startWifiScan() {
     WiFi.setSleep(false);
@@ -86,6 +91,27 @@ void setup() {
     delay(200);
 
     Serial.printf("\nIniciando SIA Estacion v%s\n", FIRMWARE_VERSION);
+
+    esp_reset_reason_t rstReason = esp_reset_reason();
+    const char* rstDesc = "Desconocido";
+    switch (rstReason) {
+        case ESP_RST_POWERON:   rstDesc = "Encendido normal (POWER ON)"; break;
+        case ESP_RST_EXT:       rstDesc = "Boton / Pin de reset externo"; break;
+        case ESP_RST_SW:        rstDesc = "Reinicio por software (ESP.restart)"; break;
+        case ESP_RST_PANIC:     rstDesc = "CRASH / PANIC EXCEPTION (Memoria / Puntero nulo)"; break;
+        case ESP_RST_INT_WDT:   rstDesc = "Watchdog de interrupcion colgada"; break;
+        case ESP_RST_TASK_WDT:  rstDesc = "Task Watchdog (Bucle bloqueado >30s)"; break;
+        case ESP_RST_WDT:       rstDesc = "Watchdog secundario"; break;
+        case ESP_RST_DEEPSLEEP: rstDesc = "Salida de Deep Sleep"; break;
+        case ESP_RST_BROWNOUT:  rstDesc = "BROWNOUT DETECTADO (Caida de voltaje electrico en 3.3V)"; break;
+        case ESP_RST_SDIO:      rstDesc = "Reset por SDIO"; break;
+        default:                rstDesc = "Desconocido"; break;
+    }
+    Serial.println("==================================================");
+    Serial.printf("[DIAGNOSTICO] Motivo del ultimo reinicio: [%d] %s\n", (int)rstReason, rstDesc);
+    Serial.printf("[DIAGNOSTICO] RAM Libre inicial: %u KB | Bloque Max: %u KB\n",
+                  ESP.getFreeHeap() / 1024, ESP.getMaxAllocHeap() / 1024);
+    Serial.println("==================================================");
 
     Storage.begin();
     Serial.printf("MAC STA: %s\n", Storage.getMacAddress().c_str());
@@ -139,6 +165,7 @@ void setup() {
     bootStartTime = millis();
     lastPerfReport = millis();
     currentState = StationState::Boot;
+    screens.transitionTo(ScreenState::BOOT, "Iniciando", "Cargando componentes...");
 
     esp_task_wdt_init(30, true);
     esp_task_wdt_add(NULL);
@@ -151,6 +178,7 @@ void loop() {
     CameraServer.update();
     handleSerialCli();
     reportPerformance(false);
+    processPendingCapture();
 
     if (pendingWifiSelectIdx >= 0) {
         int idx = pendingWifiSelectIdx;
@@ -353,16 +381,14 @@ void loop() {
 static void enterStandbyView() {
     CameraServer.begin();
     StationConfig cfg = Storage.getConfig();
-    String title = cfg.name.length() > 0 ? cfg.name : "Estacion SIA";
-    String info = "Web: http://" + (Api.isConnected() ? WiFi.localIP().toString() : WiFi.softAPIP().toString());
-    screens.transitionTo(ScreenState::WAITING, title.c_str(), info.c_str());
+    String stationName = cfg.name.length() > 0 ? cfg.name : "Entrada Principal";
+    screens.transitionTo(ScreenState::WAITING, stationName.c_str(), "Control de Acceso e Identificacion");
     heartbeatTimer = millis();
 }
 
 static void showPairingView() {
     CameraServer.begin();
-    String pairingUrl = DEFAULT_PAIRING_WEB_URL + Storage.getCleanMac();
-    screens.transitionTo(ScreenState::LINK_CODE, pairingUrl.c_str(), Storage.getMacAddress().c_str());
+    screens.transitionTo(ScreenState::LINK_CODE);
 }
 
 static bool attemptWifiConnection(const String& ssid, const String& pass) {
@@ -382,7 +408,7 @@ static bool attemptWifiConnection(const String& ssid, const String& pass) {
     if (WiFi.status() == WL_CONNECTED) {
         Storage.setWifi(ssid, pass);
 
-        // Feedback visual de éxito en LVGL
+        // Feedback visual de exito en LVGL
         screens.showWifiSuccess(ssid.c_str(), WiFi.localIP().toString().c_str());
         uint32_t sStart = millis();
         while (millis() - sStart < 2200) {
@@ -446,21 +472,61 @@ static void onWifiConfigReceived(const String& ssid, const String& password) {
     attemptWifiConnection(ssid, password);
 }
 
+// Se ejecuta dentro del manejador HTTP del telefono (CameraServer.update()). Debe
+// devolver el control de inmediato para que el telefono reciba su ack rapido: solo
+// encola la captura, la validacion real la hace processPendingCapture() en el loop().
 static void onCameraCapture(const String& code, const String& imageBase64) {
-    if (currentState != StationState::Standby && currentState != StationState::Validating) {
+    if (currentState != StationState::Standby) {
+        Serial.printf("[ACCESO] Ignorando captura: estado actual (%d) no es Standby\n", (int)currentState);
+        return;
+    }
+    if (pendingCaptureReady) {
+        Serial.println("[ACCESO] Ya hay una captura pendiente de procesar; se descarta la nueva.");
         return;
     }
 
+    pendingCaptureCode = code;
+    pendingCaptureImage = imageBase64;
+    pendingCaptureReady = true;
+}
+
+// Procesa en el loop principal la captura encolada por onCameraCapture(): valida contra
+// el backend (que decide Ingreso/Egreso dinamicamente) y muestra el resultado en la
+// pantalla de la estacion. El telefono ya recibio su ack y no espera este resultado.
+static void processPendingCapture() {
+    if (!pendingCaptureReady) return;
+    pendingCaptureReady = false;
+
+    String code = pendingCaptureCode;
+    String imageBase64 = pendingCaptureImage;
+    pendingCaptureCode = "";
+    pendingCaptureImage = "";
+
+    Serial.printf("[ACCESO] Procesando validacion: Codigo='%s', ImagenBase64=%u bytes\n",
+                  code.c_str(), (unsigned int)imageBase64.length());
+
     currentState = StationState::Validating;
-    screens.transitionTo(ScreenState::PROCESSING, "Validando Acceso", "Consultando sistema...");
+    screens.transitionTo(ScreenState::PROCESSING, "Validando acceso", "Consultando sistema...");
 
     AccessResult res;
     bool ok = Api.validateAccess(code, "", "ACCESO", res, imageBase64);
 
+    if (ok && (res.isAdmin || code.startsWith("ADMIN") || code == "ADMIN_PASS")) {
+        Serial.println("[AUTH] Credencial administrativa detectada");
+        screens.transitionTo(ScreenState::ADMIN_DETECTED);
+        CameraServer.notifyResult(true, "Administrador", "Acceso Administrativo");
+        currentState = StationState::Admin;
+        return;
+    }
+
     if (ok && res.authorized) {
-        screens.transitionTo(ScreenState::GRANTED, res.personName.c_str(), res.itemName.c_str());
-        CameraServer.notifyResult(true, res.personName, res.message);
+        Serial.printf("[ACCESO] Concedido -> %s (%s)\n", res.personName.c_str(), res.direction.c_str());
+        String dirLabel = (res.direction == "Egreso") ? "Salida Concedida" : "Entrada Concedida";
+        screens.transitionTo(ScreenState::GRANTED, res.personName.c_str(), dirLabel.c_str());
+        String msg = dirLabel + (res.message.length() > 0 ? (" - " + res.message) : "");
+        CameraServer.notifyResult(true, res.personName, msg);
     } else {
+        Serial.printf("[ACCESO] Denegado -> %s\n", res.message.c_str());
         screens.transitionTo(ScreenState::DENIED, res.message.c_str());
         CameraServer.notifyResult(false, "Acceso Denegado", res.message);
     }
@@ -480,9 +546,27 @@ static void handleSerialCli() {
         Serial.printf("Estado: %d | Provisioned: %d | WiFi STA: %s | AP: %s\n",
                       (int)currentState, Storage.isProvisioned(),
                       WiFi.localIP().toString().c_str(), WiFi.softAPIP().toString().c_str());
+    } else if (line == "UNPAIR") {
+        Serial.println("[CLI] Desvinculando estacion...");
+        Storage.clearConfig();
+        currentState = StationState::Unpaired;
+        showPairingView();
     } else if (line == "RESET") {
         Storage.factoryReset();
         ESP.restart();
+    } else if (line.startsWith("STATE:")) {
+        String stName = line.substring(6);
+        stName.toUpperCase();
+        if (stName == "BOOT") screens.transitionTo(ScreenState::BOOT, "Iniciando", "Cargando componentes...");
+        else if (stName == "WAITING" || stName == "STANDBY") enterStandbyView();
+        else if (stName == "GRANTED") screens.transitionTo(ScreenState::GRANTED, "Carlos Espinoza", "Autorizado");
+        else if (stName == "DENIED") screens.transitionTo(ScreenState::DENIED, "Acceso no autorizado");
+        else if (stName == "ADMIN") screens.transitionTo(ScreenState::ADMIN_PANEL);
+        else if (stName == "UNCONFIGURED" || stName == "UNPAIR") showPairingView();
+        else if (stName == "LINK") screens.transitionTo(ScreenState::LINK_CODE);
+        else if (stName == "WIFI") screens.transitionTo(ScreenState::SELECT_WIFI);
+        else if (stName == "ITEM") screens.transitionTo(ScreenState::ITEM_SUMMARY);
+        Serial.printf("[CLI] Cambiado a pantalla: %s\n", stName.c_str());
     } else if (line.startsWith("WIFI:")) {
         int sep = line.indexOf(':', 5);
         if (sep != -1) {
@@ -502,7 +586,7 @@ static void handleSerialCli() {
     } else if (line == "PERF") {
         reportPerformance(true);
     } else if (line == "HELP") {
-        Serial.println("Comandos disponibles: STATUS | PERF | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
+        Serial.println("Comandos disponibles: STATUS | UNPAIR | STATE:<BOOT|WAITING|GRANTED|DENIED|ADMIN|WIFI|LINK|ITEM> | PERF | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
     }
 }
 

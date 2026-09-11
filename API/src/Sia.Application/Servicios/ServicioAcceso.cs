@@ -35,19 +35,17 @@ public class ServicioAcceso
     public async Task<Result<ValidarAccesoResponse>> ValidarAsync(ValidarAccesoRequest request, CancellationToken ct)
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();
+        DateTimeOffset ahora = DateTimeOffset.UtcNow;
 
         if (!_contextoUsuario.EsEstacion || _contextoUsuario.EstacionId is null)
-            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Error", "Contexto de estación inválido.", timer.ElapsedMilliseconds));
+            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, DireccionAcceso.Ingreso, "Error", "Contexto de estación inválido.", timer.ElapsedMilliseconds));
 
         Guid estacionId = _contextoUsuario.EstacionId.Value;
         Guid empresaId = _contextoUsuario.EmpresaId!.Value;
 
         Estacion? estacion = await _estacionesRepository.ObtenerPorIdAsync(estacionId, ct);
         if (estacion is null || !estacion.Estado)
-            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Error", "Estación no encontrada o inactiva.", timer.ElapsedMilliseconds));
-
-        if (!Enum.TryParse<DireccionAcceso>(request.Direccion, out DireccionAcceso direccion))
-            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Error", "Dirección inválida.", timer.ElapsedMilliseconds));
+            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, DireccionAcceso.Ingreso, "Error", "Estación no encontrada o inactiva.", timer.ElapsedMilliseconds));
 
         Persona? persona = await _personasRepository.ObtenerPorCodigoAsync(request.CodigoEscaneado, ct);
 
@@ -55,23 +53,28 @@ public class ServicioAcceso
 
         if (persona is null || persona.EmpresaId != empresaId || !persona.Estado)
         {
-            await RegistrarEventoAsync(empresaId, estacionId, null, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Denegado, "Persona no existe o inactiva", request.FechaHoraLocal, ct);
-            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Acceso Denegado", "Código no registrado.", timer.ElapsedMilliseconds));
+            await RegistrarEventoAsync(empresaId, estacionId, null, request.CodigoEscaneado, DireccionAcceso.Ingreso, modo, ResultadoAcceso.Denegado, "Persona no existe o inactiva", ahora, ct);
+            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, DireccionAcceso.Ingreso, "Acceso Denegado", "Código no registrado.", timer.ElapsedMilliseconds));
         }
+
+        // Dirección totalmente dinámica: se alterna según el último acceso concedido de la persona
+        // (sin importar la estación), ya que el dispositivo de la estación no tiene reloj confiable.
+        DireccionAcceso? ultimaDireccion = await _eventosRepository.ObtenerUltimaDireccionConcedidaAsync(persona.Id, ct);
+        DireccionAcceso direccion = ultimaDireccion == DireccionAcceso.Ingreso ? DireccionAcceso.Egreso : DireccionAcceso.Ingreso;
 
         if (estacion.RequiereIdentificacion)
         {
             if (modo != ModoValidacion.QrFacial)
             {
-                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Denegado, "Estación requiere validación facial", request.FechaHoraLocal, ct);
-                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Acceso Denegado", "Se requiere validación facial.", timer.ElapsedMilliseconds));
+                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Denegado, "Estación requiere validación facial", ahora, ct);
+                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, direccion, "Acceso Denegado", "Se requiere validación facial.", timer.ElapsedMilliseconds));
             }
 
             List<FotoReferencia> fotosReferencia = persona.FotosReferencia.Where(f => f.Estado).ToList();
             if (fotosReferencia.Count == 0)
             {
-                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "No tiene foto de referencia", request.FechaHoraLocal, ct);
-                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Revisión Manual", "No tiene foto registrada.", timer.ElapsedMilliseconds));
+                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "No tiene foto de referencia", ahora, ct);
+                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, direccion, "Revisión Manual", "No tiene foto registrada.", timer.ElapsedMilliseconds));
             }
 
             bool coinciden = false;
@@ -89,24 +92,25 @@ public class ServicioAcceso
             }
             catch (Exception)
             {
-                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "Error al obtener foto referencia", request.FechaHoraLocal, ct);
-                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Revisión Manual", "Error al procesar identidad.", timer.ElapsedMilliseconds));
+                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "Error al obtener foto referencia", ahora, ct);
+                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, direccion, "Revisión Manual", "Error al procesar identidad.", timer.ElapsedMilliseconds));
             }
 
             if (!coinciden)
             {
-                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Denegado, "Reconocimiento facial fallido", request.FechaHoraLocal, ct);
-                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, "Acceso Denegado", "Identidad no verificada.", timer.ElapsedMilliseconds));
+                await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Denegado, "Reconocimiento facial fallido", ahora, ct);
+                return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, direccion, "Acceso Denegado", "Identidad no verificada.", timer.ElapsedMilliseconds));
             }
         }
         else if (estacion.RequiereAprobacion)
         {
-            await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "Estación requiere aprobación manual", request.FechaHoraLocal, ct);
-            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Revisión Manual", $"{persona.Nombres} {persona.Apellidos}", timer.ElapsedMilliseconds));
+            await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, "Estación requiere aprobación manual", ahora, ct);
+            return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, direccion, "Revisión Manual", $"{persona.Nombres} {persona.Apellidos}", timer.ElapsedMilliseconds));
         }
 
-        await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, null, request.FechaHoraLocal, ct);
-        return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, "Acceso Permitido", $"Bienvenido, {persona.Nombres}", timer.ElapsedMilliseconds));
+        await RegistrarEventoAsync(empresaId, estacionId, persona.Id, request.CodigoEscaneado, direccion, modo, ResultadoAcceso.Concedido, null, ahora, ct);
+        string saludo = direccion == DireccionAcceso.Egreso ? $"Hasta luego, {persona.Nombres}" : $"Bienvenido, {persona.Nombres}";
+        return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Concedido, direccion, "Acceso Permitido", saludo, timer.ElapsedMilliseconds));
     }
 
     public async Task<Result<bool>> ProcesarLoteAsync(LoteEventosRequest request, CancellationToken ct)
@@ -194,11 +198,12 @@ public class ServicioAcceso
         await _eventosRepository.SaveChangesAsync(ct);
     }
 
-    private static ValidarAccesoResponse CrearRespuesta(ResultadoAcceso resultado, string titulo, string mensaje, long ms)
+    private static ValidarAccesoResponse CrearRespuesta(ResultadoAcceso resultado, DireccionAcceso direccion, string titulo, string mensaje, long ms)
     {
         return new ValidarAccesoResponse
         {
             Resultado = resultado.ToString(),
+            Direccion = direccion.ToString(),
             Titulo = titulo,
             Mensaje = mensaje,
             DuracionMs = (int)ms

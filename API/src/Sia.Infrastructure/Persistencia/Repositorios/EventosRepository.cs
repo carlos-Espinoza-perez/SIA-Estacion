@@ -31,6 +31,15 @@ public class EventosRepository : IEventosRepository
         return await _db.EventosAcceso.IgnoreQueryFilters().AnyAsync(e => e.Id == id, ct);
     }
 
+    public async Task<DireccionAcceso?> ObtenerUltimaDireccionConcedidaAsync(Guid personaId, CancellationToken ct)
+    {
+        return await _db.EventosAcceso
+            .Where(e => e.PersonaId == personaId && e.Resultado == ResultadoAcceso.Concedido)
+            .OrderByDescending(e => e.FechaHoraLocal)
+            .Select(e => (DireccionAcceso?)e.Direccion)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<List<EventoAcceso>> ObtenerPresenciaActualAsync(DateTimeOffset inicioDia, CancellationToken ct)
     {
         return await _db.EventosAcceso
