@@ -28,18 +28,26 @@ jobs:
       - name: Restaurar dependencias NuGet
         run: dotnet restore API/src/Sia.Api/Sia.Api.csproj
 
-      - name: Compilar Sia.Api (Release)
-        run: dotnet build API/src/Sia.Api/Sia.Api.csproj --configuration Release --no-restore
-
       - name: Generar appsettings.json base
         run: cp API/src/Sia.Api/appsettings.Development.json.example API/src/Sia.Api/appsettings.json
 
+      - name: Compilar Sia.Api (Release)
+        run: dotnet build API/src/Sia.Api/Sia.Api.csproj --configuration Release --no-restore
+
       - name: Publicar Sia.Api
-        run: dotnet publish API/src/Sia.Api/Sia.Api.csproj --configuration Release --no-build --output ./publish-api
+        run: |
+          dotnet publish API/src/Sia.Api/Sia.Api.csproj --configuration Release --output ./publish-api
+          cp API/src/Sia.Api/appsettings.Development.json.example ./publish-api/appsettings.json
+
+      - name: Empaquetar artefacto en ZIP
+        run: |
+          cd ./publish-api
+          zip -r ../api-deployment.zip .
+          cd ..
 
       - name: Desplegar a Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'sia-api-app'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: './publish-api'
+          package: './api-deployment.zip'
