@@ -38,6 +38,8 @@ jobs:
         run: |
           dotnet publish API/src/Sia.Api/Sia.Api.csproj --configuration Release --output ./publish-api
           cp API/src/Sia.Api/appsettings.Development.json.example ./publish-api/appsettings.json
+          # Excluir FaceONNX.dll (177MB) en Linux para evitar agotar la cuota de red y RAM en Azure App Service F1
+          rm -f ./publish-api/FaceONNX.dll
 
       - name: Empaquetar artefacto en ZIP
         run: |
