@@ -42,10 +42,11 @@ jobs:
       - name: Empaquetar artefacto en ZIP
         run: |
           cd ./publish-api
-          zip -r ../api-deployment.zip .
+          zip -q -r ../api-deployment.zip .
           cd ..
+          ls -lh api-deployment.zip
 
-      - name: Desplegar a Azure Web App (ZipDeploy)
+      - name: Desplegar a Azure Web App (ZipDeploy Asíncrono)
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
@@ -59,37 +60,52 @@ jobs:
           
           echo "Conectando al servicio SCM en: $URL con usuario: $USER"
           
-          # Verificar estado y conectividad
-          echo "=== Consultando estado e historial de Kudu ==="
-          HTTP_TEST=$(curl -s -w "%{http_code}" -o kudu_test.txt -u "$USER:$PASS" "https://$URL/api/deployments")
-          echo "HTTP Test de autenticación: $HTTP_TEST"
-          cat kudu_test.txt | head -c 500
-          echo ""
-
-          # Desplegar paquete ZIP directamente via ZipDeploy
-          echo "=== Iniciando despliegue de api-deployment.zip via /api/zipdeploy ==="
-          HTTP_STATUS=$(curl -s -w "%{http_code}" -o deploy_response.txt -X POST -u "$USER:$PASS" \
+          echo "=== Iniciando subida de api-deployment.zip via /api/zipdeploy?isAsync=true ==="
+          HTTP_STATUS=$(curl -s -w "%{http_code}" -o upload_response.txt -X POST -u "$USER:$PASS" \
+            -H "Content-Type: application/zip" \
             --data-binary @"./api-deployment.zip" \
-            "https://$URL/api/zipdeploy")
+            "https://$URL/api/zipdeploy?isAsync=true")
           
-          echo "Respuesta del despliegue (HTTP $HTTP_STATUS):"
-          cat deploy_response.txt
+          echo "Código HTTP de subida: $HTTP_STATUS"
+          cat upload_response.txt
           echo ""
 
           if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ]; then
-            echo "=== Diagnostico de Error 400 en Kudu ==="
-            echo "--- Listando archivos de traza Kudu ---"
-            curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/" | jq -r '.[-3:] | .[].name' || true
-            LATEST_TRACE=$(curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/" | jq -r '.[-1].name // empty')
-            if [ -n "$LATEST_TRACE" ]; then
-              echo "--- Contenido de la última traza ($LATEST_TRACE) ---"
-              curl -s -u "$USER:$PASS" "https://$URL/api/vfs/LogFiles/kudu/trace/$LATEST_TRACE" | tail -n 50
-            fi
-            echo ""
-            echo "--- Listando espacio y archivos en /site ---"
-            curl -s -u "$USER:$PASS" "https://$URL/api/vfs/site/" | jq -r '.[] | "\(.name) - \(.size) bytes"' || true
-            echo "Error en el despliegue a Azure Web App. Código HTTP: $HTTP_STATUS"
+            echo "Error al subir paquete a Azure Web App (HTTP $HTTP_STATUS)"
             exit 1
           fi
-          echo "¡Despliegue a Azure Web App completado exitosamente!"
+
+          echo "Paquete recibido correctamente. Monitoreando progreso del despliegue..."
+          
+          POLL_COUNT=0
+          MAX_POLL=40
+          SUCCESS=false
+
+          while [ $POLL_COUNT -lt $MAX_POLL ]; do
+            sleep 5
+            STATUS_JSON=$(curl -s -u "$USER:$PASS" "https://$URL/api/deployments/latest")
+            COMPLETE=$(echo "$STATUS_JSON" | jq -r '.complete // false')
+            STATUS_CODE=$(echo "$STATUS_JSON" | jq -r '.status // 0')
+            STATUS_MSG=$(echo "$STATUS_JSON" | jq -r '.message // ""')
+            
+            echo "Progreso [intento $((POLL_COUNT+1))/$MAX_POLL]: complete=$COMPLETE, status=$STATUS_CODE ($STATUS_MSG)"
+            
+            if [ "$COMPLETE" = "true" ]; then
+              if [ "$STATUS_CODE" -eq 4 ]; then
+                echo "¡Despliegue a Azure Web App completado exitosamente!"
+                SUCCESS=true
+                break
+              else
+                echo "El despliegue finalizó con error. Estado: $STATUS_CODE. Mensaje: $STATUS_MSG"
+                echo "$STATUS_JSON" | jq . || true
+                exit 1
+              fi
+            fi
+            POLL_COUNT=$((POLL_COUNT + 1))
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Timeout esperando la finalización del despliegue en Kudu."
+            exit 1
+          fi
 
