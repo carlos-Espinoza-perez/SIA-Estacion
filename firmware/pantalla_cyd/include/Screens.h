@@ -32,7 +32,6 @@ enum class ScreenState {
     ADMIN_SYNC,
     ADMIN_STORAGE,
     ADMIN_CONFIG,
-    ADMIN_FACE_VERIFY,
     ADMIN_DETECTED,
     SELECT_WIFI,
     WIFI_PASSWORD
@@ -128,7 +127,6 @@ private:
     void renderAdminSync();
     void renderAdminStorage();
     void renderAdminConfig();
-    void renderAdminFaceVerify();
     void renderAdminDetected();
     void renderSelectWifi();
     void renderWifiPassword();

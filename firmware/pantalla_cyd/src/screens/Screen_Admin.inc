@@ -1,6 +1,6 @@
 // ============================================================
 // Screen_Admin.inc — Modulo 6: Administracion Local
-// showAdminDetected | showAdminPanel | showAdminSync | showAdminStorage | showAdminConfig | showAdminFaceVerify
+// showAdminDetected | showAdminPanel | showAdminSync | showAdminStorage | showAdminConfig
 // ============================================================
 // NOTA: Este archivo es incluido por LvglManager.cpp
 //       No compilar de forma independiente.
@@ -334,46 +334,6 @@ void LvglManager::showAdminConfig(const char* stationName, const char* wifiSsid,
     lv_label_set_text(bLbl, "Salir de admin");
     lv_obj_center(bLbl);
     lv_obj_add_event_cb(btnBack, [](lv_event_t* e) {
-        if (_onBackCb) _onBackCb();
-    }, LV_EVENT_CLICKED, NULL);
-}
-
-void LvglManager::showAdminFaceVerify(std::function<void()> onCancel) {
-    if (!_initialized) return;
-    _onBackCb = onCancel;
-    _active = true;
-    lv_obj_clean(lv_scr_act());
-    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x0A0E17), LV_PART_MAIN);
-
-    createFigmaHeader("Verificacion facial", "Mira a la camara para verificar tu identidad.");
-
-    lv_obj_t* card = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(card, 440, 160);
-    lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 70);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0x111827), LV_PART_MAIN);
-    lv_obj_set_style_border_color(card, lv_color_hex(0x2563EB), LV_PART_MAIN);
-    lv_obj_set_style_radius(card, 12, LV_PART_MAIN);
-
-    lv_obj_t* spinner = lv_spinner_create(card, 1000, 60);
-    lv_obj_set_size(spinner, 50, 50);
-    lv_obj_align(spinner, LV_ALIGN_CENTER, 0, -20);
-    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x2563EB), LV_PART_INDICATOR);
-
-    lv_obj_t* sLbl = lv_label_create(card);
-    lv_label_set_text(sLbl, "Esperando verificacion facial...");
-    lv_obj_set_style_text_color(sLbl, lv_color_hex(0x60A5FA), LV_PART_MAIN);
-    lv_obj_set_style_text_font(sLbl, &lv_font_montserrat_14, LV_PART_MAIN);
-    lv_obj_align(sLbl, LV_ALIGN_CENTER, 0, 35);
-
-    lv_obj_t* btnCancel = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btnCancel, 440, 44);
-    lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_MID, 0, -12);
-    lv_obj_set_style_bg_color(btnCancel, lv_color_hex(0x1F2937), LV_PART_MAIN);
-    lv_obj_set_style_radius(btnCancel, 8, LV_PART_MAIN);
-    lv_obj_t* bLbl = lv_label_create(btnCancel);
-    lv_label_set_text(bLbl, "Cancelar verificacion");
-    lv_obj_center(bLbl);
-    lv_obj_add_event_cb(btnCancel, [](lv_event_t* e) {
         if (_onBackCb) _onBackCb();
     }, LV_EVENT_CLICKED, NULL);
 }

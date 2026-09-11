@@ -126,9 +126,6 @@ void ScreenManager::transitionTo(ScreenState newState, const char* param1, const
         case ScreenState::ADMIN_CONFIG:
             renderAdminConfig();
             break;
-        case ScreenState::ADMIN_FACE_VERIFY:
-            renderAdminFaceVerify();
-            break;
         case ScreenState::ADMIN_DETECTED:
             renderAdminDetected();
             break;
@@ -319,15 +316,11 @@ void ScreenManager::renderAdminStorage() {
 
 void ScreenManager::renderAdminConfig() {
     const char* name = (_param1[0] != '\0') ? _param1 : "Laboratorio SIA";
-    Lvgl.showAdminConfig(name, WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.macAddress().c_str(), 
-        _onAdminWifiCb, 
-        [this]() { transitionTo(ScreenState::ADMIN_PANEL); });
-}
-
-void ScreenManager::renderAdminFaceVerify() {
-    Lvgl.showAdminFaceVerify([this]() {
-        transitionTo(ScreenState::ADMIN_PANEL);
-    });
+    // El boton dice "Salir de admin": debe salir de verdad del modo administrador
+    // (antes solo regresaba al menu del panel, dejando al usuario atrapado en admin).
+    Lvgl.showAdminConfig(name, WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.macAddress().c_str(),
+        _onAdminWifiCb,
+        _onAdminExitCb);
 }
 
 void ScreenManager::renderAdminDetected() {

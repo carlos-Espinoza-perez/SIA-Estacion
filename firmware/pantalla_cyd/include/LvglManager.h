@@ -88,8 +88,6 @@ public:
                           std::function<void()> onClear, std::function<void()> onBack);
     void showAdminConfig(const char* stationName, const char* wifiSsid, const char* ip, const char* mac, 
                          std::function<void()> onUpdateConfig, std::function<void()> onBack);
-    void showAdminFaceVerify(std::function<void()> onCancel = nullptr);
-
     // Generico para mensajes de estado tipo badge
     void showStatusMessage(bool success, const char* badge, const char* title, const char* subtitle = nullptr);
 
