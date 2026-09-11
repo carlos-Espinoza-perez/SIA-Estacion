@@ -58,13 +58,14 @@ public class ServicioReportes
         {
             Id = e.Id,
             PersonaNombre = e.Persona != null ? $"{e.Persona.Nombres} {e.Persona.Apellidos}" : "Desconocido",
+            CodigoEstudiantil = e.Persona?.CodigoEstudiantil,
             EstacionNombre = e.Estacion?.Nombre ?? "Desconocida",
             Direccion = e.Direccion.ToString(),
             ModoValidacion = e.ModoValidacion.ToString(),
             Resultado = e.Resultado.ToString(),
             MotivoDenegacion = e.MotivoDenegacion,
             FotoEvidenciaUrl = e.FotoEvidenciaUrl,
-            FechaHoraLocal = e.FechaHoraLocal
+            FechaHora = e.FechaHoraLocal
         }).ToList();
 
         return Result<List<EventoReporteResponse>>.Exitoso(response);

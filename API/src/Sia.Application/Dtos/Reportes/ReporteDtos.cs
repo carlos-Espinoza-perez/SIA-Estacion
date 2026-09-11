@@ -13,13 +13,14 @@ public class EventoReporteResponse
 {
     public Guid Id { get; set; }
     public string? PersonaNombre { get; set; }
+    public string? CodigoEstudiantil { get; set; }
     public string EstacionNombre { get; set; } = string.Empty;
     public string Direccion { get; set; } = string.Empty;
     public string ModoValidacion { get; set; } = string.Empty;
     public string Resultado { get; set; } = string.Empty;
     public string? MotivoDenegacion { get; set; }
     public string? FotoEvidenciaUrl { get; set; }
-    public DateTimeOffset FechaHoraLocal { get; set; }
+    public DateTimeOffset FechaHora { get; set; }
 }
 
 public class TrazabilidadItemResponse
