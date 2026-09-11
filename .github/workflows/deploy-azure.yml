@@ -45,9 +45,40 @@ jobs:
           zip -r ../api-deployment.zip .
           cd ..
 
-      - name: Desplegar a Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'sia-api-app'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: './api-deployment.zip'
+      - name: Desplegar a Azure Web App (ZipDeploy)
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          USER=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -1)
+          PASS=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -1)
+          URL=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*publishUrl="\([^":]*\).*/\1/p' | head -1)
+          
+          if [ -z "$URL" ]; then
+            URL="sia-api-app.scm.azurewebsites.net"
+          fi
+          
+          echo "Conectando al servicio SCM en: $URL con usuario: $USER"
+          
+          # Verificar estado y conectividad
+          echo "=== Consultando estado e historial de Kudu ==="
+          HTTP_TEST=$(curl -s -w "%{http_code}" -o kudu_test.txt -u "$USER:$PASS" "https://$URL/api/deployments")
+          echo "HTTP Test de autenticación: $HTTP_TEST"
+          cat kudu_test.txt | head -c 500
+          echo ""
+
+          # Desplegar paquete ZIP directamente via ZipDeploy
+          echo "=== Iniciando despliegue de api-deployment.zip via /api/zipdeploy ==="
+          HTTP_STATUS=$(curl -s -w "%{http_code}" -o deploy_response.txt -X POST -u "$USER:$PASS" \
+            --data-binary @"./api-deployment.zip" \
+            "https://$URL/api/zipdeploy")
+          
+          echo "Respuesta del despliegue (HTTP $HTTP_STATUS):"
+          cat deploy_response.txt
+          echo ""
+
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ]; then
+            echo "Error en el despliegue a Azure Web App. Código HTTP: $HTTP_STATUS"
+            exit 1
+          fi
+          echo "¡Despliegue a Azure Web App completado exitosamente!"
+
