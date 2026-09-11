@@ -471,6 +471,9 @@ void loop() {
 static void enterStandbyView() {
     CameraServer.begin();
     wasConnected = Api.isConnected();
+    // De vuelta a operacion normal: el contexto "vengo del panel admin" para el
+    // boton Volver de seleccion de WiFi ya no aplica (se reconecto o se cancelo).
+    screens.setWifiFromAdmin(false);
 
     if (wasConnected) {
         StationConfig cfg = Storage.getConfig();
