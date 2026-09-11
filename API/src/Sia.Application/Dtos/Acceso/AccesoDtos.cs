@@ -13,6 +13,7 @@ public class ValidarAccesoResponse
     public string Direccion { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
+    public string NombrePersona { get; set; } = string.Empty;
     public int DuracionMs { get; set; } = 3000;
 }
 

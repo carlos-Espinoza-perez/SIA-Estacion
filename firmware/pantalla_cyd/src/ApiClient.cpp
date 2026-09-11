@@ -307,7 +307,7 @@ bool ApiClient::validateAccess(const String& personCode, const String& itemCode,
             String resStr = data["resultado"].as<String>();
             result.authorized = (resStr == "Concedido" || resStr == "Acceso Permitido");
             result.isAdmin = data["esAdmin"].as<bool>() || (data["rol"].as<String>() == "Admin") || (resStr == "Admin") || (data["tipo"].as<String>() == "ADMIN");
-            result.personName = data["titulo"].as<String>();
+            result.personName = data["nombrePersona"].as<String>();
             result.message = data["mensaje"].as<String>();
             result.itemName = itemCode;
             result.direction = (data["direccion"].as<String>() == "Egreso") ? "Egreso" : "Ingreso";
