@@ -5,6 +5,7 @@
 #include "LvglManager.h"
 #include "StorageManager.h"
 #include "UIComponents.h"
+#include "OfflineManager.h"
 
 ScreenManager::ScreenManager(TFT_eSPI& tft, TouchManager& touch)
     : _tft(tft), _touch(touch), _currentState(ScreenState::BOOT),
@@ -296,7 +297,7 @@ void ScreenManager::renderLoanRejected() {
 void ScreenManager::renderAdminPanel() {
     const char* name = (_param1[0] != '\0') ? _param1 : "Laboratorio de Electronica";
     bool online = (WiFi.status() == WL_CONNECTED);
-    Lvgl.showAdminPanel(3, name, online,
+    Lvgl.showAdminPanel(Offline.contarPendientes(), name, online,
         [this]() { transitionTo(ScreenState::ADMIN_SYNC); },
         [this]() { transitionTo(ScreenState::ADMIN_STORAGE); },
         [this]() { transitionTo(ScreenState::ADMIN_CONFIG); },
@@ -305,13 +306,13 @@ void ScreenManager::renderAdminPanel() {
 
 void ScreenManager::renderAdminSync() {
     bool online = (WiFi.status() == WL_CONNECTED);
-    Lvgl.showAdminSync(3, online, _onAdminSyncCb, [this]() {
+    Lvgl.showAdminSync(Offline.contarPendientes(), online, _onAdminSyncCb, [this]() {
         transitionTo(ScreenState::ADMIN_PANEL);
     });
 }
 
 void ScreenManager::renderAdminStorage() {
-    Lvgl.showAdminStorage(3, "Hoy - 10:42", _onAdminStorageCb, [this]() {
+    Lvgl.showAdminStorage(Offline.contarPendientes(), Offline.obtenerUltimaSincronizacionEventos().c_str(), _onAdminStorageCb, [this]() {
         transitionTo(ScreenState::ADMIN_PANEL);
     });
 }

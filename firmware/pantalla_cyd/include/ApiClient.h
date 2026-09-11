@@ -32,6 +32,10 @@ public:
                         const String& operationType, AccessResult& result,
                         const String& imageBase64 = "");
 
+    // Modo sin conexion: copia local de codigos validos y sincronizacion de eventos encolados
+    bool obtenerCodigosSincronizacion(String& outJsonArray);
+    bool sincronizarEventosOffline(const String& loteJson);
+
     bool hasToken() const;
 
 private:

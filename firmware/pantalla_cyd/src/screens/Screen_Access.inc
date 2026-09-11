@@ -198,6 +198,27 @@ void LvglManager::showOfflineMode(std::function<void()> onAdminClick) {
     lv_obj_set_style_text_font(statusLbl, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_align(statusLbl, LV_ALIGN_LEFT_MID, 0, 0);
 
+    // Acceso de respaldo local: 3 toques rapidos sobre la barra. El QR admin necesita
+    // conexion (el servidor lo confirma), asi que sin red esta es la unica entrada al panel.
+    if (_onAdminClickCb) {
+        lv_obj_add_flag(topBar, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(topBar, [](lv_event_t* e) {
+            static uint32_t lastTap = 0;
+            static int tapCount = 0;
+            uint32_t now = millis();
+            if (now - lastTap < 700) {
+                tapCount++;
+                if (tapCount >= 3) {
+                    tapCount = 0;
+                    if (_onAdminClickCb) _onAdminClickCb();
+                }
+            } else {
+                tapCount = 1;
+            }
+            lastTap = now;
+        }, LV_EVENT_CLICKED, NULL);
+    }
+
     lv_obj_t* card = lv_obj_create(lv_scr_act());
     lv_obj_set_size(card, 440, 220);
     lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 60);

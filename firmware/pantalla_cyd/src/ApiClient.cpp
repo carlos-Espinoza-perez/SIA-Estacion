@@ -120,6 +120,10 @@ bool ApiClient::connectWifi() {
                       WiFi.RSSI());
 
         Serial.printf("[API] Destino base: %s\n", Storage.getApiUrl().c_str());
+
+        // Sincroniza el reloj en UTC para poder fechar correctamente los eventos
+        // que se encolen en modo sin conexion (el ESP32 no tiene RTC propio).
+        configTime(0, 0, "pool.ntp.org", "time.google.com");
     } else {
         Serial.println("[WiFi] No se pudo conectar.");
     }
@@ -338,5 +342,61 @@ bool ApiClient::validateAccess(const String& personCode, const String& itemCode,
     }
 
     result.authorized = false;
+    return false;
+}
+
+bool ApiClient::obtenerCodigosSincronizacion(String& outJsonArray) {
+    StationConfig cfg = Storage.getConfig();
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        return false;
+    }
+
+    String url = buildUrl("/api/estacion-api/sync/codigos");
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    if (!sendHttpRequest(http, url, "GET", "", _token, 10000, code, payload)) {
+        return false;
+    }
+
+    if (code != 200) {
+        Serial.printf("[SYNC] Fallo al descargar codigos: HTTP %d\n", code);
+        return false;
+    }
+
+    JsonDocument res;
+    DeserializationError err = deserializeJson(res, payload);
+    if (err || res["datos"].isNull()) {
+        Serial.printf("[SYNC] Error deserializando codigos: %s\n", err.c_str());
+        return false;
+    }
+
+    serializeJson(res["datos"], outJsonArray);
+    return true;
+}
+
+bool ApiClient::sincronizarEventosOffline(const String& loteJson) {
+    StationConfig cfg = Storage.getConfig();
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        return false;
+    }
+
+    String url = buildUrl("/api/estacion-api/sync/eventos");
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    Serial.printf("[SYNC] Enviando lote de eventos offline (%u bytes)...\n", (unsigned int)loteJson.length());
+    if (!sendHttpRequest(http, url, "POST", loteJson, _token, 15000, code, payload)) {
+        return false;
+    }
+
+    if (code == 200 || code == 204) {
+        Serial.println("[SYNC] Lote de eventos offline sincronizado con exito.");
+        return true;
+    }
+
+    Serial.printf("[SYNC] Fallo al sincronizar eventos: HTTP %d | %s\n", code, payload.c_str());
     return false;
 }

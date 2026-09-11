@@ -10,6 +10,7 @@
 #include "StorageManager.h"
 #include "ApiClient.h"
 #include "PhoneCameraServer.h"
+#include "OfflineManager.h"
 
 static TFT_eSPI        tft;
 static TouchManager    touch(tft);
@@ -84,7 +85,13 @@ static bool pendingWifiBack = false;
 static bool pendingAdminOpen = false;
 static bool pendingAdminWifi = false;
 static bool pendingAdminSync = false;
+static bool pendingAdminStorage = false;
 static bool pendingAdminExit = false;
+
+static bool wasConnected = false;
+static bool codigosSincronizadosAlMenosUnaVez = false;
+static uint32_t lastCodigosSyncTime = 0;
+static const uint32_t CODIGOS_SYNC_INTERVAL_MS = 10UL * 60UL * 1000UL; // cada 10 minutos
 
 void setup() {
     Serial.begin(SERIAL_BAUD);
@@ -114,6 +121,7 @@ void setup() {
     Serial.println("==================================================");
 
     Storage.begin();
+    Offline.begin();
     Serial.printf("MAC STA: %s\n", Storage.getMacAddress().c_str());
 
     screens.init();
@@ -156,6 +164,10 @@ void setup() {
 
     screens.onAdminSync([]() {
         pendingAdminSync = true;
+    });
+
+    screens.onAdminStorage([]() {
+        pendingAdminStorage = true;
     });
 
     screens.onAdminExit([]() {
@@ -242,8 +254,22 @@ void loop() {
 
     if (pendingAdminSync) {
         pendingAdminSync = false;
-        Api.sendHeartbeat();
-        screens.transitionTo(ScreenState::ADMIN_PANEL);
+        if (Api.isConnected()) {
+            Api.sendHeartbeat();
+            String lote = Offline.construirLoteJson();
+            if (lote.length() > 0 && Api.sincronizarEventosOffline(lote)) {
+                Offline.marcarPendientesSincronizados();
+            }
+        } else {
+            Api.connectWifi();
+        }
+        screens.transitionTo(ScreenState::ADMIN_SYNC);
+    }
+
+    if (pendingAdminStorage) {
+        pendingAdminStorage = false;
+        Offline.limpiarPendientes();
+        screens.transitionTo(ScreenState::ADMIN_STORAGE);
     }
 
     if (pendingAdminExit) {
@@ -354,10 +380,45 @@ void loop() {
         }
 
         case StationState::Standby: {
+            bool nowConnected = Api.isConnected();
+            if (nowConnected != wasConnected) {
+                // Cambio de conectividad detectado: refrescar la pantalla de espera
+                // (Waiting <-> Offline) y, si se acaba de recuperar la red, sincronizar.
+                wasConnected = nowConnected;
+                enterStandbyView();
+                if (nowConnected) {
+                    String lote = Offline.construirLoteJson();
+                    if (lote.length() > 0 && Api.sincronizarEventosOffline(lote)) {
+                        Offline.marcarPendientesSincronizados();
+                    }
+                    String codigosJson;
+                    if (Api.obtenerCodigosSincronizacion(codigosJson)) {
+                        Offline.actualizarCodigosDesdeJson(codigosJson);
+                        codigosSincronizadosAlMenosUnaVez = true;
+                        lastCodigosSyncTime = millis();
+                    }
+                }
+            }
+
             if (millis() - heartbeatTimer >= HEARTBEAT_INTERVAL_MS) {
                 heartbeatTimer = millis();
-                if (Api.isConnected()) {
+                if (nowConnected) {
                     Api.sendHeartbeat();
+
+                    String lote = Offline.construirLoteJson();
+                    if (lote.length() > 0 && Api.sincronizarEventosOffline(lote)) {
+                        Offline.marcarPendientesSincronizados();
+                    }
+
+                    // Siempre en el primer heartbeat tras el arranque, luego cada CODIGOS_SYNC_INTERVAL_MS
+                    if (!codigosSincronizadosAlMenosUnaVez || millis() - lastCodigosSyncTime >= CODIGOS_SYNC_INTERVAL_MS) {
+                        String codigosJson;
+                        if (Api.obtenerCodigosSincronizacion(codigosJson)) {
+                            Offline.actualizarCodigosDesdeJson(codigosJson);
+                            codigosSincronizadosAlMenosUnaVez = true;
+                        }
+                        lastCodigosSyncTime = millis();
+                    }
                 } else {
                     Api.connectWifi();
                 }
@@ -380,9 +441,16 @@ void loop() {
 
 static void enterStandbyView() {
     CameraServer.begin();
-    StationConfig cfg = Storage.getConfig();
-    String stationName = cfg.name.length() > 0 ? cfg.name : "Entrada Principal";
-    screens.transitionTo(ScreenState::WAITING, stationName.c_str(), "Control de Acceso e Identificacion");
+    wasConnected = Api.isConnected();
+
+    if (wasConnected) {
+        StationConfig cfg = Storage.getConfig();
+        String stationName = cfg.name.length() > 0 ? cfg.name : "Entrada Principal";
+        screens.transitionTo(ScreenState::WAITING, stationName.c_str(), "Control de Acceso e Identificacion");
+    } else {
+        screens.transitionTo(ScreenState::OFFLINE);
+    }
+
     heartbeatTimer = millis();
 }
 
@@ -508,8 +576,9 @@ static void processPendingCapture() {
     currentState = StationState::Validating;
     screens.transitionTo(ScreenState::PROCESSING, "Validando acceso", "Consultando sistema...");
 
+    bool intentarOnline = Api.isConnected();
     AccessResult res;
-    bool ok = Api.validateAccess(code, "", "ACCESO", res, imageBase64);
+    bool ok = intentarOnline ? Api.validateAccess(code, "", "ACCESO", res, imageBase64) : false;
 
     if (ok && res.isAdmin) {
         Serial.println("[AUTH] Credencial administrativa detectada (verificada por el servidor)");
@@ -519,16 +588,41 @@ static void processPendingCapture() {
         return;
     }
 
-    if (ok && res.authorized) {
-        Serial.printf("[ACCESO] Concedido -> %s (%s)\n", res.personName.c_str(), res.direction.c_str());
-        String dirLabel = (res.direction == "Egreso") ? "Salida Concedida" : "Entrada Concedida";
-        screens.transitionTo(ScreenState::GRANTED, res.personName.c_str(), dirLabel.c_str());
-        String msg = dirLabel + (res.message.length() > 0 ? (" - " + res.message) : "");
-        CameraServer.notifyResult(true, res.personName, msg);
+    if (ok) {
+        // Respuesta valida del servidor (Concedido o Denegado como decision real del negocio)
+        if (res.authorized) {
+            Serial.printf("[ACCESO] Concedido -> %s (%s)\n", res.personName.c_str(), res.direction.c_str());
+            String dirLabel = (res.direction == "Egreso") ? "Salida Concedida" : "Entrada Concedida";
+            screens.transitionTo(ScreenState::GRANTED, res.personName.c_str(), dirLabel.c_str());
+            String msg = dirLabel + (res.message.length() > 0 ? (" - " + res.message) : "");
+            CameraServer.notifyResult(true, res.personName, msg);
+        } else {
+            Serial.printf("[ACCESO] Denegado -> %s\n", res.message.c_str());
+            screens.transitionTo(ScreenState::DENIED, res.message.c_str());
+            CameraServer.notifyResult(false, "Acceso Denegado", res.message);
+        }
     } else {
-        Serial.printf("[ACCESO] Denegado -> %s\n", res.message.c_str());
-        screens.transitionTo(ScreenState::DENIED, res.message.c_str());
-        CameraServer.notifyResult(false, "Acceso Denegado", res.message);
+        // Sin conexion o el servidor no respondio: se valida contra la copia local
+        // (descargada de /sync/codigos) y el evento se encola para subirlo despues.
+        bool localOk = Offline.codigoValidoLocal(code);
+        String direccion = Offline.determinarDireccionLocal(code);
+        Offline.encolarEvento(code, direccion, localOk ? "Concedido" : "Denegado");
+
+        Serial.printf("[ACCESO-OFFLINE] Codigo='%s' -> %s (%s) | Copia local: %s\n",
+                      code.c_str(), localOk ? "Concedido" : "Denegado", direccion.c_str(),
+                      Offline.tieneCopiaLocal() ? "disponible" : "vacia");
+
+        if (localOk) {
+            String dirLabel = (direccion == "Egreso") ? "Salida Concedida (Offline)" : "Entrada Concedida (Offline)";
+            screens.transitionTo(ScreenState::GRANTED, "Codigo valido", dirLabel.c_str());
+            CameraServer.notifyResult(true, "Acceso Offline", dirLabel);
+        } else {
+            const char* motivo = Offline.tieneCopiaLocal()
+                ? "Codigo no reconocido (sin conexion)"
+                : "Sin conexion y sin copia local de codigos";
+            screens.transitionTo(ScreenState::DENIED, motivo);
+            CameraServer.notifyResult(false, "Acceso Denegado", motivo);
+        }
     }
 
     stateTimer = millis();
@@ -585,8 +679,17 @@ static void handleSerialCli() {
         screens.transitionTo(ScreenState::SELECT_WIFI);
     } else if (line == "PERF") {
         reportPerformance(true);
+    } else if (line.startsWith("CAPTURE:")) {
+        String code = line.substring(8);
+        Serial.printf("[CLI] Simulando captura de camara con codigo='%s'\n", code.c_str());
+        onCameraCapture(code, "");
+    } else if (line == "OFFLINE") {
+        Serial.printf("[OFFLINE] Conectado: %d | Copia local de codigos: %s | Ultima sync codigos: %s | Pendientes por sincronizar: %d | Ultima sync eventos: %s\n",
+                      Api.isConnected(), Offline.tieneCopiaLocal() ? "SI" : "NO",
+                      Offline.obtenerUltimaSincronizacionCodigos().c_str(), Offline.contarPendientes(),
+                      Offline.obtenerUltimaSincronizacionEventos().c_str());
     } else if (line == "HELP") {
-        Serial.println("Comandos disponibles: STATUS | UNPAIR | STATE:<BOOT|WAITING|GRANTED|DENIED|ADMIN|WIFI|LINK|ITEM> | PERF | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
+        Serial.println("Comandos disponibles: STATUS | UNPAIR | STATE:<BOOT|WAITING|GRANTED|DENIED|ADMIN|WIFI|LINK|ITEM> | PERF | OFFLINE | CAPTURE:<codigo> | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
     }
 }
 
