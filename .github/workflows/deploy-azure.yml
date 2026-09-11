@@ -41,79 +41,27 @@ jobs:
           # Excluir FaceONNX.dll (177MB) en Linux para evitar agotar la cuota de red y RAM en Azure App Service F1
           rm -f ./publish-api/FaceONNX.dll
 
-      - name: Empaquetar artefacto en ZIP
-        run: |
-          cd ./publish-api
-          zip -q -r ../api-deployment.zip .
-          cd ..
-          ls -lh api-deployment.zip
-
-      - name: Desplegar a Azure Web App (ZipDeploy Asíncrono)
+      - name: Limpiar paquetes antiguos en Azure
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
           USER=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -1)
           PASS=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -1)
-          URL=$(echo "$PUBLISH_PROFILE" | sed -n 's/.*publishUrl="\([^":]*\).*/\1/p' | head -1)
-          
-          if [ -z "$URL" ]; then
-            URL="sia-api-app.scm.azurewebsites.net"
-          fi
-          
-          echo "Conectando al servicio SCM en: $URL con usuario: $USER"
-          
-          echo "=== Consultando App Settings de la Web App en Kudu ==="
-          curl -s -u "$USER:$PASS" "https://$URL/api/settings" | jq . || true
-
-          echo "=== Iniciando subida de api-deployment.zip via /api/zipdeploy ==="
-          HTTP_STATUS=$(curl -v -s -w "\n%{http_code}" -o upload_response.txt -X POST -u "$USER:$PASS" \
-            -H "Content-Type: application/zip" \
-            --data-binary @"./api-deployment.zip" \
-            "https://$URL/api/zipdeploy" 2>&1 | tee curl_debug.log | tail -n 1)
-          
-          echo "Código HTTP de subida: $HTTP_STATUS"
-          echo "--- Detalle de la conexión y respuesta (curl_debug.log) ---"
-          cat curl_debug.log | grep -E '^<|^>|HTTP/' || true
-          echo "--- Cuerpo de respuesta de error ---"
-          cat upload_response.txt
-          echo ""
-
-          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ]; then
-            echo "Error al subir paquete a Azure Web App (HTTP $HTTP_STATUS)"
-            exit 1
-          fi
-
-          echo "Paquete recibido correctamente. Monitoreando progreso del despliegue..."
-          
-          POLL_COUNT=0
-          MAX_POLL=40
-          SUCCESS=false
-
-          while [ $POLL_COUNT -lt $MAX_POLL ]; do
-            sleep 5
-            STATUS_JSON=$(curl -s -u "$USER:$PASS" "https://$URL/api/deployments/latest")
-            COMPLETE=$(echo "$STATUS_JSON" | jq -r '.complete // false')
-            STATUS_CODE=$(echo "$STATUS_JSON" | jq -r '.status // 0')
-            STATUS_MSG=$(echo "$STATUS_JSON" | jq -r '.message // ""')
-            
-            echo "Progreso [intento $((POLL_COUNT+1))/$MAX_POLL]: complete=$COMPLETE, status=$STATUS_CODE ($STATUS_MSG)"
-            
-            if [ "$COMPLETE" = "true" ]; then
-              if [ "$STATUS_CODE" -eq 4 ]; then
-                echo "¡Despliegue a Azure Web App completado exitosamente!"
-                SUCCESS=true
-                break
-              else
-                echo "El despliegue finalizó con error. Estado: $STATUS_CODE. Mensaje: $STATUS_MSG"
-                echo "$STATUS_JSON" | jq . || true
-                exit 1
-              fi
+          URL="sia-api-app.scm.azurewebsites.net"
+          ACTIVE=$(curl -s -u "$USER:$PASS" "https://$URL/api/vfs/data/SitePackages/packagename.txt" || true)
+          echo "Paquete activo actual: $ACTIVE"
+          for zipfile in $(curl -s -u "$USER:$PASS" "https://$URL/api/vfs/data/SitePackages/" | jq -r '.[].name' | grep '\.zip$' || true); do
+            if [ "$zipfile" != "$ACTIVE" ]; then
+              echo "Eliminando backup obsoleto para liberar espacio: $zipfile"
+              curl -s -X DELETE -H 'If-Match: *' -u "$USER:$PASS" "https://$URL/api/vfs/data/SitePackages/$zipfile" || true
             fi
-            POLL_COUNT=$((POLL_COUNT + 1))
           done
 
-          if [ "$SUCCESS" != "true" ]; then
-            echo "Timeout esperando la finalización del despliegue en Kudu."
-            exit 1
-          fi
+      - name: Desplegar a Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'sia-api-app'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: './publish-api'
+
 
