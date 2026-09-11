@@ -31,7 +31,7 @@ export interface OperacionItemHistorial {
   folio: string;
   fecha: string;
   item: string;
-  estado: 'Pendiente' | 'Devuelta' | 'En curso' | 'Vencida';
+  estado: 'Pendiente' | 'Devuelta' | 'En curso' | 'Vencida' | 'Cancelada';
 }
 
 export interface FichaPersonaDetalle extends Persona {

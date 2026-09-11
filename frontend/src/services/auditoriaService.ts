@@ -122,19 +122,6 @@ class AuditoriaService {
     };
   }
 
-  async registrarEvento(
-    evento: Omit<EventoAuditoria, 'id' | 'fechaHora'>
-  ): Promise<EventoAuditoria> {
-    const now = new Date();
-    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    return {
-      id: `AUD-${Math.floor(Math.random() * 1000)}`,
-      fechaHora: formattedDate,
-      ...evento,
-    };
-  }
-
   async exportarCSV(filtros?: FiltrosAuditoria): Promise<string> {
     const { data } = await this.getEventos({ ...filtros, pagina: 1, limite: 10000 });
     const headers = ['ID', 'Fecha y hora', 'Tipo', 'Actor', 'Descripción', 'Estación', 'Origen'];

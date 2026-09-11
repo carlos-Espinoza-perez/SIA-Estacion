@@ -3,11 +3,8 @@ import { DashboardLayoutTemplate } from '../../components/templates/DashboardLay
 import { Table, TableColumn } from '../../components/molecules/Table/Table';
 import { SearchInput } from '../../components/atoms/SearchInput/SearchInput';
 import { Select, SelectOption } from '../../components/atoms/Select/Select';
-import { ResultadoBadge, ResultadoAcceso } from '../../components/atoms/ResultadoBadge/ResultadoBadge';
-import { useToast } from '../../context/ToastContext';
-import { auditoriaService } from '../../services/auditoriaService';
+import { ResultadoBadge } from '../../components/atoms/ResultadoBadge/ResultadoBadge';
 import { accesoService, AccesoRow } from '../../services/accesoService';
-import { Button } from '../../components/atoms/Button/Button';
 import { estacionService } from '../../services/estacionService';
 
 // Opciones de filtros
@@ -99,7 +96,6 @@ const COLUMNS: TableColumn<AccesoRow>[] = [
 ];
 
 export const AccesosPage: React.FC = () => {
-  const { showToast } = useToast();
   const [accesos,   setAccesos]   = useState<AccesoRow[]>([]);
   const [estacionOptions, setEstacionOptions] = useState<SelectOption[]>([
     { value: '', label: 'Estación: Todas' },
@@ -149,44 +145,6 @@ export const AccesosPage: React.FC = () => {
     });
   }, [accesos, search, estacion, resultado]);
 
-  const handleSimularAcceso = async () => {
-    const nombres = ['Ana Morales', 'Luis Herrera', 'María López', 'Carlos Ruiz', 'Sofía Méndez', 'Diego Vargas'];
-    const carnets = ['22-A0200-0056', '21-A0134-0012', '23-A0311-0087', '22-A0200-0057', '20-A0098-0104', '23-A0311-0088'];
-    const estaciones = ['Entrada principal', 'Laboratorio A', 'Biblioteca', 'Taller', 'Cafetería'];
-    const idx = Math.floor(Math.random() * nombres.length);
-    const estacionRand = estaciones[Math.floor(Math.random() * estaciones.length)];
-    const resultadoRand: ResultadoAcceso = Math.random() > 0.15 ? 'Concedido' : 'Denegado';
-
-    const now = new Date();
-    const fechaHoraStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const nuevoAcceso: AccesoRow = {
-      id: `acc-${Date.now()}`,
-      fechaHora: fechaHoraStr,
-      persona: nombres[idx],
-      carnet: carnets[idx],
-      estacion: estacionRand,
-      direccion: Math.random() > 0.5 ? 'Ingreso' : 'Egreso',
-      validacion: 'QR + Facial',
-      resultado: resultadoRand,
-    };
-
-    setAccesos((prev) => [nuevoAcceso, ...prev]);
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Acceso',
-      actor: nuevoAcceso.persona,
-      descripcion: `Validación de acceso (${nuevoAcceso.direccion}) - Resultado: ${nuevoAcceso.resultado}`,
-      origen: 'Estación',
-      estacion: nuevoAcceso.estacion,
-    });
-
-    showToast(
-      `Acceso ${resultadoRand === 'Concedido' ? 'permitido' : 'denegado'} a ${nuevoAcceso.persona} en ${nuevoAcceso.estacion}`,
-      resultadoRand === 'Concedido' ? 'success' : 'error'
-    );
-  };
-
   return (
     <DashboardLayoutTemplate breadcrumbTitle="Accesos">
       <div
@@ -199,7 +157,6 @@ export const AccesosPage: React.FC = () => {
           width: '100%',
         }}
       >
-        {/* Encabezado y Simulación */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2
             style={{
@@ -212,20 +169,6 @@ export const AccesosPage: React.FC = () => {
           >
             Accesos
           </h2>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleSimularAcceso}
-            leftIcon={
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14" />
-                <path d="M12 5l7 7-7 7" />
-              </svg>
-            }
-          >
-            Simular validación NFC/QR
-          </Button>
         </div>
 
         {/* Barra de filtros */}

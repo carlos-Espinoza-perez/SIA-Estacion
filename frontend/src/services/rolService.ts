@@ -1,7 +1,6 @@
 import { Privilegio, NivelPermiso, RolPrivilegioDetalle, AsignacionPrivilegioRequest, Rol, CrearRolFormData } from '../types/rol';
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta } from '../types/api';
-import { auditoriaService } from './auditoriaService';
 
 interface RolBackendDto {
   id: string;
@@ -45,13 +44,6 @@ export const rolService = {
   crearPrivilegio: async (data: { codigo: string; nombre: string; modulo: string }): Promise<Privilegio> => {
     const response = await apiClient.post<RespuestaEnvuelta<Privilegio>>('/privilegios', data);
     if (response.data?.datos) {
-      await auditoriaService.registrarEvento({
-        tipo: 'Seguridad',
-        actor: 'Administrador',
-        descripcion: `Nuevo privilegio creado: [${data.codigo}] ${data.nombre} en módulo ${data.modulo}`,
-        origen: 'Panel',
-        estacion: '—',
-      });
       return response.data.datos;
     }
     throw new Error('No se pudo crear el privilegio');
@@ -83,14 +75,6 @@ export const rolService = {
 
     if (response.data?.datos) {
       const nuevoBackend = response.data.datos;
-      
-      await auditoriaService.registrarEvento({
-        tipo: 'Configuración',
-        actor: 'Administrador',
-        descripcion: `Creación de nuevo rol "${nuevoBackend.nombre}"`,
-        origen: 'Panel',
-        estacion: '—',
-      });
 
       return {
         id: nuevoBackend.id,
@@ -115,14 +99,6 @@ export const rolService = {
     if (response.data?.datos) {
       const actBackend = response.data.datos;
 
-      await auditoriaService.registrarEvento({
-        tipo: 'Configuración',
-        actor: 'Administrador',
-        descripcion: `Actualización del rol "${actBackend.nombre}"`,
-        origen: 'Panel',
-        estacion: '—',
-      });
-
       return {
         id: actBackend.id,
         nombre: actBackend.nombre,
@@ -142,13 +118,6 @@ export const rolService = {
     });
 
     if (response.status === 204 || response.status === 200 || response.data?.exitoso) {
-      await auditoriaService.registrarEvento({
-        tipo: 'Seguridad',
-        actor: 'Administrador',
-        descripcion: `Matriz de privilegios actualizada para el rol (${asignaciones.length} asignaciones)`,
-        origen: 'Panel',
-        estacion: '—',
-      });
       return true;
     }
     throw new Error('No se pudo actualizar la matriz de privilegios');
@@ -170,30 +139,11 @@ export const rolService = {
       activo: !rolActual.activo,
     });
 
-    await auditoriaService.registrarEvento({
-      tipo: 'Seguridad',
-      actor: 'Administrador',
-      descripcion: `Rol "${response.nombre}" ${response.activo ? 'activado' : 'desactivado'}`,
-      origen: 'Panel',
-      estacion: '—',
-    });
-
     return response;
   },
 
   eliminarRol: async (rolId: string): Promise<boolean> => {
     const response = await apiClient.delete<RespuestaEnvuelta<boolean>>(`/roles/${rolId}`);
-    
-    if (response.data?.exitoso) {
-      await auditoriaService.registrarEvento({
-        tipo: 'Seguridad',
-        actor: 'Administrador',
-        descripcion: `Eliminación de un rol`,
-        origen: 'Panel',
-        estacion: '—',
-      });
-      return true;
-    }
-    return false;
+    return !!response.data?.exitoso;
   },
 };

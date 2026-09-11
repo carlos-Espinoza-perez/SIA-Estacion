@@ -8,7 +8,6 @@ import {
   AprobacionPrestamoData,
 } from '../../components/organisms/Modal/ModalAprobacionPrestamo';
 import { useToast } from '../../context/ToastContext';
-import { auditoriaService } from '../../services/auditoriaService';
 import { estacionService } from '../../services/estacionService';
 import {
   operacionService,
@@ -236,28 +235,12 @@ export const OperacionesPage: React.FC = () => {
     });
   }, [operaciones, search, estacion, estado]);
 
-  const handleAprobarOperacion = async (nota?: string, fechaLimite?: string, cantidad?: number) => {
+  const handleAprobarOperacion = async (nota?: string) => {
     if (!modalData) return;
     await operacionService.aprobarOperacion(modalData.id, nota);
     setOperaciones((prev) =>
       prev.map((op) => (op.id === modalData.id ? { ...op, estado: 'Aprobada' } : op))
     );
-
-    const detalleStr = [
-      cantidad ? `${cantidad} ud.` : '',
-      fechaLimite ? `Hasta: ${fechaLimite}` : '',
-      nota ? `Nota: "${nota}"` : '',
-    ]
-      .filter(Boolean)
-      .join(' | ');
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Ítem',
-      actor: 'Encargado de recurso',
-      descripcion: `Aprobación de préstamo ${modalData.folio} para ${modalData.solicitante.nombre} (${modalData.item.nombre})${detalleStr ? ` - ${detalleStr}` : ''}`,
-      origen: 'Panel',
-      estacion: modalData.estacion,
-    });
 
     showToast(`Solicitud ${modalData.folio} aprobada con éxito`, 'success');
     setModalData(null);
@@ -269,14 +252,6 @@ export const OperacionesPage: React.FC = () => {
     setOperaciones((prev) =>
       prev.map((op) => (op.id === modalData.id ? { ...op, estado: 'Cancelada' } : op))
     );
-
-    await auditoriaService.registrarEvento({
-      tipo: 'Ítem',
-      actor: 'Encargado de recurso',
-      descripcion: `Rechazo de préstamo ${modalData.folio} solicitado por ${modalData.solicitante.nombre}`,
-      origen: 'Panel',
-      estacion: modalData.estacion,
-    });
 
     showToast(`Solicitud ${modalData.folio} rechazada`, 'info');
     setModalData(null);

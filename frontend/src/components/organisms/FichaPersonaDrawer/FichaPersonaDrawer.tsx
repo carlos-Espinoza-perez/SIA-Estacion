@@ -713,12 +713,16 @@ export const FichaPersonaDrawer: React.FC<FichaPersonaDrawerProps> = ({
                                   ? 'rgba(34, 197, 94, 0.12)'
                                   : op.estado === 'Pendiente'
                                   ? 'rgba(234, 179, 8, 0.12)'
+                                  : op.estado === 'Cancelada'
+                                  ? 'rgba(148, 163, 184, 0.12)'
                                   : 'rgba(59, 130, 246, 0.12)',
                               color:
                                 op.estado === 'Devuelta'
                                   ? '#4ADE80'
                                   : op.estado === 'Pendiente'
                                   ? '#FACC15'
+                                  : op.estado === 'Cancelada'
+                                  ? '#94A3B8'
                                   : '#60A5FA',
                             }}
                           >

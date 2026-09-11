@@ -147,9 +147,16 @@ export function useNotificaciones() {
     window.addEventListener(NOTIF_EVENT, handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
+    // No hay push desde el backend (WebSocket/SignalR); se hace polling periodico
+    // para que las notificaciones no dependan de recargar la pagina.
+    const intervalo = window.setInterval(() => {
+      notificacionService.sincronizarEventosRecientes().catch(() => {});
+    }, 30000);
+
     return () => {
       window.removeEventListener(NOTIF_EVENT, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      window.clearInterval(intervalo);
     };
   }, []);
 

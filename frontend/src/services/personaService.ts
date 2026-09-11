@@ -9,6 +9,8 @@ import {
 
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta, PaginacionMetadata } from '../types/api';
+import { accesoService } from './accesoService';
+import { operacionService } from './operacionService';
 
 interface FotoReferenciaBackendDto {
   id: string;
@@ -37,6 +39,24 @@ interface PersonaBackendDto {
 
 const normalizarUrlFoto = (url: string): string =>
   url.trim().replace(/&amp;/gi, '&').replace(/\\u0026/gi, '&');
+
+const mapEstadoOperacionParaFicha = (
+  estado: 'Pendiente' | 'Aprobada' | 'Entregada' | 'Devuelta' | 'Cancelada' | 'Offline'
+): 'Pendiente' | 'Devuelta' | 'En curso' | 'Vencida' | 'Cancelada' => {
+  switch (estado) {
+    case 'Pendiente':
+      return 'Pendiente';
+    case 'Aprobada':
+    case 'Entregada':
+      return 'En curso';
+    case 'Devuelta':
+      return 'Devuelta';
+    case 'Cancelada':
+      return 'Cancelada';
+    default:
+      return 'Pendiente';
+  }
+};
 
 export const personaService = {
   getPersonas: async (filtros?: FiltrosPersona): Promise<{ data: Persona[]; paginacion?: PaginacionMetadata }> => {
@@ -96,6 +116,39 @@ export const personaService = {
     const fotoPrincipal = fotosReferencia[0];
     const fechaFoto = fotoPrincipal ? new Date(fotoPrincipal.fechaCarga).toLocaleDateString() : '';
 
+    const [historialAccesos, operacionesItems] = await Promise.all([
+      accesoService
+        .getAccesos({ busqueda: p.codigoEstudiantil })
+        .then((accesos) =>
+          accesos
+            .filter((a) => a.carnet === p.codigoEstudiantil)
+            .slice(0, 5)
+            .map((a) => ({
+              id: a.id,
+              fechaHora: a.fechaHora,
+              estacion: a.estacion,
+              direccion: (a.direccion === 'Ingreso' ? 'Ingreso' : 'Egreso') as 'Ingreso' | 'Egreso',
+              validacion: a.validacion as 'QR + Facial' | 'QR' | 'Facial' | 'Manual',
+              resultado: a.resultado,
+            }))
+        )
+        .catch(() => []),
+      operacionService
+        .getOperaciones({ busqueda: p.codigoEstudiantil })
+        .then((operaciones) =>
+          operaciones
+            .filter((o) => o.carnet === p.codigoEstudiantil)
+            .map((o) => ({
+              id: o.id,
+              folio: o.folio,
+              fecha: o.fechaHora,
+              item: o.item,
+              estado: mapEstadoOperacionParaFicha(o.estado),
+            }))
+        )
+        .catch(() => []),
+    ]);
+
     return {
       id: p.id,
       nombre: `${p.nombres} ${p.apellidos}`.trim(),
@@ -124,8 +177,8 @@ export const personaService = {
         url: foto.url,
         fechaCarga: new Date(foto.fechaCarga).toLocaleDateString(),
       })),
-      historialAccesos: [],
-      operacionesItems: [],
+      historialAccesos,
+      operacionesItems,
     };
   },
 
