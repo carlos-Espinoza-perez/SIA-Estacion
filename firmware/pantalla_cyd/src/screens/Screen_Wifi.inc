@@ -6,10 +6,31 @@
 //       No compilar de forma independiente.
 // ============================================================
 
-void LvglManager::showWifiList(int numNetworks, 
+// Crea un boton "Volver" generico a las coordenadas dadas. Solo se usa cuando
+// se paso un onCancel real, es decir, cuando la seleccion de red se entro
+// desde el panel admin (no durante el emparejamiento inicial).
+static lv_obj_t* createWifiBackButton(int x, int y, int w, lv_align_t align, std::function<void()> onCancel) {
+    _onBackCb = onCancel;
+    lv_obj_t* btn = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(btn, w, 44);
+    lv_obj_align(btn, align, x, y);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x1F2937), LV_PART_MAIN);
+    lv_obj_set_style_radius(btn, 8, LV_PART_MAIN);
+    lv_obj_t* lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, LV_SYMBOL_LEFT " Volver");
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_center(lbl);
+    lv_obj_add_event_cb(btn, [](lv_event_t* e) {
+        if (_onBackCb) _onBackCb();
+    }, LV_EVENT_CLICKED, NULL);
+    return btn;
+}
+
+void LvglManager::showWifiList(int numNetworks,
                               std::function<void(int)> onSelect,
                               std::function<void()> onRefresh,
-                              std::function<void()> onOther) {
+                              std::function<void()> onOther,
+                              std::function<void()> onCancel) {
     if (!_initialized) return;
 
     _onSelectCb = onSelect;
@@ -57,33 +78,41 @@ void LvglManager::showWifiList(int numNetworks,
         }, LV_EVENT_CLICKED, (void*)(uintptr_t)i);
     }
 
-    // Botones
+    // Botones: 2 columnas normalmente; 3 (con Volver) cuando se entro desde el panel admin.
+    int btnW = onCancel ? 140 : 210;
+
+    if (onCancel) {
+        createWifiBackButton(20, -10, btnW, LV_ALIGN_BOTTOM_LEFT, onCancel);
+    }
+
     lv_obj_t* btn_ref = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btn_ref, 210, 44);
-    lv_obj_align(btn_ref, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+    lv_obj_set_size(btn_ref, btnW, 44);
+    lv_obj_align(btn_ref, onCancel ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_BOTTOM_LEFT, onCancel ? 0 : 20, -10);
     lv_obj_set_style_bg_color(btn_ref, lv_color_hex(0x1F2937), LV_PART_MAIN);
     lv_obj_set_style_radius(btn_ref, 8, LV_PART_MAIN);
     lv_obj_t* lbl_ref = lv_label_create(btn_ref);
     lv_label_set_text(lbl_ref, LV_SYMBOL_REFRESH "  Actualizar");
+    lv_obj_set_style_text_font(lbl_ref, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_center(lbl_ref);
     lv_obj_add_event_cb(btn_ref, [](lv_event_t * e) {
         if (_onRefreshCb) _onRefreshCb();
     }, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t* btn_other = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btn_other, 210, 44);
+    lv_obj_set_size(btn_other, btnW, 44);
     lv_obj_align(btn_other, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
     lv_obj_set_style_bg_color(btn_other, lv_color_hex(0x1F2937), LV_PART_MAIN);
     lv_obj_set_style_radius(btn_other, 8, LV_PART_MAIN);
     lv_obj_t* lbl_oth = lv_label_create(btn_other);
     lv_label_set_text(lbl_oth, "Otra red...");
+    lv_obj_set_style_text_font(lbl_oth, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_center(lbl_oth);
     lv_obj_add_event_cb(btn_other, [](lv_event_t * e) {
         if (_onOtherCb) _onOtherCb();
     }, LV_EVENT_CLICKED, NULL);
 }
 
-void LvglManager::showWifiScanning(std::function<void()> onRefresh, std::function<void()> onOther) {
+void LvglManager::showWifiScanning(std::function<void()> onRefresh, std::function<void()> onOther, std::function<void()> onCancel) {
     if (!_initialized) return;
     _onRefreshCb = onRefresh;
     _onOtherCb = onOther;
@@ -104,9 +133,13 @@ void LvglManager::showWifiScanning(std::function<void()> onRefresh, std::functio
     lv_obj_set_style_text_color(msg, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_set_style_text_font(msg, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_align(msg, LV_ALIGN_CENTER, 0, 48);
+
+    if (onCancel) {
+        createWifiBackButton(0, -14, 210, LV_ALIGN_BOTTOM_MID, onCancel);
+    }
 }
 
-void LvglManager::showWifiEmpty(std::function<void()> onRefresh, std::function<void()> onOther) {
+void LvglManager::showWifiEmpty(std::function<void()> onRefresh, std::function<void()> onOther, std::function<void()> onCancel) {
     if (!_initialized) return;
     _onRefreshCb = onRefresh;
     _onOtherCb = onOther;
@@ -128,9 +161,13 @@ void LvglManager::showWifiEmpty(std::function<void()> onRefresh, std::function<v
     lv_obj_set_style_text_font(sub, &lv_font_montserrat_12, LV_PART_MAIN);
     lv_obj_align(sub, LV_ALIGN_CENTER, 0, 12);
 
+    if (onCancel) {
+        createWifiBackButton(20, -20, 210, LV_ALIGN_BOTTOM_LEFT, onCancel);
+    }
+
     lv_obj_t* btn_ref = lv_btn_create(lv_scr_act());
     lv_obj_set_size(btn_ref, 210, 44);
-    lv_obj_align(btn_ref, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_align(btn_ref, onCancel ? LV_ALIGN_BOTTOM_RIGHT : LV_ALIGN_BOTTOM_MID, onCancel ? -20 : 0, -20);
     lv_obj_set_style_bg_color(btn_ref, lv_color_hex(0x1F2937), LV_PART_MAIN);
     lv_obj_set_style_radius(btn_ref, 8, LV_PART_MAIN);
     lv_obj_t* lbl_ref = lv_label_create(btn_ref);

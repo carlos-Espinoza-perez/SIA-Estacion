@@ -331,18 +331,21 @@ void ScreenManager::renderAdminDetected() {
 
 void ScreenManager::renderSelectWifi() {
     int numNetworks = WiFi.scanComplete();
+    // El boton "Volver" solo aparece si se entro a la seleccion de red desde el
+    // panel admin: durante el emparejamiento inicial no hay a donde volver.
+    std::function<void()> cancelCb = _wifiFromAdmin ? _onWifiCancelCb : nullptr;
 
     if (numNetworks < 0) {
-        Lvgl.showWifiScanning(_onWifiRefreshCb, _onWifiOtherCb);
+        Lvgl.showWifiScanning(_onWifiRefreshCb, _onWifiOtherCb, cancelCb);
         return;
     }
 
     if (numNetworks == 0) {
-        Lvgl.showWifiEmpty(_onWifiRefreshCb, _onWifiOtherCb);
+        Lvgl.showWifiEmpty(_onWifiRefreshCb, _onWifiOtherCb, cancelCb);
         return;
     }
 
-    Lvgl.showWifiList(numNetworks, _onWifiSelectCb, _onWifiRefreshCb, _onWifiOtherCb);
+    Lvgl.showWifiList(numNetworks, _onWifiSelectCb, _onWifiRefreshCb, _onWifiOtherCb, cancelCb);
 }
 
 void ScreenManager::renderWifiPassword() {

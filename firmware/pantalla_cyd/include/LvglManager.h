@@ -26,14 +26,17 @@ public:
     void updateBootStatus(const char* subtitle);
     void showConnecting(const char* ssid);
     void showBootNoNetwork(const char* ssid, std::function<void()> onRetry, std::function<void()> onConfig);
-    void showWifiList(int numNetworks, 
+    void showWifiList(int numNetworks,
                       std::function<void(int)> onSelect,
                       std::function<void()> onRefresh,
-                      std::function<void()> onOther);
+                      std::function<void()> onOther,
+                      std::function<void()> onCancel = nullptr);
     void showWifiScanning(std::function<void()> onRefresh,
-                          std::function<void()> onOther);
+                          std::function<void()> onOther,
+                          std::function<void()> onCancel = nullptr);
     void showWifiEmpty(std::function<void()> onRefresh,
-                       std::function<void()> onOther);
+                       std::function<void()> onOther,
+                       std::function<void()> onCancel = nullptr);
     void showWifiPassword(const char* ssid,
                           const char* currentPass,
                           const char* errorMsg,

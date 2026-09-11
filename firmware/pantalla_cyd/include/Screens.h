@@ -65,6 +65,8 @@ public:
     void onWifiOther(std::function<void()> cb) { _onWifiOtherCb = cb; }
     void onWifiConnect(std::function<void(const char*)> cb) { _onWifiConnectCb = cb; }
     void onWifiBack(std::function<void()> cb) { _onWifiBackCb = cb; }
+    void onWifiCancel(std::function<void()> cb) { _onWifiCancelCb = cb; }
+    void setWifiFromAdmin(bool fromAdmin) { _wifiFromAdmin = fromAdmin; }
     void onAdminClick(std::function<void()> cb) { _onAdminClickCb = cb; }
     void onAdminWifi(std::function<void()> cb) { _onAdminWifiCb = cb; }
     void onAdminSync(std::function<void()> cb) { _onAdminSyncCb = cb; }
@@ -95,6 +97,8 @@ private:
     std::function<void()> _onWifiOtherCb;
     std::function<void(const char*)> _onWifiConnectCb;
     std::function<void()> _onWifiBackCb;
+    std::function<void()> _onWifiCancelCb;
+    bool _wifiFromAdmin = false;
     std::function<void()> _onAdminClickCb;
     std::function<void()> _onAdminWifiCb;
     std::function<void()> _onAdminSyncCb;

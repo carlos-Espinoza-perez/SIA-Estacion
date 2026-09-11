@@ -94,6 +94,7 @@ static bool pendingWifiOther = false;
 static String pendingWifiConnectPass = "";
 static bool pendingDoConnect = false;
 static bool pendingWifiBack = false;
+static bool pendingWifiCancel = false;
 static bool pendingAdminOpen = false;
 static bool pendingAdminWifi = false;
 static bool pendingAdminSync = false;
@@ -164,6 +165,10 @@ void setup() {
 
     screens.onWifiBack([]() {
         pendingWifiBack = true;
+    });
+
+    screens.onWifiCancel([]() {
+        pendingWifiCancel = true;
     });
 
     screens.onAdminClick([]() {
@@ -243,6 +248,14 @@ void loop() {
         screens.transitionTo(ScreenState::SELECT_WIFI);
     }
 
+    if (pendingWifiCancel) {
+        pendingWifiCancel = false;
+        Serial.println("[UI] Cancelando seleccion de red, regresando al panel admin");
+        screens.setWifiFromAdmin(false);
+        currentState = StationState::Admin;
+        screens.transitionTo(ScreenState::ADMIN_PANEL);
+    }
+
     if (pendingDoConnect) {
         pendingDoConnect = false;
         String pass = pendingWifiConnectPass;
@@ -261,6 +274,7 @@ void loop() {
         wifiScanRetries = 0;
         startWifiScan();
         currentState = StationState::SelectWifi;
+        screens.setWifiFromAdmin(true);
         screens.transitionTo(ScreenState::SELECT_WIFI);
     }
 
