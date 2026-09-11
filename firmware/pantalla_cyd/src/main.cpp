@@ -65,15 +65,27 @@ static bool   pendingCaptureReady = false;
 static String pendingCaptureCode;
 static String pendingCaptureImage;
 
+static uint32_t wifiScanStartTime = 0;
+
 static void startWifiScan() {
     WiFi.setSleep(false);
-    WiFi.mode(WIFI_STA);
+    // Si el SoftAP de la camara ya esta activo (CameraServer.begin() ya se llamo),
+    // conservar WIFI_AP_STA en vez de forzar WIFI_STA: cambiar de modo mientras el
+    // AP tiene clientes conectados puede dejar el escaneo colgado indefinidamente
+    // (WiFi.scanComplete() nunca sale de WIFI_SCAN_RUNNING) y ademas tira el AP.
+    wifi_mode_t modoActual = WiFi.getMode();
+    if (modoActual == WIFI_MODE_AP || modoActual == WIFI_MODE_APSTA) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_STA);
+    }
     WiFi.disconnect(false, true);
     delay(60);
     WiFi.setTxPower(WIFI_POWER_15dBm);
     WiFi.scanDelete();
     WiFi.scanNetworks(true, true, false, 150);
     wifiScanRendered = false;
+    wifiScanStartTime = millis();
 }
 
 static int pendingWifiSelectIdx = -1;
@@ -332,7 +344,10 @@ void loop() {
 
         case StationState::SelectWifi: {
             int scanStatus = WiFi.scanComplete();
-            if (scanStatus == WIFI_SCAN_FAILED) {
+            if (scanStatus == WIFI_SCAN_RUNNING && millis() - wifiScanStartTime > 8000) {
+                Serial.println("[WIFI] Escaneo colgado por mas de 8s, forzando reintento...");
+                startWifiScan();
+            } else if (scanStatus == WIFI_SCAN_FAILED) {
                 startWifiScan();
             } else if (scanStatus == 0 && wifiScanRetries < 2) {
                 wifiScanRetries++;
