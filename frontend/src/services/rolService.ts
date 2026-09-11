@@ -13,60 +13,33 @@ interface RolBackendDto {
   permisos: string[];
 }
 
-export const NIVELES_POR_DEFECTO: NivelPermiso[] = [
-  { id: '11111111-1111-1111-1111-111111111101', codigo: 'C', nombre: 'Crear', orden: 1, estado: true },
-  { id: '11111111-1111-1111-1111-111111111102', codigo: 'L', nombre: 'Lectura', orden: 2, estado: true },
-  { id: '11111111-1111-1111-1111-111111111103', codigo: 'A', nombre: 'Actualizar', orden: 3, estado: true },
-  { id: '11111111-1111-1111-1111-111111111104', codigo: 'B', nombre: 'Borrar', orden: 4, estado: true },
-  { id: '11111111-1111-1111-1111-111111111105', codigo: 'E', nombre: 'Escritura', orden: 5, estado: true },
-  { id: '11111111-1111-1111-1111-111111111106', codigo: 'T', nombre: 'Total', orden: 6, estado: true },
-];
-
-export const PRIVILEGIOS_POR_DEFECTO: Privilegio[] = [
-  { id: '22222222-2222-2222-2222-222222222201', codigo: 'ACC', nombre: 'Control de Accesos', modulo: 'Accesos', estado: true },
-  { id: '22222222-2222-2222-2222-222222222202', codigo: 'OPE', nombre: 'Operaciones y Préstamos', modulo: 'Operaciones', estado: true },
-  { id: '22222222-2222-2222-2222-222222222203', codigo: 'PER', nombre: 'Gestión de Personas', modulo: 'Personas', estado: true },
-  { id: '22222222-2222-2222-2222-222222222204', codigo: 'ITM', nombre: 'Gestión de Ítems e Inventario', modulo: 'Inventario', estado: true },
-  { id: '22222222-2222-2222-2222-222222222205', codigo: 'TIP', nombre: 'Tipos de Ítems y Categorías', modulo: 'Catálogos', estado: true },
-  { id: '22222222-2222-2222-2222-222222222206', codigo: 'EST', nombre: 'Configuración de Estaciones', modulo: 'Estaciones', estado: true },
-  { id: '22222222-2222-2222-2222-222222222207', codigo: 'ROL', nombre: 'Gestión de Roles y Permisos', modulo: 'Seguridad', estado: true },
-  { id: '22222222-2222-2222-2222-222222222208', codigo: 'USU', nombre: 'Gestión de Usuarios', modulo: 'Seguridad', estado: true },
-  { id: '22222222-2222-2222-2222-222222222209', codigo: 'AUD', nombre: 'Auditoría y Bitácora', modulo: 'Auditoría', estado: true },
-  { id: '22222222-2222-2222-2222-222222222210', codigo: 'REP', nombre: 'Reportes y Estadísticas', modulo: 'Reportes', estado: true },
-  { id: '22222222-2222-2222-2222-222222222211', codigo: 'EMP', nombre: 'Configuración de Empresas', modulo: 'Configuración', estado: true },
-];
-
 export const rolService = {
+  // Nota: estas llamadas dejan que el error se propague (sin catch interno). Si se
+  // silenciaba aqui con datos por defecto, la pagina de Roles se veia funcional
+  // aunque la API estuviera caida — riesgoso en una pantalla que asigna permisos.
+  // El try/catch que muestra el toast de error vive en RolesPage.
   getRoles: async (): Promise<Rol[]> => {
-    try {
-      const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
-      if (response.data && Array.isArray(response.data.datos)) {
-        return response.data.datos.map((r) => ({
-          id: r.id,
-          nombre: r.nombre,
-          descripcion: r.descripcion || '',
-          personasAsignadas: r.personasAsignadas,
-          permisos: r.permisos,
-          activo: r.activo,
-          esSistema: r.esSistema,
-        }));
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
+    const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
+    if (!response.data || !Array.isArray(response.data.datos)) {
+      throw new Error('La API no devolvio la lista de roles.');
     }
-    return [];
+    return response.data.datos.map((r) => ({
+      id: r.id,
+      nombre: r.nombre,
+      descripcion: r.descripcion || '',
+      personasAsignadas: r.personasAsignadas,
+      permisos: r.permisos,
+      activo: r.activo,
+      esSistema: r.esSistema,
+    }));
   },
 
   getPrivilegios: async (): Promise<Privilegio[]> => {
-    try {
-      const response = await apiClient.get<RespuestaEnvuelta<Privilegio[]>>('/privilegios');
-      if (response.data && Array.isArray(response.data.datos) && response.data.datos.length > 0) {
-        return response.data.datos;
-      }
-    } catch (error) {
-      console.error('Error fetching privilegios from API, using defaults:', error);
+    const response = await apiClient.get<RespuestaEnvuelta<Privilegio[]>>('/privilegios');
+    if (!response.data || !Array.isArray(response.data.datos)) {
+      throw new Error('La API no devolvio la lista de privilegios.');
     }
-    return [...PRIVILEGIOS_POR_DEFECTO];
+    return response.data.datos;
   },
 
   crearPrivilegio: async (data: { codigo: string; nombre: string; modulo: string }): Promise<Privilegio> => {
@@ -85,27 +58,19 @@ export const rolService = {
   },
 
   getNivelesPermiso: async (): Promise<NivelPermiso[]> => {
-    try {
-      const response = await apiClient.get<RespuestaEnvuelta<NivelPermiso[]>>('/niveles-permiso');
-      if (response.data && Array.isArray(response.data.datos) && response.data.datos.length > 0) {
-        return response.data.datos.sort((a, b) => a.orden - b.orden);
-      }
-    } catch (error) {
-      console.error('Error fetching niveles de permiso from API, using defaults:', error);
+    const response = await apiClient.get<RespuestaEnvuelta<NivelPermiso[]>>('/niveles-permiso');
+    if (!response.data || !Array.isArray(response.data.datos)) {
+      throw new Error('La API no devolvio los niveles de permiso.');
     }
-    return [...NIVELES_POR_DEFECTO];
+    return response.data.datos.sort((a, b) => a.orden - b.orden);
   },
 
   getPrivilegiosRol: async (rolId: string): Promise<RolPrivilegioDetalle[]> => {
-    try {
-      const response = await apiClient.get<RespuestaEnvuelta<RolPrivilegioDetalle[]>>(`/roles/${rolId}/privilegios`);
-      if (response.data && Array.isArray(response.data.datos)) {
-        return response.data.datos;
-      }
-    } catch (error) {
-      console.error(`Error fetching privilegios for role ${rolId}:`, error);
+    const response = await apiClient.get<RespuestaEnvuelta<RolPrivilegioDetalle[]>>(`/roles/${rolId}/privilegios`);
+    if (!response.data || !Array.isArray(response.data.datos)) {
+      throw new Error('La API no devolvio los privilegios del rol.');
     }
-    return [];
+    return response.data.datos;
   },
 
   crearRol: async (formData: CrearRolFormData): Promise<Rol> => {

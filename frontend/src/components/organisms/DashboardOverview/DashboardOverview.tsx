@@ -9,16 +9,68 @@ import { dashboardService, DashboardMetrics } from '../../../services/dashboardS
 
 export const DashboardOverview: React.FC = () => {
   const [metricas, setMetricas] = useState<DashboardMetrics | null>(null);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const cargarMetricas = () => {
     let montado = true;
-    dashboardService.getMetricas().then((data) => {
-      if (montado) setMetricas(data);
-    });
+    setError(false);
+    dashboardService
+      .getMetricas()
+      .then((data) => {
+        if (montado) setMetricas(data);
+      })
+      .catch((err) => {
+        console.error('No se pudieron cargar las metricas del dashboard', err);
+        if (montado) setError(true);
+      });
     return () => {
       montado = false;
     };
+  };
+
+  useEffect(() => {
+    return cargarMetricas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          padding: '60px 28px',
+          textAlign: 'center',
+        }}
+      >
+        <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
+          No se pudieron cargar las métricas del dashboard
+        </span>
+        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontFamily: 'Inter, sans-serif' }}>
+          Revisa tu conexión o intenta de nuevo en unos segundos.
+        </span>
+        <button
+          onClick={cargarMetricas}
+          style={{
+            marginTop: '4px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.15)',
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            color: '#FFFFFF',
+            fontSize: '13px',
+            fontFamily: 'Inter, sans-serif',
+            cursor: 'pointer',
+          }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
