@@ -11,6 +11,7 @@
 #include "ApiClient.h"
 #include "PhoneCameraServer.h"
 #include "OfflineManager.h"
+#include "LvglManager.h"
 
 static TFT_eSPI        tft;
 static TouchManager    touch(tft);
@@ -24,8 +25,33 @@ enum class StationState {
     Standby,
     Validating,
     Feedback,
-    Admin
+    Admin,
+    ItemsIdle,       // estacion de items: esperando escanear carnet
+    ItemsScanning,   // persona identificada, escaneando items del prestamo
+    ItemsProcessing, // enviando el lote de items al backend
+    ItemsFeedback    // mostrando el resultado final del prestamo
 };
+
+// true si la estacion es de prestamo de items (Equipo de laboratorio / Material
+// bibliografico) en vez de control de acceso. Se obtiene de StationConfig.tipoRecurso.
+static bool isItemsStation = false;
+
+struct CarritoItem { String id; String nombre; String codigo; };
+static const int CARRITO_MAX = 20;
+static CarritoItem carrito[CARRITO_MAX];
+static int carritoCount = 0;
+static String personaIdActual;
+static String personaNombreActual;
+static StationState itemsFeedbackReturnState = StationState::ItemsIdle;
+
+static bool pendingItemsContinue = false;
+static bool pendingItemsViewCart = false;
+static bool pendingItemsComplete = false;
+static int  pendingItemsRemoveIdx = -1;
+
+static void renderItemsScanNext();
+static void renderItemsSummary();
+static void processItemsCapture(const String& code);
 
 static StationState currentState = StationState::Boot;
 static uint32_t bootStartTime = 0;
@@ -300,8 +326,53 @@ void loop() {
 
     if (pendingAdminExit) {
         pendingAdminExit = false;
-        currentState = StationState::Standby;
         enterStandbyView();
+    }
+
+    if (pendingItemsContinue) {
+        pendingItemsContinue = false;
+        renderItemsScanNext();
+    }
+
+    if (pendingItemsViewCart) {
+        pendingItemsViewCart = false;
+        renderItemsSummary();
+    }
+
+    if (pendingItemsRemoveIdx >= 0) {
+        int idx = pendingItemsRemoveIdx;
+        pendingItemsRemoveIdx = -1;
+        if (idx >= 0 && idx < carritoCount) {
+            for (int i = idx; i < carritoCount - 1; i++) carrito[i] = carrito[i + 1];
+            carritoCount--;
+            Serial.printf("[ITEMS] Item removido del carrito. Quedan %d\n", carritoCount);
+        }
+        renderItemsSummary();
+    }
+
+    if (pendingItemsComplete) {
+        pendingItemsComplete = false;
+        currentState = StationState::ItemsProcessing;
+        Lvgl.showItemValidating("Validando solicitud", "Estamos verificando los items y tu solicitud.");
+
+        String itemIds[CARRITO_MAX];
+        for (int i = 0; i < carritoCount; i++) itemIds[i] = carrito[i].id;
+
+        OperacionLoteResultado resultadoLote = Api.crearOperacionLote(personaIdActual, itemIds, carritoCount);
+        if (resultadoLote.ok && resultadoLote.estado == "Pendiente") {
+            Lvgl.showLoanApprovalSent("Te notificaremos cuando tu solicitud sea aprobada o rechazada.");
+        } else if (resultadoLote.ok) {
+            Lvgl.showLoanCompleted(personaNombreActual.c_str(), "Tu prestamo se realizo correctamente.");
+        } else {
+            Lvgl.showLoanRejected(resultadoLote.mensajeError.c_str());
+        }
+
+        carritoCount = 0;
+        personaIdActual = "";
+        personaNombreActual = "";
+        itemsFeedbackReturnState = StationState::ItemsIdle;
+        stateTimer = millis();
+        currentState = StationState::ItemsFeedback;
     }
 
     switch (currentState) {
@@ -332,13 +403,21 @@ void loop() {
                         if (authTaskFinished) {
                             if (authTaskSuccess) {
                                 screens.updateBootStatus("Autenticado con exito");
+
+                                // Actualizar TipoRecurso (control de acceso vs items) por si
+                                // cambio desde el dashboard despues de la vinculacion inicial.
+                                StationConfig cfgActual = Storage.getConfig();
+                                if (Api.obtenerConfiguracionEstacion(cfgActual)) {
+                                    Storage.saveConfig(cfgActual);
+                                }
+                                isItemsStation = cfgActual.tipoRecurso != "ControlAcceso";
                             } else {
                                 screens.updateBootStatus("Modo fuera de linea");
+                                isItemsStation = Storage.getConfig().tipoRecurso != "ControlAcceso";
                             }
                             screens.update();
                             delay(600);
                             authTaskStarted = false;
-                            currentState = StationState::Standby;
                             enterStandbyView();
                         }
                     } else {
@@ -390,10 +469,10 @@ void loop() {
                 if (status == PollStatus::Success) {
                     Storage.saveConfig(cfg);
                     Api.authenticate(cfg.clientId, cfg.clientSecret);
+                    isItemsStation = cfg.tipoRecurso != "ControlAcceso";
 
                     screens.transitionTo(ScreenState::LINKED, cfg.name.c_str(), "Estacion Vinculada");
                     delay(2500);
-                    currentState = StationState::Standby;
                     enterStandbyView();
                 } else if (status == PollStatus::Error) {
                     screens.update();
@@ -457,8 +536,31 @@ void loop() {
 
         case StationState::Feedback: {
             if (millis() - stateTimer >= RESULT_FEEDBACK_TIME_MS) {
-                currentState = StationState::Standby;
                 enterStandbyView();
+            }
+            break;
+        }
+
+        case StationState::ItemsIdle: {
+            if (millis() - heartbeatTimer >= HEARTBEAT_INTERVAL_MS) {
+                heartbeatTimer = millis();
+                if (Api.isConnected()) {
+                    Api.sendHeartbeat();
+                } else {
+                    Api.connectWifi();
+                }
+            }
+            break;
+        }
+
+        case StationState::ItemsFeedback: {
+            if (millis() - stateTimer >= RESULT_FEEDBACK_TIME_MS) {
+                if (itemsFeedbackReturnState == StationState::ItemsScanning) {
+                    currentState = StationState::ItemsScanning;
+                    renderItemsScanNext();
+                } else {
+                    enterStandbyView();
+                }
             }
             break;
         }
@@ -475,11 +577,21 @@ static void enterStandbyView() {
     // boton Volver de seleccion de WiFi ya no aplica (se reconecto o se cancelo).
     screens.setWifiFromAdmin(false);
 
-    if (wasConnected) {
+    if (isItemsStation) {
+        currentState = StationState::ItemsIdle;
+        carritoCount = 0;
+        personaIdActual = "";
+        personaNombreActual = "";
+        StationConfig cfg = Storage.getConfig();
+        String stationName = cfg.name.length() > 0 ? cfg.name : "Estacion SIA";
+        Lvgl.showItemScanCard(stationName.c_str());
+    } else if (wasConnected) {
+        currentState = StationState::Standby;
         StationConfig cfg = Storage.getConfig();
         String stationName = cfg.name.length() > 0 ? cfg.name : "Entrada Principal";
         screens.transitionTo(ScreenState::WAITING, stationName.c_str(), "Control de Acceso e Identificacion");
     } else {
+        currentState = StationState::Standby;
         screens.transitionTo(ScreenState::OFFLINE);
     }
 
@@ -576,12 +688,16 @@ static void onWifiConfigReceived(const String& ssid, const String& password) {
 // devolver el control de inmediato para que el telefono reciba su ack rapido: solo
 // encola la captura, la validacion real la hace processPendingCapture() en el loop().
 static void onCameraCapture(const String& code, const String& imageBase64) {
-    if (currentState != StationState::Standby) {
-        Serial.printf("[ACCESO] Ignorando captura: estado actual (%d) no es Standby\n", (int)currentState);
+    bool aceptaCaptura = isItemsStation
+        ? (currentState == StationState::ItemsIdle || currentState == StationState::ItemsScanning)
+        : (currentState == StationState::Standby);
+
+    if (!aceptaCaptura) {
+        Serial.printf("[CAPTURA] Ignorando captura: estado actual (%d) no acepta escaneo\n", (int)currentState);
         return;
     }
     if (pendingCaptureReady) {
-        Serial.println("[ACCESO] Ya hay una captura pendiente de procesar; se descarta la nueva.");
+        Serial.println("[CAPTURA] Ya hay una captura pendiente de procesar; se descarta la nueva.");
         return;
     }
 
@@ -590,9 +706,10 @@ static void onCameraCapture(const String& code, const String& imageBase64) {
     pendingCaptureReady = true;
 }
 
-// Procesa en el loop principal la captura encolada por onCameraCapture(): valida contra
-// el backend (que decide Ingreso/Egreso dinamicamente) y muestra el resultado en la
-// pantalla de la estacion. El telefono ya recibio su ack y no espera este resultado.
+static void processAccessCapture(const String& code, const String& imageBase64);
+
+// Procesa en el loop principal la captura encolada por onCameraCapture() y la
+// reparte al flujo correspondiente segun el tipo de estacion.
 static void processPendingCapture() {
     if (!pendingCaptureReady) return;
     pendingCaptureReady = false;
@@ -602,6 +719,16 @@ static void processPendingCapture() {
     pendingCaptureCode = "";
     pendingCaptureImage = "";
 
+    if (isItemsStation) {
+        processItemsCapture(code);
+    } else {
+        processAccessCapture(code, imageBase64);
+    }
+}
+
+// Valida contra el backend (que decide Ingreso/Egreso dinamicamente) y muestra el
+// resultado en la pantalla de la estacion. El telefono ya recibio su ack y no espera esto.
+static void processAccessCapture(const String& code, const String& imageBase64) {
     Serial.printf("[ACCESO] Procesando validacion: Codigo='%s', ImagenBase64=%u bytes\n",
                   code.c_str(), (unsigned int)imageBase64.length());
 
@@ -659,6 +786,93 @@ static void processPendingCapture() {
 
     stateTimer = millis();
     currentState = StationState::Feedback;
+}
+
+// ============================================================
+// Flujo de gestion de items (prestamo de equipo de laboratorio / material
+// bibliografico). Solo se usa cuando isItemsStation es true.
+// ============================================================
+
+static void renderItemsScanNext() {
+    currentState = StationState::ItemsScanning;
+    Lvgl.showItemScanNext(personaNombreActual.c_str(), carritoCount, []() {
+        pendingItemsViewCart = true;
+    });
+}
+
+static void renderItemsSummary() {
+    ItemSummaryEntry entries[CARRITO_MAX];
+    for (int i = 0; i < carritoCount; i++) {
+        entries[i].name = carrito[i].nombre.c_str();
+        entries[i].code = carrito[i].codigo.c_str();
+    }
+    Lvgl.showItemSummary(entries, carritoCount,
+        []() { pendingItemsContinue = true; },
+        []() { pendingItemsComplete = true; },
+        [](int idx) { pendingItemsRemoveIdx = idx; });
+}
+
+// Procesa la captura encolada por onCameraCapture() cuando isItemsStation es true.
+// En ItemsIdle el codigo escaneado es el carnet de la persona; en ItemsScanning es
+// el codigo QR de un item a agregar al carrito.
+static void processItemsCapture(const String& code) {
+    if (currentState == StationState::ItemsIdle) {
+        currentState = StationState::ItemsProcessing;
+        Lvgl.showItemValidating("Verificando carnet", "Consultando sistema...");
+
+        PersonaIdentificada persona = Api.identificarPersona(code);
+        if (persona.ok) {
+            personaIdActual = persona.personaId;
+            personaNombreActual = persona.nombreCompleto;
+            carritoCount = 0;
+            Serial.printf("[ITEMS] Persona identificada: '%s'\n", personaNombreActual.c_str());
+            renderItemsScanNext();
+        } else {
+            Serial.printf("[ITEMS] Carnet no reconocido: %s\n", persona.mensajeError.c_str());
+            Lvgl.showError("Carnet no reconocido", persona.mensajeError.c_str());
+            itemsFeedbackReturnState = StationState::ItemsIdle;
+            stateTimer = millis();
+            currentState = StationState::ItemsFeedback;
+        }
+        return;
+    }
+
+    // currentState == StationState::ItemsScanning: el codigo es un item a agregar
+    currentState = StationState::ItemsProcessing;
+    Lvgl.showItemValidating("Verificando item", "Consultando sistema...");
+
+    ItemEscaneado item = Api.escanearItem(code);
+    if (item.ok && item.disponible) {
+        bool yaEnCarrito = false;
+        for (int i = 0; i < carritoCount; i++) {
+            if (carrito[i].id == item.itemId) { yaEnCarrito = true; break; }
+        }
+
+        if (yaEnCarrito) {
+            Lvgl.showError("Item ya escaneado", "Este item ya esta en tu lista de prestamo.");
+        } else if (carritoCount >= CARRITO_MAX) {
+            Lvgl.showError("Limite alcanzado", "No puedes agregar mas items a este prestamo.");
+        } else {
+            carrito[carritoCount].id = item.itemId;
+            carrito[carritoCount].nombre = item.nombre;
+            carrito[carritoCount].codigo = item.codigoQr;
+            carritoCount++;
+            Serial.printf("[ITEMS] Item agregado: '%s' (%d en carrito)\n", item.nombre.c_str(), carritoCount);
+
+            currentState = StationState::ItemsScanning;
+            Lvgl.showItemAdded(item.nombre.c_str(), item.codigoQr.c_str(), carritoCount,
+                []() { pendingItemsContinue = true; },
+                []() { pendingItemsViewCart = true; });
+            return;
+        }
+    } else {
+        Serial.printf("[ITEMS] Item no disponible: %s\n", item.mensajeError.c_str());
+        Lvgl.showError("Item no disponible", item.mensajeError.c_str());
+    }
+
+    itemsFeedbackReturnState = StationState::ItemsScanning;
+    stateTimer = millis();
+    currentState = StationState::ItemsFeedback;
 }
 
 static void handleSerialCli() {
@@ -720,8 +934,20 @@ static void handleSerialCli() {
                       Api.isConnected(), Offline.tieneCopiaLocal() ? "SI" : "NO",
                       Offline.obtenerUltimaSincronizacionCodigos().c_str(), Offline.contarPendientes(),
                       Offline.obtenerUltimaSincronizacionEventos().c_str());
+    } else if (line == "ITEMS") {
+        Serial.printf("[ITEMS] EsEstacionItems=%d | Estado=%d | Persona='%s' | Carrito=%d item(s)\n",
+                      isItemsStation, (int)currentState, personaNombreActual.c_str(), carritoCount);
+        for (int i = 0; i < carritoCount; i++) {
+            Serial.printf("  [%d] %s (Codigo: %s)\n", i, carrito[i].nombre.c_str(), carrito[i].codigo.c_str());
+        }
+    } else if (line == "ITEMS:VER") {
+        pendingItemsViewCart = true;
+    } else if (line == "ITEMS:COMPLETAR") {
+        pendingItemsComplete = true;
+    } else if (line.startsWith("ITEMS:QUITAR:")) {
+        pendingItemsRemoveIdx = line.substring(13).toInt();
     } else if (line == "HELP") {
-        Serial.println("Comandos disponibles: STATUS | UNPAIR | STATE:<BOOT|WAITING|GRANTED|DENIED|ADMIN|WIFI|LINK|ITEM> | PERF | OFFLINE | CAPTURE:<codigo> | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
+        Serial.println("Comandos disponibles: STATUS | UNPAIR | STATE:<BOOT|WAITING|GRANTED|DENIED|ADMIN|WIFI|LINK|ITEM> | PERF | OFFLINE | ITEMS | ITEMS:VER | ITEMS:COMPLETAR | ITEMS:QUITAR:<idx> | CAPTURE:<codigo> | SCAN | CAL | RESET | WIFI:<ssid>:<pass>");
     }
 }
 

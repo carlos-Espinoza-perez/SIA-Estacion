@@ -7,6 +7,7 @@ struct StationConfig {
     String clientId;
     String clientSecret;
     String name;
+    String tipoRecurso = "ControlAcceso"; // ControlAcceso | EquipoLaboratorio | MaterialBibliografico
     bool requireAuth;
     bool requireApproval;
 };

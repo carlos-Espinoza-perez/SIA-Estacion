@@ -69,8 +69,9 @@ public:
     void showItemScanNext(const char* personName, int itemCount, std::function<void()> onViewItems = nullptr);
     void showItemAdded(const char* itemName, const char* itemCode, int itemCount, 
                        std::function<void()> onContinue, std::function<void()> onViewItems);
-    void showItemSummary(const ItemSummaryEntry* items, int itemCount, 
-                         std::function<void()> onContinue, std::function<void()> onComplete);
+    void showItemSummary(const ItemSummaryEntry* items, int itemCount,
+                         std::function<void()> onContinue, std::function<void()> onComplete,
+                         std::function<void(int)> onRemove = nullptr);
     void showItemValidating(const char* title = nullptr, const char* subtitle = nullptr);
     void showLoanCompleted(const char* person = nullptr, const char* detail = nullptr);
     void showLoanApprovalSent(const char* detail = nullptr);

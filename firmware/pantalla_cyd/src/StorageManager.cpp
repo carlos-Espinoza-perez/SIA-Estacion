@@ -32,6 +32,7 @@ StationConfig StorageManager::getConfig() {
     cfg.clientId = _prefs.getString("cid", "");
     cfg.clientSecret = _prefs.getString("sec", "");
     cfg.name = _prefs.getString("name", "Estacion SIA");
+    cfg.tipoRecurso = _prefs.getString("tipo_rec", "ControlAcceso");
     cfg.requireAuth = _prefs.getBool("req_id", true);
     cfg.requireApproval = _prefs.getBool("req_ap", false);
     return cfg;
@@ -41,6 +42,7 @@ bool StorageManager::saveConfig(const StationConfig& cfg) {
     _prefs.putString("cid", cfg.clientId);
     _prefs.putString("sec", cfg.clientSecret);
     _prefs.putString("name", cfg.name);
+    _prefs.putString("tipo_rec", cfg.tipoRecurso);
     _prefs.putBool("req_id", cfg.requireAuth);
     _prefs.putBool("req_ap", cfg.requireApproval);
     _prefs.putBool("ok", true);
@@ -52,6 +54,7 @@ void StorageManager::clearConfig() {
     _prefs.remove("cid");
     _prefs.remove("sec");
     _prefs.remove("name");
+    _prefs.remove("tipo_rec");
     _prefs.remove("req_id");
     _prefs.remove("req_ap");
 }

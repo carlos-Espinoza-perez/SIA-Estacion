@@ -20,6 +20,30 @@ struct AccessResult {
     String direction = "Ingreso"; // "Ingreso" o "Egreso", decidido por el backend
 };
 
+// Flujo de gestion de items (prestamos de laboratorio / biblioteca)
+struct PersonaIdentificada {
+    bool ok = false;
+    String personaId;
+    String nombreCompleto;
+    String mensajeError;
+};
+
+struct ItemEscaneado {
+    bool ok = false;
+    String itemId;
+    String nombre;
+    String codigoQr;
+    bool disponible = false;
+    String mensajeError;
+};
+
+struct OperacionLoteResultado {
+    bool ok = false;
+    String folio;
+    String estado; // "Aprobado" o "Pendiente"
+    String mensajeError;
+};
+
 class ApiClient {
 public:
     bool isConnected();
@@ -35,6 +59,14 @@ public:
     // Modo sin conexion: copia local de codigos validos y sincronizacion de eventos encolados
     bool obtenerCodigosSincronizacion(String& outJsonArray);
     bool sincronizarEventosOffline(const String& loteJson);
+
+    // Configuracion de la estacion (incluye TipoRecurso: control de acceso o items)
+    bool obtenerConfiguracionEstacion(StationConfig& cfg);
+
+    // Flujo de gestion de items
+    PersonaIdentificada identificarPersona(const String& codigo);
+    ItemEscaneado escanearItem(const String& codigoQr);
+    OperacionLoteResultado crearOperacionLote(const String& personaId, const String itemIds[], int itemCount);
 
     bool hasToken() const;
 

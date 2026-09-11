@@ -170,6 +170,7 @@ PollStatus ApiClient::pollProvisioning(const String& mac, StationConfig& out) {
             out.clientId = data["clientId"].as<String>();
             out.clientSecret = data["clientSecret"].as<String>();
             out.name = data["estacionNombre"].as<String>();
+            out.tipoRecurso = data["tipoRecurso"] | "ControlAcceso";
             out.requireAuth = data["requiereIdentificacion"].as<bool>();
             out.requireApproval = data["requiereAprobacion"].as<bool>();
             Serial.printf("[API] Vinculacion exitosa! Estacion: '%s' (ClientId: %s)\n",
@@ -399,4 +400,163 @@ bool ApiClient::sincronizarEventosOffline(const String& loteJson) {
 
     Serial.printf("[SYNC] Fallo al sincronizar eventos: HTTP %d | %s\n", code, payload.c_str());
     return false;
+}
+
+bool ApiClient::obtenerConfiguracionEstacion(StationConfig& cfg) {
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        return false;
+    }
+
+    String url = buildUrl("/api/estacion-api/configuracion");
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    if (!sendHttpRequest(http, url, "GET", "", _token, 8000, code, payload) || code != 200) {
+        Serial.printf("[CONFIG] No se pudo obtener configuracion de la estacion (code=%d)\n", code);
+        return false;
+    }
+
+    JsonDocument res;
+    DeserializationError err = deserializeJson(res, payload);
+    if (err || res["datos"].isNull()) {
+        Serial.printf("[CONFIG] Error deserializando configuracion: %s\n", err.c_str());
+        return false;
+    }
+
+    JsonObject data = res["datos"];
+    cfg.name = data["nombre"] | cfg.name;
+    cfg.tipoRecurso = data["tipoRecurso"] | cfg.tipoRecurso;
+    cfg.requireAuth = data["requiereIdentificacion"].as<bool>();
+    cfg.requireApproval = data["requiereAprobacion"].as<bool>();
+    Serial.printf("[CONFIG] TipoRecurso='%s' RequiereIdentificacion=%d RequiereAprobacion=%d\n",
+                  cfg.tipoRecurso.c_str(), cfg.requireAuth, cfg.requireApproval);
+    return true;
+}
+
+PersonaIdentificada ApiClient::identificarPersona(const String& codigo) {
+    PersonaIdentificada resultado;
+    StationConfig cfg = Storage.getConfig();
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        resultado.mensajeError = "Sin sesion con el servidor";
+        return resultado;
+    }
+
+    String url = buildUrl("/api/estacion-api/personas/" + codigo);
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    if (!sendHttpRequest(http, url, "GET", "", _token, 10000, code, payload)) {
+        resultado.mensajeError = "Error de conexion con el servidor";
+        return resultado;
+    }
+
+    JsonDocument res;
+    DeserializationError err = deserializeJson(res, payload);
+
+    if (code == 200 && !err && !res["datos"].isNull()) {
+        JsonObject data = res["datos"];
+        resultado.ok = true;
+        resultado.personaId = data["personaId"].as<String>();
+        resultado.nombreCompleto = data["nombreCompleto"].as<String>();
+        Serial.printf("[ITEMS] Persona identificada: '%s' (Id: %s)\n",
+                      resultado.nombreCompleto.c_str(), resultado.personaId.c_str());
+        return resultado;
+    }
+
+    resultado.mensajeError = (!err && !res["mensaje"].isNull())
+        ? res["mensaje"].as<String>()
+        : "Codigo no registrado";
+    Serial.printf("[ITEMS] No se pudo identificar persona: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
+    return resultado;
+}
+
+ItemEscaneado ApiClient::escanearItem(const String& codigoQr) {
+    ItemEscaneado resultado;
+    StationConfig cfg = Storage.getConfig();
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        resultado.mensajeError = "Sin sesion con el servidor";
+        return resultado;
+    }
+
+    String url = buildUrl("/api/estacion-api/items/" + codigoQr);
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    if (!sendHttpRequest(http, url, "GET", "", _token, 10000, code, payload)) {
+        resultado.mensajeError = "Error de conexion con el servidor";
+        return resultado;
+    }
+
+    JsonDocument res;
+    DeserializationError err = deserializeJson(res, payload);
+
+    if (code == 200 && !err && !res["datos"].isNull()) {
+        JsonObject data = res["datos"];
+        resultado.ok = true;
+        resultado.itemId = data["id"].as<String>();
+        resultado.nombre = data["nombre"].as<String>();
+        resultado.codigoQr = data["codigoQr"].as<String>();
+        resultado.disponible = data["estadoActual"].as<String>() == "Disponible";
+        if (!resultado.disponible) {
+            resultado.mensajeError = "Item no disponible (" + data["estadoActual"].as<String>() + ")";
+        }
+        Serial.printf("[ITEMS] Item escaneado: '%s' | Disponible=%d\n", resultado.nombre.c_str(), resultado.disponible);
+        return resultado;
+    }
+
+    resultado.mensajeError = (!err && !res["mensaje"].isNull())
+        ? res["mensaje"].as<String>()
+        : "Codigo de item no reconocido";
+    Serial.printf("[ITEMS] No se pudo escanear item: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
+    return resultado;
+}
+
+OperacionLoteResultado ApiClient::crearOperacionLote(const String& personaId, const String itemIds[], int itemCount) {
+    OperacionLoteResultado resultado;
+    StationConfig cfg = Storage.getConfig();
+    if (!hasToken() && !authenticate(cfg.clientId, cfg.clientSecret)) {
+        resultado.mensajeError = "Sin sesion con el servidor";
+        return resultado;
+    }
+
+    JsonDocument doc;
+    doc["personaId"] = personaId;
+    JsonArray items = doc["itemIds"].to<JsonArray>();
+    for (int i = 0; i < itemCount; i++) {
+        items.add(itemIds[i]);
+    }
+    String body;
+    serializeJson(doc, body);
+
+    String url = buildUrl("/api/estacion-api/operaciones/lote");
+    HTTPClient http;
+    int code = -1;
+    String payload;
+
+    Serial.printf("[ITEMS] Creando operacion de prestamo con %d item(s)...\n", itemCount);
+    if (!sendHttpRequest(http, url, "POST", body, _token, 15000, code, payload)) {
+        resultado.mensajeError = "Error de conexion con el servidor";
+        return resultado;
+    }
+
+    JsonDocument res;
+    DeserializationError err = deserializeJson(res, payload);
+
+    if (code == 200 && !err && !res["datos"].isNull()) {
+        JsonObject data = res["datos"];
+        resultado.ok = true;
+        resultado.folio = data["folio"].as<String>();
+        resultado.estado = data["estadoActual"].as<String>();
+        Serial.printf("[ITEMS] Operacion creada: Folio=%s Estado=%s\n", resultado.folio.c_str(), resultado.estado.c_str());
+        return resultado;
+    }
+
+    resultado.mensajeError = (!err && !res["mensaje"].isNull())
+        ? res["mensaje"].as<String>()
+        : "No se pudo completar la solicitud";
+    Serial.printf("[ITEMS] Fallo al crear operacion: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
+    return resultado;
 }

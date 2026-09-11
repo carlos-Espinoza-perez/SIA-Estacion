@@ -142,11 +142,13 @@ void LvglManager::showItemAdded(const char* itemName, const char* itemCode, int 
     }, LV_EVENT_CLICKED, NULL);
 }
 
-void LvglManager::showItemSummary(const ItemSummaryEntry* items, int itemCount, 
-                                 std::function<void()> onContinue, std::function<void()> onComplete) {
+void LvglManager::showItemSummary(const ItemSummaryEntry* items, int itemCount,
+                                 std::function<void()> onContinue, std::function<void()> onComplete,
+                                 std::function<void(int)> onRemove) {
     if (!_initialized) return;
     _onAction1Cb = onContinue;
     _onAction2Cb = onComplete;
+    _onSelectCb = onRemove;
     _active = true;
     lv_obj_clean(lv_scr_act());
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x0A0E17), LV_PART_MAIN);
@@ -155,26 +157,54 @@ void LvglManager::showItemSummary(const ItemSummaryEntry* items, int itemCount,
     snprintf(countBuf, sizeof(countBuf), "%d items seleccionados", itemCount);
     createFigmaHeader("Resumen de items", countBuf);
 
-    lv_obj_t* list = lv_list_create(lv_scr_act());
+    lv_obj_t* list = lv_obj_create(lv_scr_act());
     lv_obj_set_size(list, 444, 180);
     lv_obj_align(list, LV_ALIGN_TOP_MID, 0, 68);
     lv_obj_set_style_bg_color(list, lv_color_hex(0x111827), LV_PART_MAIN);
     lv_obj_set_style_border_color(list, lv_color_hex(0x1F2937), LV_PART_MAIN);
+    lv_obj_set_style_border_width(list, 1, LV_PART_MAIN);
     lv_obj_set_style_radius(list, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_all(list, 6, LV_PART_MAIN);
     lv_obj_set_style_pad_row(list, 6, LV_PART_MAIN);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
     for (int i = 0; i < itemCount; i++) {
+        // Fila propia (no lv_list_add_btn): asi el boton "Quitar" puede tener su
+        // propio evento de click sin disparar el de toda la fila.
+        lv_obj_t* row = lv_obj_create(list);
+        lv_obj_set_size(row, LV_PCT(100), 46);
+        lv_obj_set_style_bg_color(row, lv_color_hex(0x182234), LV_PART_MAIN);
+        lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
+        lv_obj_set_style_radius(row, 8, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(row, 8, LV_PART_MAIN);
+        lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
         char itemText[96];
-        snprintf(itemText, sizeof(itemText), "%s  (Codigo: %s)", 
-                 (items && items[i].name) ? items[i].name : "Item", 
+        snprintf(itemText, sizeof(itemText), "%s\nCodigo: %s",
+                 (items && items[i].name) ? items[i].name : "Item",
                  (items && items[i].code) ? items[i].code : "ID");
 
-        lv_obj_t* btn = lv_list_add_btn(list, LV_SYMBOL_FILE, itemText);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x182234), LV_PART_MAIN);
-        lv_obj_set_style_text_color(btn, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_set_style_radius(btn, 8, LV_PART_MAIN);
-        lv_obj_set_style_pad_ver(btn, 10, LV_PART_MAIN);
+        lv_obj_t* lbl = lv_label_create(row);
+        lv_label_set_text(lbl, itemText);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_12, LV_PART_MAIN);
+        lv_obj_align(lbl, LV_ALIGN_LEFT_MID, 0, 0);
+
+        lv_obj_t* btnQuitar = lv_btn_create(row);
+        lv_obj_set_size(btnQuitar, 74, 30);
+        lv_obj_align(btnQuitar, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_style_bg_color(btnQuitar, lv_color_hex(0x7F1D1D), LV_PART_MAIN);
+        lv_obj_set_style_radius(btnQuitar, 6, LV_PART_MAIN);
+        lv_obj_t* lblQuitar = lv_label_create(btnQuitar);
+        lv_label_set_text(lblQuitar, "Quitar");
+        lv_obj_set_style_text_color(lblQuitar, lv_color_hex(0xFCA5A5), LV_PART_MAIN);
+        lv_obj_set_style_text_font(lblQuitar, &lv_font_montserrat_12, LV_PART_MAIN);
+        lv_obj_center(lblQuitar);
+        lv_obj_add_event_cb(btnQuitar, [](lv_event_t* e) {
+            int idx = (int)(uintptr_t)lv_event_get_user_data(e);
+            if (_onSelectCb) _onSelectCb(idx);
+        }, LV_EVENT_CLICKED, (void*)(uintptr_t)i);
     }
 
     // Botones
