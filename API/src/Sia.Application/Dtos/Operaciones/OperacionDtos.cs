@@ -71,3 +71,27 @@ public class DevolucionDetalleRequest
     public string CondicionDevolucion { get; set; } = string.Empty;
     public string? Observacion { get; set; }
 }
+
+// Usado por la estacion (pantalla CYD) para el flujo de gestion de items: identificar
+// a la persona por su carnet y crear un solo folio agrupando varios items escaneados.
+public class PersonaBusquedaResponse
+{
+    public Guid PersonaId { get; set; }
+    public string NombreCompleto { get; set; } = string.Empty;
+    public string CodigoEstudiantil { get; set; } = string.Empty;
+}
+
+public class CrearOperacionLoteRequest
+{
+    public Guid PersonaId { get; set; }
+    public List<Guid> ItemIds { get; set; } = [];
+    public string? Observaciones { get; set; }
+}
+
+public class OperacionLoteResponse
+{
+    public Guid Id { get; set; }
+    public string Folio { get; set; } = string.Empty;
+    public string EstadoActual { get; set; } = string.Empty; // "Aprobado" o "Pendiente"
+    public List<string> ItemNombres { get; set; } = [];
+}

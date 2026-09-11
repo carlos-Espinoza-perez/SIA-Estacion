@@ -13,13 +13,23 @@ namespace Sia.Application.Servicios;
 public class ServicioOperaciones
 {
     private readonly IOperacionesRepository _repository;
+    private readonly IPersonasRepository _personasRepository;
+    private readonly IEstacionesRepository _estacionesRepository;
     private readonly IMapper _mapper;
     private readonly IContextoEmpresa _contextoEmpresa;
     private readonly IContextoUsuario _contextoUsuario;
 
-    public ServicioOperaciones(IOperacionesRepository repository, IMapper mapper, IContextoEmpresa contextoEmpresa, IContextoUsuario contextoUsuario)
+    public ServicioOperaciones(
+        IOperacionesRepository repository,
+        IPersonasRepository personasRepository,
+        IEstacionesRepository estacionesRepository,
+        IMapper mapper,
+        IContextoEmpresa contextoEmpresa,
+        IContextoUsuario contextoUsuario)
     {
         _repository = repository;
+        _personasRepository = personasRepository;
+        _estacionesRepository = estacionesRepository;
         _mapper = mapper;
         _contextoEmpresa = contextoEmpresa;
         _contextoUsuario = contextoUsuario;
@@ -60,6 +70,16 @@ public class ServicioOperaciones
             return Result<OperacionResponse>.Fallido("TRANSICION_INVALIDA", $"No se puede rechazar una operación en estado {estadoAnterior}");
 
         operacion.EstadoActual = EstadoOperacionItem.Rechazado;
+
+        // Liberar TODOS los items reservados por esta operacion, no solo el item
+        // principal: un lote (o un agrupador con componentes) reserva varios.
+        foreach (var detalle in operacion.Detalles)
+        {
+            if (detalle.Item != null)
+            {
+                detalle.Item.EstadoActual = EstadoItem.Disponible;
+            }
+        }
         if (operacion.ItemEscaneado != null)
         {
             operacion.ItemEscaneado.EstadoActual = EstadoItem.Disponible;
@@ -149,6 +169,124 @@ public class ServicioOperaciones
         };
 
         return Result<OperacionDetalleResponse>.Exitoso(response);
+    }
+
+    // Usado por la estacion (pantalla CYD) en el paso "Escanea tu carnet" del flujo de
+    // items: resuelve la persona por su codigo, igual que /validar lo hace para acceso,
+    // pero expuesto para el flujo de prestamos (un token de estacion no puede llamar a
+    // GET /api/personas/codigo/{codigo}, que exige privilegios de usuario del dashboard).
+    public async Task<Result<PersonaBusquedaResponse>> IdentificarPersonaAsync(string codigo, CancellationToken ct)
+    {
+        if (!_contextoUsuario.EsEstacion)
+            return Result<PersonaBusquedaResponse>.Fallido("NO_AUTORIZADO", "Contexto de estación inválido.");
+
+        Persona? persona = await _personasRepository.ObtenerPorCodigoAsync(codigo, ct);
+        if (persona is null || persona.EmpresaId != _contextoEmpresa.EmpresaId || !persona.Estado)
+            return Result<PersonaBusquedaResponse>.Fallido("NO_ENCONTRADA", "Código no registrado.");
+
+        return Result<PersonaBusquedaResponse>.Exitoso(new PersonaBusquedaResponse
+        {
+            PersonaId = persona.Id,
+            NombreCompleto = $"{persona.Nombres} {persona.Apellidos}".Trim(),
+            CodigoEstudiantil = persona.CodigoEstudiantil
+        });
+    }
+
+    // Crea UN solo folio agrupando varios items escaneados en la misma sesion (el
+    // "carrito" de la pantalla Resumen de items). Si la estacion requiere aprobacion,
+    // la operacion queda Pendiente (revisada despues desde el dashboard) en vez de
+    // auto-aprobarse; en ambos casos los items quedan reservados de inmediato.
+    public async Task<Result<OperacionLoteResponse>> CrearOperacionLoteAsync(CrearOperacionLoteRequest request, CancellationToken ct)
+    {
+        if (!_contextoUsuario.EsEstacion || _contextoUsuario.EstacionId is null)
+            return Result<OperacionLoteResponse>.Fallido("NO_AUTORIZADO", "Contexto de estación inválido.");
+
+        if (request.ItemIds is null || request.ItemIds.Count == 0)
+            return Result<OperacionLoteResponse>.Fallido("SIN_ITEMS", "Debe incluir al menos un ítem.");
+
+        Guid estacionId = _contextoUsuario.EstacionId.Value;
+        Estacion? estacion = await _estacionesRepository.ObtenerPorIdAsync(estacionId, ct);
+        if (estacion is null || !estacion.Estado)
+            return Result<OperacionLoteResponse>.Fallido("ESTACION_INVALIDA", "Estación no encontrada o inactiva.");
+
+        var itemsResueltos = new List<Item>();
+        foreach (Guid itemId in request.ItemIds)
+        {
+            Item? item = await _repository.ObtenerItemConComponentesAsync(itemId, ct);
+            if (item is null)
+                return Result<OperacionLoteResponse>.Fallido("ITEM_NO_ENCONTRADO", "Uno de los ítems escaneados ya no existe.");
+            if (item.EstadoActual != EstadoItem.Disponible)
+                return Result<OperacionLoteResponse>.Fallido("ITEM_NO_DISPONIBLE", $"'{item.Nombre}' no está disponible en este momento.");
+            itemsResueltos.Add(item);
+        }
+
+        EstadoOperacionItem estadoInicial = estacion.RequiereAprobacion ? EstadoOperacionItem.Pendiente : EstadoOperacionItem.Aprobado;
+        string folio = $"OP-{DateTimeOffset.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpperInvariant()}";
+
+        var operacion = new OperacionItem
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = _contextoEmpresa.EmpresaId,
+            Folio = folio,
+            ItemEscaneadoId = itemsResueltos[0].Id,
+            PersonaId = request.PersonaId,
+            EstacionId = estacionId,
+            TipoOperacion = TipoOperacionItem.Prestamo,
+            EstadoActual = estadoInicial,
+            Observaciones = request.Observaciones,
+            FechaSolicitud = DateTimeOffset.UtcNow
+        };
+
+        foreach (Item item in itemsResueltos)
+        {
+            // Reservar de inmediato (Pendiente o Aprobado): evita que otra persona
+            // se lleve el mismo item mientras esta solicitud espera aprobacion.
+            item.EstadoActual = EstadoItem.Prestado;
+
+            await _repository.AgregarOperacionDetalleAsync(new OperacionItemDetalle
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = _contextoEmpresa.EmpresaId,
+                OperacionItemId = operacion.Id,
+                ItemId = item.Id
+            }, ct);
+
+            if (item.EsAgrupador)
+            {
+                foreach (var comp in item.ComponentesDe)
+                {
+                    Item? componente = await _repository.ObtenerItemBasicoAsync(comp.ItemComponenteId, ct);
+                    if (componente is null)
+                        throw new EntidadNoEncontradaException(nameof(Item), comp.ItemComponenteId);
+
+                    componente.EstadoActual = EstadoItem.Prestado;
+
+                    await _repository.AgregarOperacionDetalleAsync(new OperacionItemDetalle
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = _contextoEmpresa.EmpresaId,
+                        OperacionItemId = operacion.Id,
+                        ItemId = componente.Id
+                    }, ct);
+                }
+            }
+        }
+
+        string mensajeMovimiento = estadoInicial == EstadoOperacionItem.Pendiente
+            ? "Solicitud enviada a aprobación"
+            : "Operación creada";
+        await RegistrarMovimiento(operacion, estadoInicial, estadoInicial, mensajeMovimiento, ct);
+
+        await _repository.AgregarOperacionAsync(operacion, ct);
+        await _repository.SaveChangesAsync(ct);
+
+        return Result<OperacionLoteResponse>.Exitoso(new OperacionLoteResponse
+        {
+            Id = operacion.Id,
+            Folio = operacion.Folio,
+            EstadoActual = operacion.EstadoActual.ToString(),
+            ItemNombres = itemsResueltos.Select(i => i.Nombre).ToList()
+        });
     }
 
     public async Task<Result<OperacionResponse>> CrearOperacionAsync(CrearOperacionRequest request, CancellationToken ct)

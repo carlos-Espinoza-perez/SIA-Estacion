@@ -16,10 +16,24 @@ public partial class EstacionApiController
         return HandleResult(resultado);
     }
 
+    [HttpGet("personas/{codigo}")]
+    public async Task<IActionResult> IdentificarPersona(string codigo, CancellationToken ct)
+    {
+        var resultado = await _servicioOperaciones.IdentificarPersonaAsync(codigo, ct);
+        return HandleResult(resultado);
+    }
+
     [HttpPost("operaciones")]
     public async Task<IActionResult> CrearOperacion([FromBody] CrearOperacionRequest request, CancellationToken ct)
     {
         var resultado = await _servicioOperaciones.CrearOperacionAsync(request, ct);
+        return HandleResult(resultado);
+    }
+
+    [HttpPost("operaciones/lote")]
+    public async Task<IActionResult> CrearOperacionLote([FromBody] CrearOperacionLoteRequest request, CancellationToken ct)
+    {
+        var resultado = await _servicioOperaciones.CrearOperacionLoteAsync(request, ct);
         return HandleResult(resultado);
     }
 }
