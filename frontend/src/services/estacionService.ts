@@ -17,6 +17,7 @@ interface EstacionBackendDto {
   firmwareVersion?: string;
   direccionIp?: string;
   clientId: string;
+  tipoRecurso: string;
   requiereIdentificacion: boolean;
   requiereAprobacion: boolean;
   estado: boolean;
@@ -29,6 +30,26 @@ interface EstacionBackendDto {
 }
 
 const HEARTBEAT_TIMEOUT_SECONDS = 90; // Tolerancia de 3 latidos (30s cada uno)
+
+const TIPO_RECURSO_A_BACKEND: Record<string, string> = {
+  'Control de acceso': 'ControlAcceso',
+  'Equipo de laboratorio': 'EquipoLaboratorio',
+  'Material bibliográfico': 'MaterialBibliografico',
+};
+
+const TIPO_RECURSO_DESDE_BACKEND: Record<string, string> = {
+  ControlAcceso: 'Control de acceso',
+  EquipoLaboratorio: 'Equipo de laboratorio',
+  MaterialBibliografico: 'Material bibliográfico',
+};
+
+function mapTipoRecursoToBackend(valor?: string): string {
+  return (valor && TIPO_RECURSO_A_BACKEND[valor]) || 'ControlAcceso';
+}
+
+function mapTipoRecursoFromBackend(valor?: string): string {
+  return (valor && TIPO_RECURSO_DESDE_BACKEND[valor]) || 'Control de acceso';
+}
 
 export function mapBackendDtoToEstacion(e: EstacionBackendDto): Estacion {
   let estadoCalculado: EstadoEstacion = 'Offline';
@@ -51,7 +72,7 @@ export function mapBackendDtoToEstacion(e: EstacionBackendDto): Estacion {
     id: e.id,
     nombre: e.nombre,
     ubicacion: e.ubicacion,
-    tipoRecurso: 'Control de acceso',
+    tipoRecurso: mapTipoRecursoFromBackend(e.tipoRecurso),
     flujo: e.requiereAprobacion ? 'Aprobación' : 'Directo',
     ultimaSincronizacion: e.ultimaSincronizacion
       ? new Date(e.ultimaSincronizacion).toLocaleString()
@@ -109,11 +130,13 @@ export const estacionService = {
   },
 
   crearEstacion: async (data: CrearEstacionFormData): Promise<Estacion> => {
+    const esControlAcceso = data.tipoRecurso === 'Control de acceso';
     const response = await apiClient.post<RespuestaEnvuelta<EstacionBackendDto>>('/estaciones', {
       nombre: data.nombre,
       ubicacion: data.ubicacion,
       encargadoId: data.encargadoId || null,
-      requiereIdentificacion: true,
+      tipoRecurso: mapTipoRecursoToBackend(data.tipoRecurso),
+      requiereIdentificacion: esControlAcceso,
       requiereAprobacion: data.flujo === 'Aprobación',
     });
 
@@ -122,10 +145,13 @@ export const estacionService = {
   },
 
   actualizarEstacion: async (id: string, data: Partial<Estacion>): Promise<Estacion> => {
+    const esControlAcceso = data.tipoRecurso === 'Control de acceso';
     await apiClient.put(`/estaciones/${id}`, {
       nombre: data.nombre,
       ubicacion: data.ubicacion,
       encargadoId: data.encargadoId || null,
+      tipoRecurso: mapTipoRecursoToBackend(data.tipoRecurso),
+      requiereIdentificacion: esControlAcceso,
       requiereAprobacion: data.flujo === 'Aprobación',
     });
 

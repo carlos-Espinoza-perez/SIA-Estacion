@@ -5,6 +5,7 @@ using Sia.Application.Dtos.Estaciones;
 using Sia.Application.Dtos.Items;
 using Sia.Application.Resultados;
 using Sia.Domain.Entidades;
+using Sia.Domain.Enums;
 using Sia.Domain.Excepciones;
 
 namespace Sia.Application.Servicios;
@@ -61,6 +62,7 @@ public class ServicioEstaciones
             DireccionIp = request.DireccionIp,
             ClientId = clientId,
             ClientSecretHash = _hashService.Hash(secretoPlano),
+            TipoRecurso = ParseTipoRecurso(request.TipoRecurso),
             RequiereIdentificacion = request.RequiereIdentificacion,
             RequiereAprobacion = request.RequiereAprobacion
         };
@@ -79,6 +81,7 @@ public class ServicioEstaciones
             FirmwareVersion = baseResponse.FirmwareVersion,
             DireccionIp = baseResponse.DireccionIp,
             ClientId = baseResponse.ClientId,
+            TipoRecurso = baseResponse.TipoRecurso,
             RequiereIdentificacion = baseResponse.RequiereIdentificacion,
             RequiereAprobacion = baseResponse.RequiereAprobacion,
             Estado = baseResponse.Estado,
@@ -100,6 +103,8 @@ public class ServicioEstaciones
         estacion.EncargadoId = request.EncargadoId;
         estacion.FirmwareVersion = request.FirmwareVersion;
         estacion.DireccionIp = request.DireccionIp;
+        if (!string.IsNullOrWhiteSpace(request.TipoRecurso))
+            estacion.TipoRecurso = ParseTipoRecurso(request.TipoRecurso);
         estacion.RequiereIdentificacion = request.RequiereIdentificacion;
         estacion.RequiereAprobacion = request.RequiereAprobacion;
         await _repository.SaveChangesAsync(ct);
@@ -223,6 +228,7 @@ public class ServicioEstaciones
             EstacionNombre = estacion.Nombre,
             ClientId = estacion.ClientId,
             ClientSecret = nuevoSecreto,
+            TipoRecurso = estacion.TipoRecurso.ToString(),
             RequiereIdentificacion = estacion.RequiereIdentificacion,
             RequiereAprobacion = estacion.RequiereAprobacion
         };
@@ -302,6 +308,7 @@ public class ServicioEstaciones
             EstacionNombre = estacion.Nombre,
             ClientId = estacion.ClientId,
             ClientSecret = nuevoSecreto,
+            TipoRecurso = estacion.TipoRecurso.ToString(),
             RequiereIdentificacion = estacion.RequiereIdentificacion,
             RequiereAprobacion = estacion.RequiereAprobacion
         };
@@ -318,11 +325,15 @@ public class ServicioEstaciones
             EstacionId = estacion.Id,
             Nombre = estacion.Nombre,
             Ubicacion = estacion.Ubicacion,
+            TipoRecurso = estacion.TipoRecurso.ToString(),
             RequiereIdentificacion = estacion.RequiereIdentificacion,
             RequiereAprobacion = estacion.RequiereAprobacion,
             Estado = estacion.Estado
         });
     }
+
+    private static TipoRecursoEstacion ParseTipoRecurso(string? valor) =>
+        Enum.TryParse<TipoRecursoEstacion>(valor, true, out var tipo) ? tipo : TipoRecursoEstacion.ControlAcceso;
 
     public async Task<Result<bool>> RegistrarHeartbeatAsync(Guid estacionId, HeartbeatEstacionRequest? request, CancellationToken ct)
     {

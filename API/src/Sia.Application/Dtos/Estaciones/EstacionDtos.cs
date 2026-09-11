@@ -10,6 +10,7 @@ public class EstacionResponse
     public string? FirmwareVersion { get; set; }
     public string? DireccionIp { get; set; }
     public string ClientId { get; set; } = string.Empty;
+    public string TipoRecurso { get; set; } = "ControlAcceso";
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
     public bool Estado { get; set; }
@@ -33,6 +34,7 @@ public class CrearEstacionRequest
     public string? FirmwareVersion { get; set; }
     public string? DireccionIp { get; set; }
     public string? MacAddress { get; set; }
+    public string TipoRecurso { get; set; } = "ControlAcceso";
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
 }
@@ -50,6 +52,7 @@ public class ActualizarEstacionRequest
     public string? FirmwareVersion { get; set; }
     public string? DireccionIp { get; set; }
     public string? MacAddress { get; set; }
+    public string? TipoRecurso { get; set; }
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
 }

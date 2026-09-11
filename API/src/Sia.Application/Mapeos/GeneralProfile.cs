@@ -38,7 +38,8 @@ public class GeneralProfile : Profile
             .IncludeBase<Item, ItemResponse>();
 
         CreateMap<Estacion, EstacionResponse>()
-            .ForMember(d => d.EncargadoNombre, o => o.MapFrom(s => s.Encargado != null ? $"{s.Encargado.Nombres} {s.Encargado.Apellidos}".Trim() : null));
+            .ForMember(d => d.EncargadoNombre, o => o.MapFrom(s => s.Encargado != null ? $"{s.Encargado.Nombres} {s.Encargado.Apellidos}".Trim() : null))
+            .ForMember(d => d.TipoRecurso, o => o.MapFrom(s => s.TipoRecurso.ToString()));
         CreateMap<CrearEstacionRequest, Estacion>();
     }
 }

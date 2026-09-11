@@ -1,3 +1,5 @@
+using Sia.Domain.Enums;
+
 namespace Sia.Domain.Entidades;
 
 public class Estacion
@@ -12,6 +14,7 @@ public class Estacion
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecretHash { get; set; } = string.Empty;
     public string? CodigoAdminHash { get; set; }
+    public TipoRecursoEstacion TipoRecurso { get; set; } = TipoRecursoEstacion.ControlAcceso;
     public bool RequiereIdentificacion { get; set; }
     public bool RequiereAprobacion { get; set; }
     public bool Estado { get; set; } = true;
