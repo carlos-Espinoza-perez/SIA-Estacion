@@ -27,8 +27,6 @@ export interface DashboardMetrics {
 }
 
 export const dashboardService = {
-  // Deja que el error se propague: la pantalla debe mostrar un estado de error
-  // explicito en vez de metricas en cero que parecen datos reales.
   async getMetricas(): Promise<DashboardMetrics> {
     const response = await apiClient.get<RespuestaEnvuelta<DashboardMetrics>>('/reportes/dashboard');
     if (!response.data || !response.data.datos) {

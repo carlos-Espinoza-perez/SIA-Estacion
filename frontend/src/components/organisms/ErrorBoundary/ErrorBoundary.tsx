@@ -8,9 +8,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Sin esto, un error de render en cualquier pagina (ej. un payload inesperado de
-// la API) deja la pantalla completamente en blanco, sin ninguna pista para el
-// usuario ni forma de recuperarse sin editar la URL a mano.
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);

@@ -13,10 +13,7 @@ interface RolBackendDto {
 }
 
 export const rolService = {
-  // Nota: estas llamadas dejan que el error se propague (sin catch interno). Si se
-  // silenciaba aqui con datos por defecto, la pagina de Roles se veia funcional
-  // aunque la API estuviera caida — riesgoso en una pantalla que asigna permisos.
-  // El try/catch que muestra el toast de error vive en RolesPage.
+  // El manejo de error (toast) vive en RolesPage, no aqui.
   getRoles: async (): Promise<Rol[]> => {
     const response = await apiClient.get<RespuestaEnvuelta<RolBackendDto[]>>('/roles');
     if (!response.data || !Array.isArray(response.data.datos)) {

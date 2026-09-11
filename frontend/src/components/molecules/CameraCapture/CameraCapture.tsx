@@ -108,7 +108,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
     if (capturedFiles.length > 0) onCapture(capturedFiles);
   };
 
-  // ── Idle screen ──
+  // Idle screen
   if (mode === 'idle') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -209,7 +209,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
     );
   }
 
-  // ── Camera live view ──
+  // Camera live view
   if (mode === 'camera') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -353,7 +353,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
     );
   }
 
-  // ── Preview after capture or file upload ──
+  // Preview after capture or file upload
   if (mode === 'preview' || mode === 'upload-preview') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

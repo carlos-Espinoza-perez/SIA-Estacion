@@ -147,8 +147,7 @@ export function useNotificaciones() {
     window.addEventListener(NOTIF_EVENT, handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // No hay push desde el backend (WebSocket/SignalR); se hace polling periodico
-    // para que las notificaciones no dependan de recargar la pagina.
+    // Sin WebSocket/SignalR en el backend: se hace polling.
     const intervalo = window.setInterval(() => {
       notificacionService.sincronizarEventosRecientes().catch(() => {});
     }, 30000);

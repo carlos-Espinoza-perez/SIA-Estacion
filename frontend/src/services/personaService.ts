@@ -99,8 +99,7 @@ export const personaService = {
       .map((foto) => ({ ...foto, url: normalizarUrlFoto(foto.url) }));
     const fotoConRutaInterna = fotosReferencia[0];
 
-    // La API anterior devolvía la ruta interna del blob. Se conserva este
-    // respaldo mientras las instancias en ejecución se actualizan.
+    // Compatibilidad con respuestas viejas que devuelven la ruta interna del blob
     if (fotoConRutaInterna && !/^https?:\/\//i.test(fotoConRutaInterna.url)) {
       try {
         const fotoResponse = await apiClient.get<RespuestaEnvuelta<string>>(`/personas/${id}/foto`);

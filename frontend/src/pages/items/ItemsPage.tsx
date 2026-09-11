@@ -131,8 +131,7 @@ export const ItemsPage: React.FC = () => {
     }
   };
 
-  // Genera una hoja PDF con el codigo QR de cada item actualmente listado (respeta
-  // los filtros aplicados), lista para imprimir y pegar como etiqueta fisica.
+  // Hoja de QR imprimibles de los items listados (respeta los filtros activos)
   const handleDescargarQr = async () => {
     if (items.length === 0) {
       showToast('No hay ítems para exportar con los filtros actuales.', 'info');

@@ -204,8 +204,7 @@ public class ServicioReportes
             {
                 Concedido = accesos.Count(a => a.Resultado == ResultadoAcceso.Concedido),
                 Denegado = accesos.Count(a => a.Resultado == ResultadoAcceso.Denegado),
-                // El backend aún no distingue eventos sincronizados desde la cola offline
-                // del firmware ni resultados fuera de Concedido/Denegado, por eso siempre es 0.
+                // ResultadoAcceso solo tiene Concedido/Denegado por ahora
                 Offline = 0,
                 Otro = 0
             }

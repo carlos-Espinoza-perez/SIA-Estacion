@@ -70,8 +70,7 @@ public class ServicioAcceso
             return Result<ValidarAccesoResponse>.Exitoso(CrearRespuesta(ResultadoAcceso.Denegado, DireccionAcceso.Ingreso, "Acceso Denegado", "Código no registrado.", timer.ElapsedMilliseconds));
         }
 
-        // Dirección totalmente dinámica: se alterna según el último acceso concedido de la persona
-        // (sin importar la estación), ya que el dispositivo de la estación no tiene reloj confiable.
+        // Dirección dinámica: se alterna según el último acceso concedido de la persona
         DireccionAcceso? ultimaDireccion = await _eventosRepository.ObtenerUltimaDireccionConcedidaAsync(persona.Id, ct);
         DireccionAcceso direccion = ultimaDireccion == DireccionAcceso.Ingreso ? DireccionAcceso.Egreso : DireccionAcceso.Ingreso;
         string nombreCompleto = $"{persona.Nombres} {persona.Apellidos}".Trim();
