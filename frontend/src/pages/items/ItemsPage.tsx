@@ -14,6 +14,8 @@ import { ModalEditarTipoItem } from '../../components/organisms/ModalEditarTipoI
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/atoms/Button/Button';
 import { estacionService } from '../../services/estacionService';
+import QRCode from 'qrcode';
+import jsPDF from 'jspdf';
 
 // Opciones de Filtros
 
@@ -48,6 +50,7 @@ export const ItemsPage: React.FC = () => {
   const [selectedItemForEdit, setSelectedItemForEdit] = useState<Item | null>(null);
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [isDescargandoQr, setIsDescargandoQr] = useState(false);
 
   // Estados de Pestaña 2 (Tipos de ítem)
   const [tiposItem, setTiposItem] = useState<TipoItem[]>([]);
@@ -125,6 +128,86 @@ export const ItemsPage: React.FC = () => {
       cargarItems();
     } finally {
       setIsDeletingItem(false);
+    }
+  };
+
+  // Genera una hoja PDF con el codigo QR de cada item actualmente listado (respeta
+  // los filtros aplicados), lista para imprimir y pegar como etiqueta fisica.
+  const handleDescargarQr = async () => {
+    if (items.length === 0) {
+      showToast('No hay ítems para exportar con los filtros actuales.', 'info');
+      return;
+    }
+
+    setIsDescargandoQr(true);
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const cols = 3;
+      const cellW = (pageWidth - margin * 2) / cols;
+      const cellH = 52;
+      const qrSize = 30;
+      const headerH = 14;
+      const rowsPerPage = Math.floor((pageHeight - margin - headerH) / cellH);
+
+      const drawHeader = () => {
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text('Códigos QR de ítems', margin, margin);
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Generado: ${new Date().toLocaleDateString('es-NI')} · ${items.length} ítem(s)`, margin, margin + 6);
+        doc.setTextColor(0);
+      };
+
+      drawHeader();
+      let col = 0;
+      let row = 0;
+      const gridTop = margin + headerH;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (row >= rowsPerPage) {
+          doc.addPage();
+          drawHeader();
+          row = 0;
+          col = 0;
+        }
+
+        const x = margin + col * cellW;
+        const y = gridTop + row * cellH;
+        const qrX = x + (cellW - qrSize) / 2;
+
+        // eslint-disable-next-line no-await-in-loop
+        const dataUrl = await QRCode.toDataURL(item.codigo, { margin: 1, width: 220 });
+        doc.addImage(dataUrl, 'PNG', qrX, y, qrSize, qrSize);
+
+        doc.setFontSize(9);
+        doc.setTextColor(20);
+        const nombreCorto = item.nombre.length > 30 ? `${item.nombre.slice(0, 30)}…` : item.nombre;
+        doc.text(nombreCorto, x + cellW / 2, y + qrSize + 5, { align: 'center', maxWidth: cellW - 4 });
+
+        doc.setFontSize(8);
+        doc.setTextColor(130);
+        doc.text(item.codigo, x + cellW / 2, y + qrSize + 10, { align: 'center' });
+        doc.setTextColor(0);
+
+        col++;
+        if (col >= cols) {
+          col = 0;
+          row++;
+        }
+      }
+
+      doc.save(`codigos-qr-items-${new Date().toISOString().slice(0, 10)}.pdf`);
+      showToast(`PDF generado con ${items.length} código${items.length === 1 ? '' : 's'} QR`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo generar el PDF de códigos QR.', 'error');
+    } finally {
+      setIsDescargandoQr(false);
     }
   };
 
@@ -509,21 +592,39 @@ export const ItemsPage: React.FC = () => {
                 />
               </div>
 
-              {/* Botón Nuevo Ítem */}
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsCrearItemOpen(true)}
-                leftIcon={
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                }
-                style={{ flexShrink: 0 }}
-              >
-                Nuevo ítem
-              </Button>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                {/* Botón Descargar hoja de códigos QR */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDescargarQr}
+                  disabled={isDescargandoQr}
+                  leftIcon={
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  }
+                >
+                  {isDescargandoQr ? 'Generando...' : 'Descargar QR'}
+                </Button>
+
+                {/* Botón Nuevo Ítem */}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsCrearItemOpen(true)}
+                  leftIcon={
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  }
+                >
+                  Nuevo ítem
+                </Button>
+              </div>
             </div>
 
             {/* Tabla de Ítems */}
