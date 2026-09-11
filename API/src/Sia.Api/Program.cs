@@ -96,7 +96,19 @@ builder.Services.AddScoped<IContextoUsuario, ContextoUsuario>();
 builder.Services.AddSingleton<IServicioHashSecreto, ServicioHashSecreto>();
 builder.Services.AddSingleton<IServicioJwt, ServicioJwt>();
 builder.Services.AddSingleton<IServicioAlmacenamiento, ServicioAlmacenamientoBlob>();
-builder.Services.AddSingleton<IServicioReconocimientoFacial, ServicioReconocimientoFacial>();
+// FaceONNX.dll se excluye del paquete publicado en Azure App Service F1 por su tamano
+// (ver .github/workflows/deploy-azure.yml). Si no esta presente junto al ejecutable,
+// se registra una implementacion de respaldo que no referencia FaceONNX en absoluto,
+// para evitar que el DI intente cargar el ensamblado y tumbe /validar con un 500.
+bool faceOnnxDisponible = File.Exists(Path.Combine(AppContext.BaseDirectory, "FaceONNX.dll"));
+if (faceOnnxDisponible)
+{
+    builder.Services.AddSingleton<IServicioReconocimientoFacial, ServicioReconocimientoFacial>();
+}
+else
+{
+    builder.Services.AddSingleton<IServicioReconocimientoFacial, ServicioReconocimientoFacialNoDisponible>();
+}
 builder.Services.AddSingleton<IPairingCoordinator, PairingCoordinator>();
 
 
@@ -156,6 +168,10 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+app.Logger.LogInformation(faceOnnxDisponible
+    ? "Reconocimiento facial: FaceONNX.dll encontrado, usando ServicioReconocimientoFacial."
+    : "Reconocimiento facial: FaceONNX.dll NO encontrado, usando ServicioReconocimientoFacialNoDisponible (fallback: aprobado).");
 
 app.UseMiddleware<ManejadorExcepcionesMiddleware>();
 
