@@ -211,6 +211,12 @@ public class ServicioItems
     private async Task<bool> EsTipoItemHabilitadoParaEstacionAsync(Guid estacionId, Guid tipoItemId, CancellationToken ct)
     {
         List<EstacionTipoItem> asignaciones = await _estacionesRepository.ObtenerAsignacionesTiposItemAsync(estacionId, ct);
+        // Si la estacion nunca tuvo tipos de item asignados (todavia no existe una
+        // pantalla para configurar esto), no hay restriccion que aplicar: se asume
+        // que puede manejar cualquier tipo hasta que un admin la restrinja
+        // explicitamente asignandole al menos un tipo.
+        if (asignaciones.Count == 0)
+            return true;
         return asignaciones.Any(a => a.Estado && a.TipoItemId == tipoItemId);
     }
 

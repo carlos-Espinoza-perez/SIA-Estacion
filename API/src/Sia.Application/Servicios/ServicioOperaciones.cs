@@ -214,6 +214,9 @@ public class ServicioOperaciones
             return Result<OperacionLoteResponse>.Fallido("ESTACION_INVALIDA", "Estación no encontrada o inactiva.");
 
         List<EstacionTipoItem> tiposHabilitados = await _estacionesRepository.ObtenerAsignacionesTiposItemAsync(estacionId, ct);
+        // Igual que en ServicioItems: sin asignaciones configuradas para esta
+        // estacion, no se restringe por tipo (ver comentario alla).
+        bool restringidaPorTipo = tiposHabilitados.Count > 0;
         var tipoItemIdsHabilitados = tiposHabilitados.Where(a => a.Estado).Select(a => a.TipoItemId).ToHashSet();
 
         var itemsResueltos = new List<Item>();
@@ -224,7 +227,7 @@ public class ServicioOperaciones
                 return Result<OperacionLoteResponse>.Fallido("ITEM_NO_ENCONTRADO", "Uno de los ítems escaneados ya no existe.");
             if (item.EstadoActual != EstadoItem.Disponible)
                 return Result<OperacionLoteResponse>.Fallido("ITEM_NO_DISPONIBLE", $"'{item.Nombre}' no está disponible en este momento.");
-            if (!tipoItemIdsHabilitados.Contains(item.TipoItemId))
+            if (restringidaPorTipo && !tipoItemIdsHabilitados.Contains(item.TipoItemId))
                 return Result<OperacionLoteResponse>.Fallido("ITEM_FUERA_DE_ESTACION", $"'{item.Nombre}' no pertenece a esta estación.");
             itemsResueltos.Add(item);
         }
