@@ -16,7 +16,14 @@ static lv_obj_t* _bootSubtitleLabel = nullptr;
 static std::function<void(int)> _onSelectCb = nullptr;
 static std::function<void()> _onRefreshCb = nullptr;
 static std::function<void()> _onOtherCb = nullptr;
-static std::function<void(const char*)> _onConnectCb = nullptr;
+static std::function<void(const char*, const char*)> _onConnectCb = nullptr;
+// Usados solo por showWifiPassword: el teclado es un unico widget compartido entre
+// el campo SSID (modo manual) y el de contrasena, y su callback en LVGL es un
+// puntero a funcion sin capturas, asi que el estado se guarda aqui en vez de en
+// una lambda con closure (evita reservar memoria en cada apertura de la pantalla).
+static lv_obj_t* _wifiSsidTa = nullptr;
+static lv_obj_t* _wifiPassTa = nullptr;
+static String _wifiFixedSsid = "";
 static std::function<void()> _onBackCb = nullptr;
 static std::function<void()> _onAdminClickCb = nullptr;
 static std::function<void()> _onAdminWifiCb = nullptr;

@@ -349,9 +349,9 @@ void ScreenManager::renderSelectWifi() {
 }
 
 void ScreenManager::renderWifiPassword() {
-    const char* ssid = (_param1[0] != '\0') ? _param1 : "Red WiFi";
+    const char* ssid = (_param1[0] != '\0') ? _param1 : (_wifiManualEntry ? "" : "Red WiFi");
     const char* errorMsg = (_param2[0] != '\0') ? _param2 : nullptr;
-    Lvgl.showWifiPassword(ssid, _passwordInput, errorMsg, _onWifiConnectCb, _onWifiBackCb);
+    Lvgl.showWifiPassword(ssid, _passwordInput, errorMsg, _wifiManualEntry, _onWifiConnectCb, _onWifiBackCb);
 }
 
 void ScreenManager::showWifiSuccess(const char* ssid, const char* ip) {

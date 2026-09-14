@@ -63,10 +63,13 @@ public:
     void onWifiSelect(std::function<void(int)> cb) { _onWifiSelectCb = cb; }
     void onWifiRefresh(std::function<void()> cb) { _onWifiRefreshCb = cb; }
     void onWifiOther(std::function<void()> cb) { _onWifiOtherCb = cb; }
-    void onWifiConnect(std::function<void(const char*)> cb) { _onWifiConnectCb = cb; }
+    void onWifiConnect(std::function<void(const char*, const char*)> cb) { _onWifiConnectCb = cb; }
     void onWifiBack(std::function<void()> cb) { _onWifiBackCb = cb; }
     void onWifiCancel(std::function<void()> cb) { _onWifiCancelCb = cb; }
     void setWifiFromAdmin(bool fromAdmin) { _wifiFromAdmin = fromAdmin; }
+    // true cuando se entro a la pantalla de contrasena via "Otra red...": en ese
+    // caso no hay SSID preseleccionado y hay que pedirlo tambien por teclado.
+    void setWifiManualEntry(bool manual) { _wifiManualEntry = manual; }
     void onAdminClick(std::function<void()> cb) { _onAdminClickCb = cb; }
     void onAdminWifi(std::function<void()> cb) { _onAdminWifiCb = cb; }
     void onAdminSync(std::function<void()> cb) { _onAdminSyncCb = cb; }
@@ -95,10 +98,11 @@ private:
     std::function<void(int)> _onWifiSelectCb;
     std::function<void()> _onWifiRefreshCb;
     std::function<void()> _onWifiOtherCb;
-    std::function<void(const char*)> _onWifiConnectCb;
+    std::function<void(const char*, const char*)> _onWifiConnectCb;
     std::function<void()> _onWifiBackCb;
     std::function<void()> _onWifiCancelCb;
     bool _wifiFromAdmin = false;
+    bool _wifiManualEntry = false;
     std::function<void()> _onAdminClickCb;
     std::function<void()> _onAdminWifiCb;
     std::function<void()> _onAdminSyncCb;

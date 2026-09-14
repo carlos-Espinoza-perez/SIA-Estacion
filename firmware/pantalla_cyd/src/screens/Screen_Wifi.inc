@@ -181,7 +181,8 @@ void LvglManager::showWifiEmpty(std::function<void()> onRefresh, std::function<v
 void LvglManager::showWifiPassword(const char* ssid,
                                    const char* currentPass,
                                    const char* errorMsg,
-                                   std::function<void(const char*)> onConnect,
+                                   bool manualSsid,
+                                   std::function<void(const char*, const char*)> onConnect,
                                    std::function<void()> onBack) {
     if (!_initialized) return;
 
@@ -194,16 +195,20 @@ void LvglManager::showWifiPassword(const char* ssid,
 
     // Cabecera
     lv_obj_t* title = lv_label_create(lv_scr_act());
-    lv_label_set_text(title, "INGRESE LA CONTRASENA");
+    lv_label_set_text(title, manualSsid ? "RED MANUAL" : "INGRESE LA CONTRASENA");
     lv_obj_set_style_text_color(title, lv_color_hex(0x94A3B8), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_12, LV_PART_MAIN);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 10);
 
-    lv_obj_t* ssidLbl = lv_label_create(lv_scr_act());
-    lv_label_set_text(ssidLbl, ssid ? ssid : "Red WiFi");
-    lv_obj_set_style_text_color(ssidLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    lv_obj_set_style_text_font(ssidLbl, &lv_font_montserrat_16, LV_PART_MAIN);
-    lv_obj_align(ssidLbl, LV_ALIGN_TOP_LEFT, 20, 26);
+    // Cuando no hay SSID preseleccionado (se entro por "Otra red...") no se
+    // muestra la etiqueta fija, se pide el nombre de la red en un campo editable.
+    if (!manualSsid) {
+        lv_obj_t* ssidLbl = lv_label_create(lv_scr_act());
+        lv_label_set_text(ssidLbl, ssid ? ssid : "Red WiFi");
+        lv_obj_set_style_text_color(ssidLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_set_style_text_font(ssidLbl, &lv_font_montserrat_16, LV_PART_MAIN);
+        lv_obj_align(ssidLbl, LV_ALIGN_TOP_LEFT, 20, 26);
+    }
 
     // Boton Cancelar/Volver en cabecera derecha
     lv_obj_t* btn_back = lv_btn_create(lv_scr_act());
@@ -218,10 +223,31 @@ void LvglManager::showWifiPassword(const char* ssid,
         if (_onBackCb) _onBackCb();
     }, LV_EVENT_CLICKED, NULL);
 
-    // TextArea
+    // TextArea SSID (solo en modo manual)
+    lv_obj_t* ta_ssid = nullptr;
+    int passRowY = 50;
+    if (manualSsid) {
+        ta_ssid = lv_textarea_create(lv_scr_act());
+        lv_obj_set_size(ta_ssid, 330, 42);
+        lv_obj_align(ta_ssid, LV_ALIGN_TOP_LEFT, 20, 30);
+        lv_textarea_set_one_line(ta_ssid, true);
+        lv_textarea_set_max_length(ta_ssid, 32); // limite real de un SSID 802.11
+        lv_textarea_set_placeholder_text(ta_ssid, "Nombre de la red (SSID)");
+        if (ssid && ssid[0] != '\0') {
+            lv_textarea_set_text(ta_ssid, ssid);
+        }
+        lv_obj_set_style_bg_color(ta_ssid, lv_color_hex(0x111827), LV_PART_MAIN);
+        lv_obj_set_style_border_color(ta_ssid, lv_color_hex(0x2563EB), LV_PART_MAIN);
+        lv_obj_set_style_text_color(ta_ssid, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_set_style_text_font(ta_ssid, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_set_style_radius(ta_ssid, 8, LV_PART_MAIN);
+        passRowY = 82;
+    }
+
+    // TextArea contrasena
     lv_obj_t* ta = lv_textarea_create(lv_scr_act());
     lv_obj_set_size(ta, 330, 42);
-    lv_obj_align(ta, LV_ALIGN_TOP_LEFT, 20, 50);
+    lv_obj_align(ta, LV_ALIGN_TOP_LEFT, 20, passRowY);
     lv_textarea_set_password_mode(ta, true);
     lv_textarea_set_one_line(ta, true);
     lv_textarea_set_max_length(ta, 63);
@@ -238,7 +264,7 @@ void LvglManager::showWifiPassword(const char* ssid,
     // Boton Mostrar/Ocultar
     lv_obj_t* btn_eye = lv_btn_create(lv_scr_act());
     lv_obj_set_size(btn_eye, 98, 42);
-    lv_obj_align(btn_eye, LV_ALIGN_TOP_RIGHT, -18, 50);
+    lv_obj_align(btn_eye, LV_ALIGN_TOP_RIGHT, -18, passRowY);
     lv_obj_set_style_bg_color(btn_eye, lv_color_hex(0x1F2937), LV_PART_MAIN);
     lv_obj_set_style_radius(btn_eye, 8, LV_PART_MAIN);
     lv_obj_t* lbl_eye = lv_label_create(btn_eye);
@@ -252,22 +278,49 @@ void LvglManager::showWifiPassword(const char* ssid,
         lv_label_set_text(label, !current ? "Ocultar" : "Ver");
     }, LV_EVENT_CLICKED, ta);
 
-    // Teclado virtual
+    // Estado compartido con el callback del teclado (ver comentario junto a su
+    // declaracion): el widget de teclado usa un puntero a funcion sin capturas.
+    _wifiSsidTa = ta_ssid;
+    _wifiPassTa = ta;
+    _wifiFixedSsid = ssid ? ssid : "";
+
+    // Teclado virtual: arranca enfocado en el SSID si hay que pedirlo, si no en la contrasena.
     lv_obj_t* kb = lv_keyboard_create(lv_scr_act());
     lv_obj_set_size(kb, 444, 215);
     lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, -5);
-    lv_keyboard_set_textarea(kb, ta);
+    lv_keyboard_set_textarea(kb, ta_ssid ? ta_ssid : ta);
     lv_obj_set_style_bg_color(kb, lv_color_hex(0x0E141E), LV_PART_MAIN);
     lv_obj_set_style_radius(kb, 10, LV_PART_MAIN);
 
+    // Tocar cualquiera de los dos campos mueve el teclado hacia ese campo.
+    if (ta_ssid) {
+        lv_obj_add_event_cb(ta_ssid, [](lv_event_t* e) {
+            lv_obj_t* target_kb = (lv_obj_t*)lv_event_get_user_data(e);
+            lv_keyboard_set_textarea(target_kb, lv_event_get_target(e));
+        }, LV_EVENT_FOCUSED, kb);
+    }
+    lv_obj_add_event_cb(ta, [](lv_event_t* e) {
+        lv_obj_t* target_kb = (lv_obj_t*)lv_event_get_user_data(e);
+        lv_keyboard_set_textarea(target_kb, lv_event_get_target(e));
+    }, LV_EVENT_FOCUSED, kb);
+
     lv_obj_add_event_cb(kb, [](lv_event_t * e) {
         lv_event_code_t code = lv_event_get_code(e);
+        lv_obj_t* kbObj = lv_event_get_target(e);
         if (code == LV_EVENT_READY) {
-            lv_obj_t* target_ta = (lv_obj_t*)lv_event_get_user_data(e);
-            const char* passText = lv_textarea_get_text(target_ta);
-            if (_onConnectCb) _onConnectCb(passText);
+            // Si "Enter" se presiono mientras se editaba el SSID, pasar el foco a
+            // la contrasena en vez de enviar el formulario a medio llenar.
+            if (_wifiSsidTa && lv_keyboard_get_textarea(kbObj) == _wifiSsidTa) {
+                lv_keyboard_set_textarea(kbObj, _wifiPassTa);
+                return;
+            }
+            if (_onConnectCb) {
+                const char* passText = _wifiPassTa ? lv_textarea_get_text(_wifiPassTa) : "";
+                const char* ssidText = _wifiSsidTa ? lv_textarea_get_text(_wifiSsidTa) : _wifiFixedSsid.c_str();
+                _onConnectCb(ssidText, passText);
+            }
         } else if (code == LV_EVENT_CANCEL) {
             if (_onBackCb) _onBackCb();
         }
-    }, LV_EVENT_ALL, ta);
+    }, LV_EVENT_ALL, NULL);
 }

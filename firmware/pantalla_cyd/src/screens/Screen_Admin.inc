@@ -250,11 +250,35 @@ void LvglManager::showAdminStorage(int pendingCount, const char* lastSync,
     lv_obj_set_style_bg_color(btnClear, lv_color_hex(0x7F1D1D), LV_PART_MAIN);
     lv_obj_set_style_radius(btnClear, 8, LV_PART_MAIN);
     lv_obj_t* cLbl = lv_label_create(btnClear);
-    lv_label_set_text(cLbl, "Limpiar sincronizados");
+    lv_label_set_text(cLbl, "Borrar cola local");
     lv_obj_center(cLbl);
     lv_obj_add_event_cb(btnClear, [](lv_event_t* e) {
-        if (_onAction1Cb) _onAction1Cb();
-    }, LV_EVENT_CLICKED, NULL);
+        int pending = (int)(intptr_t)lv_event_get_user_data(e);
+        // Pese al nombre del boton, esto borra TODA la cola local, incluidos
+        // eventos que aun no se subieron al servidor (marcarPendientesSincronizados()
+        // ya vacia la cola apenas se sincroniza con exito, asi que lo que queda aqui
+        // es justamente lo pendiente). Es destructivo e irreversible: se confirma
+        // antes de ejecutarlo, sobre todo si hay eventos sin sincronizar.
+        char msg[128];
+        if (pending > 0) {
+            snprintf(msg, sizeof(msg),
+                     "Hay %d evento(s) aun NO sincronizados con el servidor. Se perderan para siempre. Continuar?",
+                     pending);
+        } else {
+            snprintf(msg, sizeof(msg), "Se borrara la cola local de eventos. Esta accion no se puede deshacer.");
+        }
+        static const char* btns[] = {"Cancelar", "Si, borrar", ""};
+        lv_obj_t* mbox = lv_msgbox_create(NULL, "Confirmar borrado", msg, btns, false);
+        lv_obj_center(mbox);
+        lv_obj_add_event_cb(mbox, [](lv_event_t* e2) {
+            lv_obj_t* mb = lv_event_get_current_target(e2);
+            const char* activo = lv_msgbox_get_active_btn_text(mb);
+            if (activo && strcmp(activo, "Si, borrar") == 0) {
+                if (_onAction1Cb) _onAction1Cb();
+            }
+            lv_msgbox_close(mb);
+        }, LV_EVENT_VALUE_CHANGED, NULL);
+    }, LV_EVENT_CLICKED, (void*)(intptr_t)pendingCount);
 
     lv_obj_t* btnBack = lv_btn_create(lv_scr_act());
     lv_obj_set_size(btnBack, 210, 46);

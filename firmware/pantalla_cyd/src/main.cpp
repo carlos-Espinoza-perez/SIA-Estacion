@@ -114,6 +114,7 @@ static int pendingWifiSelectIdx = -1;
 static bool pendingWifiRefresh = false;
 static bool pendingWifiOther = false;
 static String pendingWifiConnectPass = "";
+static String pendingWifiConnectSsid = "";
 static bool pendingDoConnect = false;
 static bool pendingWifiBack = false;
 static bool pendingWifiCancel = false;
@@ -180,7 +181,8 @@ void setup() {
         pendingWifiOther = true;
     });
 
-    screens.onWifiConnect([](const char* pass) {
+    screens.onWifiConnect([](const char* ssid, const char* pass) {
+        pendingWifiConnectSsid = ssid ? ssid : "";
         pendingWifiConnectPass = pass ? pass : "";
         pendingDoConnect = true;
     });
@@ -238,6 +240,7 @@ void loop() {
         if (idx >= 0 && idx < n) {
             selectedSsid = WiFi.SSID(idx);
             screens.clearPassword();
+            screens.setWifiManualEntry(false);
             currentState = StationState::WifiPassword;
             screens.transitionTo(ScreenState::WIFI_PASSWORD, selectedSsid.c_str());
         }
@@ -255,8 +258,9 @@ void loop() {
         pendingWifiOther = false;
         selectedSsid = "";
         screens.clearPassword();
+        screens.setWifiManualEntry(true);
         currentState = StationState::WifiPassword;
-        screens.transitionTo(ScreenState::WIFI_PASSWORD, "Ingresa red manual");
+        screens.transitionTo(ScreenState::WIFI_PASSWORD);
     }
 
     if (pendingWifiBack) {
@@ -289,9 +293,21 @@ void loop() {
 
     if (pendingDoConnect) {
         pendingDoConnect = false;
+        String ssid = pendingWifiConnectSsid;
         String pass = pendingWifiConnectPass;
+        pendingWifiConnectSsid = "";
         pendingWifiConnectPass = "";
-        attemptWifiConnection(selectedSsid, pass);
+        ssid.trim();
+        if (ssid.length() == 0) {
+            // "Otra red...": el SSID es obligatorio, no hay a que conectarse sin el.
+            // Sin esta validacion attemptWifiConnection() fallaba en silencio y la
+            // pantalla quedaba congelada sin ninguna explicacion para el usuario.
+            screens.setPassword(pass.c_str());
+            screens.transitionTo(ScreenState::WIFI_PASSWORD, nullptr, "Ingresa el nombre de la red (SSID)");
+        } else {
+            selectedSsid = ssid;
+            attemptWifiConnection(selectedSsid, pass);
+        }
     }
 
     if (pendingAdminOpen) {
@@ -357,27 +373,38 @@ void loop() {
 
     if (pendingItemsComplete) {
         pendingItemsComplete = false;
-        currentState = StationState::ItemsProcessing;
-        Lvgl.showItemValidating("Validando solicitud", "Estamos verificando los items y tu solicitud.");
 
-        String itemIds[CARRITO_MAX];
-        for (int i = 0; i < carritoCount; i++) itemIds[i] = carrito[i].id;
-
-        OperacionLoteResultado resultadoLote = Api.crearOperacionLote(personaIdActual, itemIds, carritoCount);
-        if (resultadoLote.ok && resultadoLote.estado == "Pendiente") {
-            Lvgl.showLoanApprovalSent("Te notificaremos cuando tu solicitud sea aprobada o rechazada.");
-        } else if (resultadoLote.ok) {
-            Lvgl.showLoanCompleted(personaNombreActual.c_str(), "Tu prestamo se realizo correctamente.");
+        if (carritoCount == 0) {
+            // El backend tambien rechaza un lote vacio (SIN_ITEMS), pero validar aqui
+            // evita un viaje de red y una pantalla de "rechazado" confusa cuando el
+            // usuario quito todos los items y aun asi toco "Completar prestamo".
+            Lvgl.showError("Sin items seleccionados", "Escanea al menos un item antes de completar el prestamo.");
+            itemsFeedbackReturnState = StationState::ItemsScanning;
+            stateTimer = millis();
+            currentState = StationState::ItemsFeedback;
         } else {
-            Lvgl.showLoanRejected(resultadoLote.mensajeError.c_str());
-        }
+            currentState = StationState::ItemsProcessing;
+            Lvgl.showItemValidating("Validando solicitud", "Estamos verificando los items y tu solicitud.");
 
-        carritoCount = 0;
-        personaIdActual = "";
-        personaNombreActual = "";
-        itemsFeedbackReturnState = StationState::ItemsIdle;
-        stateTimer = millis();
-        currentState = StationState::ItemsFeedback;
+            String itemIds[CARRITO_MAX];
+            for (int i = 0; i < carritoCount; i++) itemIds[i] = carrito[i].id;
+
+            OperacionLoteResultado resultadoLote = Api.crearOperacionLote(personaIdActual, itemIds, carritoCount);
+            if (resultadoLote.ok && resultadoLote.estado == "Pendiente") {
+                Lvgl.showLoanApprovalSent("Te notificaremos cuando tu solicitud sea aprobada o rechazada.");
+            } else if (resultadoLote.ok) {
+                Lvgl.showLoanCompleted(personaNombreActual.c_str(), "Tu prestamo se realizo correctamente.");
+            } else {
+                Lvgl.showLoanRejected(resultadoLote.mensajeError.c_str());
+            }
+
+            carritoCount = 0;
+            personaIdActual = "";
+            personaNombreActual = "";
+            itemsFeedbackReturnState = StationState::ItemsIdle;
+            stateTimer = millis();
+            currentState = StationState::ItemsFeedback;
+        }
     }
 
     switch (currentState) {

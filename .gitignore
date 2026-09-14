@@ -129,6 +129,7 @@ dist/
 .ai/
 .copilot/
 .agents/
+.claude/
 
 
 # Tareas
@@ -141,6 +142,8 @@ BACKEND_SPEC.md
 # Carpetas de tests
 [Tt]est/
 [Tt]ests/
+test-pub/
+test_size.zip
 
 trabajos-clases
 

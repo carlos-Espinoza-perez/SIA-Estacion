@@ -40,7 +40,8 @@ public:
     void showWifiPassword(const char* ssid,
                           const char* currentPass,
                           const char* errorMsg,
-                          std::function<void(const char*)> onConnect,
+                          bool manualSsid,
+                          std::function<void(const char*, const char*)> onConnect,
                           std::function<void()> onBack);
 
     // ==========================================
