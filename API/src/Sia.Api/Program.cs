@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sia.Application.Configuracion;
+using Sia.Api.Filtros;
 using Sia.Api.Middleware;
 using Sia.Api.Hubs;
 using Sia.Application.Abstracciones;
@@ -90,6 +91,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PrivilegioPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, ManejadorPrivilegio>();
+builder.Services.AddScoped<EstacionActivaFilter>();
 
 builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
 builder.Services.AddScoped<IContextoUsuario, ContextoUsuario>();

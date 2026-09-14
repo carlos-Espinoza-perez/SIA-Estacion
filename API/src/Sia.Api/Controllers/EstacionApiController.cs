@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sia.Api.Filtros;
 using Sia.Application.Abstracciones;
 using Sia.Application.Dtos.Acceso;
 using Sia.Application.Dtos.Comunes;
@@ -11,6 +12,7 @@ namespace Sia.Api.Controllers;
 [ApiController]
 [Route("api/estacion-api")]
 [Authorize]
+[ServiceFilter(typeof(EstacionActivaFilter))]
 public partial class EstacionApiController : SiaControllerBase
 {
     private readonly ServicioAcceso _servicioAcceso;
