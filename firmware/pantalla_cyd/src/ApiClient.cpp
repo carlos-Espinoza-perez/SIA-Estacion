@@ -13,6 +13,27 @@ static uint32_t lastWifiAttempt = 0;
 static WiFiClientSecure globalSecureClient;
 static WiFiClient globalPlainClient;
 
+// El backend usa dos formatos de error distintos segun el camino que tomo la
+// solicitud: los fallos de negocio (Result.Fallido) llegan como
+// {"errores":[{"codigo":"...","mensaje":"..."}]}, y las excepciones no
+// controladas (ManejadorExcepcionesMiddleware) llegan como ProblemDetails
+// {"title":"...","detail":"..."}. Revisar solo "mensaje" en la raiz (como
+// hacia antes este archivo) no matchea ninguno de los dos, asi que cualquier
+// error del servidor terminaba mostrando siempre el texto generico de respaldo.
+static String extraerMensajeError(JsonDocument& res, const char* mensajeRespaldo) {
+    if (!res["errores"].isNull() && res["errores"].is<JsonArray>() && res["errores"].size() > 0
+        && !res["errores"][0]["mensaje"].isNull()) {
+        return res["errores"][0]["mensaje"].as<String>();
+    }
+    if (!res["detail"].isNull()) {
+        return res["detail"].as<String>();
+    }
+    if (!res["mensaje"].isNull()) {
+        return res["mensaje"].as<String>();
+    }
+    return String(mensajeRespaldo);
+}
+
 static bool sendHttpRequest(HTTPClient& http, const String& url, const char* method,
                             const String& body, const String& token, int timeoutMs,
                             int& outCode, String& outPayload) {
@@ -328,17 +349,8 @@ bool ApiClient::validateAccess(const String& personCode, const String& itemCode,
         // Extraer mensaje especifico del servidor de Azure (ej. 400, 401, 403, 404, etc.)
         JsonDocument res;
         DeserializationError err = deserializeJson(res, payload);
-        if (!err) {
-            if (!res["mensaje"].isNull()) {
-                result.message = res["mensaje"].as<String>();
-            } else if (!res["datos"].isNull() && !res["datos"]["mensaje"].isNull()) {
-                result.message = res["datos"]["mensaje"].as<String>();
-            } else {
-                result.message = "Acceso Denegado (HTTP " + String(code) + ")";
-            }
-        } else {
-            result.message = "Acceso Denegado (HTTP " + String(code) + ")";
-        }
+        String respaldo = "Acceso Denegado (HTTP " + String(code) + ")";
+        result.message = !err ? extraerMensajeError(res, respaldo.c_str()) : respaldo;
         Serial.printf("[VALIDAR] Rechazado por servidor: HTTP %d | Motivo: '%s'\n", code, result.message.c_str());
     }
 
@@ -465,9 +477,7 @@ PersonaIdentificada ApiClient::identificarPersona(const String& codigo) {
         return resultado;
     }
 
-    resultado.mensajeError = (!err && !res["mensaje"].isNull())
-        ? res["mensaje"].as<String>()
-        : "Codigo no registrado";
+    resultado.mensajeError = !err ? extraerMensajeError(res, "Codigo no registrado") : "Codigo no registrado";
     Serial.printf("[ITEMS] No se pudo identificar persona: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
     return resultado;
 }
@@ -507,9 +517,7 @@ ItemEscaneado ApiClient::escanearItem(const String& codigoQr) {
         return resultado;
     }
 
-    resultado.mensajeError = (!err && !res["mensaje"].isNull())
-        ? res["mensaje"].as<String>()
-        : "Codigo de item no reconocido";
+    resultado.mensajeError = !err ? extraerMensajeError(res, "Codigo de item no reconocido") : "Codigo de item no reconocido";
     Serial.printf("[ITEMS] No se pudo escanear item: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
     return resultado;
 }
@@ -554,9 +562,7 @@ OperacionLoteResultado ApiClient::crearOperacionLote(const String& personaId, co
         return resultado;
     }
 
-    resultado.mensajeError = (!err && !res["mensaje"].isNull())
-        ? res["mensaje"].as<String>()
-        : "No se pudo completar la solicitud";
+    resultado.mensajeError = !err ? extraerMensajeError(res, "No se pudo completar la solicitud") : "No se pudo completar la solicitud";
     Serial.printf("[ITEMS] Fallo al crear operacion: HTTP %d | %s\n", code, resultado.mensajeError.c_str());
     return resultado;
 }
