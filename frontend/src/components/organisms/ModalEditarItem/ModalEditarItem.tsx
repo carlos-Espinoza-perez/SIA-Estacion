@@ -229,7 +229,7 @@ export const ModalEditarItem: React.FC<ModalEditarItemProps> = ({
               Estación asignada
             </label>
             <select
-              value={formData.estacionId || formData.estacion || ''}
+              value={formData.estacionId || ''}
               onChange={(e) => {
                 const estObj = estacionesDisponibles.find((est) => est.id === e.target.value || est.nombre === e.target.value);
                 setFormData({

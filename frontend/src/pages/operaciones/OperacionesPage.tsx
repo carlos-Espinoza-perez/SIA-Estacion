@@ -91,16 +91,6 @@ const STATIC_COLUMNS_WITHOUT_FOLIO: TableColumn<OperacionRow>[] = [
     ),
   },
   {
-    key: 'item',
-    header: 'Ítem',
-    width: 210,
-    render: (row) => (
-      <span style={{ fontSize: '14px', color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
-        {row.item}
-      </span>
-    ),
-  },
-  {
     key: 'estacion',
     header: 'Estación',
     width: 140,
@@ -139,6 +129,14 @@ export const OperacionesPage: React.FC = () => {
   const [estado,    setEstado]    = useState('');
   const [fecha,     setFecha]     = useState('');
   const [modalData, setModalData] = useState<AprobacionPrestamoData | null>(null);
+  const [menuItemsAbiertoId, setMenuItemsAbiertoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!menuItemsAbiertoId) return;
+    const cerrar = () => setMenuItemsAbiertoId(null);
+    document.addEventListener('click', cerrar);
+    return () => document.removeEventListener('click', cerrar);
+  }, [menuItemsAbiertoId]);
 
   useEffect(() => {
     estacionService.getEstaciones().then((ests) => {
@@ -219,14 +217,102 @@ export const OperacionesPage: React.FC = () => {
     },
   };
 
-  const allColumns = useMemo(() => [folioColumn, ...STATIC_COLUMNS_WITHOUT_FOLIO], []);
+  const itemsColumn: TableColumn<OperacionRow> = {
+    key: 'items',
+    header: 'Ítems',
+    width: 220,
+    render: (row) => {
+      const items = row.items && row.items.length > 0 ? row.items : [{ id: row.itemId || row.id, nombre: row.item }];
+      const esMultiple = items.length > 1;
+      const abierto = menuItemsAbiertoId === row.id;
+
+      if (!esMultiple) {
+        return (
+          <span style={{ fontSize: '14px', color: '#FFFFFF', fontFamily: 'Inter, sans-serif' }}>
+            {items[0]?.nombre || '—'}
+          </span>
+        );
+      }
+
+      return (
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuItemsAbiertoId(abierto ? null : row.id);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              color: '#FFFFFF',
+              fontSize: '13px',
+              fontFamily: 'Inter, sans-serif',
+              cursor: 'pointer',
+            }}
+          >
+            {items[0].nombre} <span style={{ color: 'rgba(255,255,255,0.5)' }}>+{items.length - 1} más</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+              <path d="M1 1L5 5L9 1" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {abierto && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                minWidth: '220px',
+                backgroundColor: '#242424',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px',
+                padding: '6px',
+                zIndex: 20,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              }}
+            >
+              <span style={{ display: 'block', padding: '4px 8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                {items.length} ítems en esta operación
+              </span>
+              {items.map((it) => (
+                <div
+                  key={it.id}
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '13px',
+                    color: '#FFFFFF',
+                    fontFamily: 'Inter, sans-serif',
+                    borderRadius: '6px',
+                  }}
+                >
+                  {it.nombre}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    },
+  };
+
+  const allColumns = useMemo(
+    () => [folioColumn, STATIC_COLUMNS_WITHOUT_FOLIO[0], STATIC_COLUMNS_WITHOUT_FOLIO[1], itemsColumn, ...STATIC_COLUMNS_WITHOUT_FOLIO.slice(2)],
+    [menuItemsAbiertoId]
+  );
 
   const filtered = useMemo(() => {
     return operaciones.filter((row) => {
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
-        row.item.toLowerCase().includes(q) ||
+        (row.items || []).some((it) => it.nombre.toLowerCase().includes(q)) ||
         row.solicitante.toLowerCase().includes(q) ||
         row.folio.toLowerCase().includes(q);
       const matchEstacion = !estacion || row.estacion === estacion;

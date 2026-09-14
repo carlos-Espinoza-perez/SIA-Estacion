@@ -11,6 +11,11 @@ export type EstadoOperacion =
 
 export type FlujoOperacion = 'Aprobación' | 'Directo';
 
+export interface ItemOperacion {
+  id: string;
+  nombre: string;
+}
+
 export interface OperacionRow {
   id: string;
   folio: string;
@@ -19,6 +24,7 @@ export interface OperacionRow {
   carnet?: string;
   item: string;
   itemId?: string;
+  items: ItemOperacion[];
   estacion: string;
   estacionId?: string;
   flujo: FlujoOperacion;
@@ -47,11 +53,17 @@ export interface DevolucionDetalleDto {
   observacion?: string;
 }
 
+interface ItemOperacionBackendDto {
+  itemId: string;
+  nombre: string;
+}
+
 interface OperacionBackendDto {
   id: string;
   folio: string;
   itemEscaneadoId: string;
   itemNombre: string;
+  items?: ItemOperacionBackendDto[];
   personaId: string;
   personaNombre: string;
   codigoEstudiantil: string;
@@ -114,6 +126,9 @@ export const operacionService = {
       carnet: o.codigoEstudiantil,
       item: o.itemNombre,
       itemId: o.itemEscaneadoId,
+      items: (o.items && o.items.length > 0)
+        ? o.items.map((it) => ({ id: it.itemId, nombre: it.nombre }))
+        : [{ id: o.itemEscaneadoId, nombre: o.itemNombre }],
       estacion: o.estacionNombre || 'General',
       estacionId: o.estacionId,
       flujo: (o.flujo === 'Aprobación' ? 'Aprobación' : 'Directo') as FlujoOperacion,
@@ -145,6 +160,9 @@ export const operacionService = {
       carnet: o.codigoEstudiantil,
       item: o.itemNombre,
       itemId: o.itemEscaneadoId,
+      items: (o.items && o.items.length > 0)
+        ? o.items.map((it) => ({ id: it.itemId, nombre: it.nombre }))
+        : [{ id: o.itemEscaneadoId, nombre: o.itemNombre }],
       estacion: o.estacionNombre,
       estacionId: o.estacionId,
       flujo: (o.flujo === 'Aprobación' ? 'Aprobación' : 'Directo') as FlujoOperacion,

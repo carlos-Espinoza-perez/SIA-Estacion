@@ -42,7 +42,9 @@ export const itemService = {
       codigo: it.codigoQr || it.codigo || '',
       nombre: it.nombre,
       tipo: it.tipoItemNombre || it.tipoItemId,
+      tipoItemId: it.tipoItemId,
       estacion: it.estacionNombre || 'General',
+      estacionId: it.estacionId,
       estado: (it.estadoActual as EstadoItem) || 'Disponible',
       unidades: it.unidades || 1,
       observaciones: it.observaciones,
@@ -124,7 +126,9 @@ export const itemService = {
       codigo: itemBackend.codigoQr || itemBackend.codigo || data.codigo,
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || data.tipo,
+      tipoItemId: itemBackend.tipoItemId,
       estacion: itemBackend.estacionNombre || data.estacion,
+      estacionId: itemBackend.estacionId || data.estacionId,
       estado: data.estadoInicial,
       unidades: itemBackend.unidades || data.unidades,
       observaciones: itemBackend.observaciones || data.observaciones,
@@ -132,11 +136,12 @@ export const itemService = {
   },
 
   actualizarItem: async (id: string, data: Partial<Item>): Promise<Item> => {
-    if (data.nombre || data.observaciones || data.estado) {
+    if (data.nombre || data.observaciones || data.estado || data.estacionId !== undefined) {
       await apiClient.put(`/items/${id}`, {
         nombre: data.nombre,
         observaciones: data.observaciones,
         estadoActual: data.estado,
+        estacionId: data.estacionId || null,
       });
     }
 
@@ -148,7 +153,9 @@ export const itemService = {
       codigo: itemBackend.codigoQr || itemBackend.codigo || '',
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || itemBackend.tipoItemId,
+      tipoItemId: itemBackend.tipoItemId,
       estacion: itemBackend.estacionNombre || 'General',
+      estacionId: itemBackend.estacionId,
       estado: (itemBackend.estadoActual as EstadoItem) || 'Disponible',
       unidades: itemBackend.unidades || 1,
       observaciones: itemBackend.observaciones,
@@ -158,13 +165,15 @@ export const itemService = {
   cambiarEstadoItem: async (id: string, _estado: Item['estado']): Promise<Item> => {
     const response = await apiClient.get<RespuestaEnvuelta<ItemBackendDto>>(`/items/${id}`);
     const itemBackend = response.data.datos!;
-    
+
     return {
       id: itemBackend.id,
       codigo: itemBackend.codigoQr || itemBackend.codigo || '',
       nombre: itemBackend.nombre,
       tipo: itemBackend.tipoItemNombre || itemBackend.tipoItemId,
+      tipoItemId: itemBackend.tipoItemId,
       estacion: itemBackend.estacionNombre || 'General',
+      estacionId: itemBackend.estacionId,
       estado: (itemBackend.estadoActual as EstadoItem) || 'Disponible',
       unidades: itemBackend.unidades || 1,
       observaciones: itemBackend.observaciones,
