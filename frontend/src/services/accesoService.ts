@@ -49,6 +49,37 @@ function mapResultado(res: string, esOffline: boolean): ResultadoAcceso {
   }
 }
 
+export interface PresenciaActualRow {
+  personaId: string;
+  nombreCompleto: string;
+  fechaHora: string;
+  estacion: string;
+}
+
+interface PresenciaBackendDto {
+  personaId: string;
+  nombreCompleto: string;
+  ultimoEvento: string;
+  fechaHora: string;
+  estacion: string;
+}
+
+export interface PrestamoVencidoRow {
+  operacionId: string;
+  itemNombre: string;
+  personaNombre: string;
+  fechaCompromiso: string;
+  diasVencido: number;
+}
+
+interface PrestamoVencidoBackendDto {
+  operacionId: string;
+  itemNombre: string;
+  personaNombre: string;
+  fechaCompromiso: string;
+  diasVencido: number;
+}
+
 export const accesoService = {
   async getAccesos(filtros?: FiltrosAcceso): Promise<AccesoRow[]> {
     const hoy = new Date();
@@ -100,8 +131,26 @@ export const accesoService = {
     return resultado;
   },
 
-  async getPresenciaActual() {
-    const response = await apiClient.get<RespuestaEnvuelta<any>>('/reportes/presencia');
-    return response.data.datos;
+  async getPresenciaActual(): Promise<PresenciaActualRow[]> {
+    const response = await apiClient.get<RespuestaEnvuelta<PresenciaBackendDto[]>>('/reportes/presencia');
+    return (response.data?.datos || []).map((p) => ({
+      personaId: p.personaId,
+      nombreCompleto: p.nombreCompleto,
+      fechaHora: new Date(p.fechaHora).toLocaleString('es-NI', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      }),
+      estacion: p.estacion,
+    }));
+  },
+
+  async getPrestamosVencidos(): Promise<PrestamoVencidoRow[]> {
+    const response = await apiClient.get<RespuestaEnvuelta<PrestamoVencidoBackendDto[]>>('/reportes/prestamos-vencidos');
+    return (response.data?.datos || []).map((p) => ({
+      operacionId: p.operacionId,
+      itemNombre: p.itemNombre,
+      personaNombre: p.personaNombre,
+      fechaCompromiso: new Date(p.fechaCompromiso).toLocaleDateString('es-NI'),
+      diasVencido: p.diasVencido,
+    }));
   },
 };

@@ -7,7 +7,7 @@ export interface ActividadEstacion {
   persona: string;
   operacion: string;
   validacion: string;
-  resultado: 'Concedido' | 'Denegado' | 'Pendiente' | 'Entregada';
+  resultado: 'Concedido' | 'Denegado' | 'Pendiente' | 'Entregada' | 'Aprobada' | 'Devuelta' | 'Cancelada';
 }
 
 export interface Estacion {
@@ -29,8 +29,6 @@ export interface Estacion {
   firmware?: string;
   accesosHoy?: number;
   operacionesHoy?: number;
-  latenciaQrPromedio?: string;
-  latenciaFacialPromedio?: string;
   actividadReciente?: ActividadEstacion[];
 }
 
@@ -41,8 +39,6 @@ export interface CrearEstacionFormData {
   flujo: FlujoEstacion;
   encargadoId?: string;
   encargado: string;
-  identificadorDispositivo: string;
-  modoOffline: boolean;
 }
 
 export interface FiltrosEstacion {

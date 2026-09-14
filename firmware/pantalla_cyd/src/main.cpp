@@ -95,16 +95,12 @@ static uint32_t wifiScanStartTime = 0;
 
 static void startWifiScan() {
     WiFi.setSleep(false);
-    // Si el SoftAP de la camara ya esta activo (CameraServer.begin() ya se llamo),
-    // conservar WIFI_AP_STA en vez de forzar WIFI_STA: cambiar de modo mientras el
-    // AP tiene clientes conectados puede dejar el escaneo colgado indefinidamente
-    // (WiFi.scanComplete() nunca sale de WIFI_SCAN_RUNNING) y ademas tira el AP.
-    wifi_mode_t modoActual = WiFi.getMode();
-    if (modoActual == WIFI_MODE_AP || modoActual == WIFI_MODE_APSTA) {
-        WiFi.mode(WIFI_AP_STA);
-    } else {
-        WiFi.mode(WIFI_STA);
-    }
+    // Escanear en WIFI_AP_STA con el SoftAP de la camara activo (y con un
+    // celular conectado a el, como ocurre en el flujo de emparejamiento) es
+    // poco confiable en el ESP32 y suele devolver 0 redes. Se apaga el AP
+    // temporalmente y se escanea en STA puro; el panel admin vuelve a
+    // levantar la camara (CameraServer.begin()) al salir de esta pantalla.
+    WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, true);
     delay(60);
     WiFi.setTxPower(WIFI_POWER_15dBm);
@@ -277,6 +273,15 @@ void loop() {
     if (pendingWifiCancel) {
         pendingWifiCancel = false;
         Serial.println("[UI] Cancelando seleccion de red, regresando al panel admin");
+        // startWifiScan() desconecto la red actual para poder escanear; si el
+        // usuario cancela sin elegir una red nueva hay que reconectar con las
+        // credenciales guardadas para no quedar "Sin conexion" en el panel admin.
+        if (!Api.isConnected()) {
+            Api.connectWifi();
+        }
+        // startWifiScan() apago el AP de la camara para poder escanear; se
+        // restaura al volver al panel admin.
+        CameraServer.begin();
         screens.setWifiFromAdmin(false);
         currentState = StationState::Admin;
         screens.transitionTo(ScreenState::ADMIN_PANEL);
@@ -572,7 +577,11 @@ void loop() {
 
 static void enterStandbyView() {
     CameraServer.begin();
-    wasConnected = Api.isConnected();
+    // Entrar al panel de WiFi desconecta la red actual para poder escanear
+    // (ver startWifiScan). Si se sale sin elegir una red nueva, hay que
+    // reconectar con las credenciales guardadas antes de decidir si mostrar
+    // el modo "Sin conexion".
+    wasConnected = Api.isConnected() || Api.connectWifi();
     // De vuelta a operacion normal: el contexto "vengo del panel admin" para el
     // boton Volver de seleccion de WiFi ya no aplica (se reconecto o se cancelo).
     screens.setWifiFromAdmin(false);

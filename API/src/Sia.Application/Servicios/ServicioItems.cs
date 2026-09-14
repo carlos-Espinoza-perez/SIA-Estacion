@@ -26,7 +26,13 @@ public class ServicioItems
     public async Task<Result<List<TipoItemResponse>>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct)
     {
         List<TipoItem> tipos = await _repository.ObtenerTiposAsync(soloActivos, ct);
-        return Result<List<TipoItemResponse>>.Exitoso(_mapper.Map<List<TipoItemResponse>>(tipos));
+        Dictionary<Guid, int> conteos = await _repository.ContarItemsPorTipoAsync(ct);
+
+        List<TipoItemResponse> respuesta = _mapper.Map<List<TipoItemResponse>>(tipos);
+        foreach (TipoItemResponse tipo in respuesta)
+            tipo.ItemsRegistrados = conteos.GetValueOrDefault(tipo.Id);
+
+        return Result<List<TipoItemResponse>>.Exitoso(respuesta);
     }
 
     public async Task<Result<TipoItemResponse>> CrearTipoAsync(CrearTipoItemRequest request, CancellationToken ct)

@@ -10,6 +10,7 @@ interface AuditoriaBackendDto {
   descripcion?: string;
   origen?: string;
   estacionId?: string;
+  estacionNombre?: string;
   userId?: string;
   nombreUsuario?: string;
   fechaHora: string;
@@ -104,7 +105,7 @@ class AuditoriaService {
       tipo: clasificarTipoEvento(a.entidad),
       actor: a.nombreUsuario || (a.userId ? 'Usuario' : 'Sistema'),
       descripcion: descripcionNatural(a),
-      estacion: a.estacionId ? a.estacionId.substring(0, 8) : '—',
+      estacion: a.estacionNombre || (a.estacionId ? a.estacionId.substring(0, 8) : '—'),
       origen: (a.origen as OrigenAuditoria) || 'Panel',
     }));
 

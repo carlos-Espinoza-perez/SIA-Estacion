@@ -68,9 +68,9 @@ public class ReportesController : SiaControllerBase
 
     [HttpGet("dashboard")]
     // [RequierePrivilegio("REP", "L")] // Or appropriate privilege
-    public async Task<IActionResult> ObtenerMetricasDashboard(CancellationToken ct)
+    public async Task<IActionResult> ObtenerMetricasDashboard([FromQuery] string? periodo, CancellationToken ct)
     {
-        var resultado = await _servicio.ObtenerMetricasDashboardAsync(ct);
+        var resultado = await _servicio.ObtenerMetricasDashboardAsync(periodo, ct);
         return HandleResult(resultado);
     }
 }

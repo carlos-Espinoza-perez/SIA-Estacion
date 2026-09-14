@@ -24,6 +24,18 @@ public class EstacionResponse
         get => EstaVinculada && Estado && UltimaSincronizacion.HasValue && (DateTimeOffset.UtcNow - UltimaSincronizacion.Value).TotalSeconds <= 90;
         set { }
     }
+    public int AccesosHoy { get; set; }
+    public int OperacionesHoy { get; set; }
+    public List<ActividadEstacionItem> ActividadReciente { get; set; } = [];
+}
+
+public class ActividadEstacionItem
+{
+    public DateTimeOffset FechaHora { get; set; }
+    public string Persona { get; set; } = string.Empty;
+    public string Operacion { get; set; } = string.Empty;
+    public string Validacion { get; set; } = string.Empty;
+    public string Resultado { get; set; } = string.Empty;
 }
 
 public class CrearEstacionRequest

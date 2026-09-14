@@ -8,6 +8,7 @@ public interface IItemsRepository
     Task<List<TipoItem>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct);
     Task<TipoItem?> ObtenerTipoPorIdAsync(Guid id, CancellationToken ct);
     Task AgregarTipoAsync(TipoItem tipo, CancellationToken ct);
+    Task<Dictionary<Guid, int>> ContarItemsPorTipoAsync(CancellationToken ct);
     
     Task<List<AtributoDefinicion>> ObtenerAtributosAsync(Guid tipoItemId, CancellationToken ct);
     Task<AtributoDefinicion?> ObtenerAtributoPorIdAsync(Guid id, CancellationToken ct);

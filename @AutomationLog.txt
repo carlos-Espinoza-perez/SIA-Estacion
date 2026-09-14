@@ -1,0 +1,1 @@
+2026-09-11 08:29:36.746 walk_dialog.py[19] <module> -> Find Control Timeout(10s): {Name: 'Secuencias de comandos y complementos', ControlType: WindowControl}

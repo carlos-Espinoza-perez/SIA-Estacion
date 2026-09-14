@@ -33,6 +33,15 @@ public class ItemsRepository : IItemsRepository
         return Task.CompletedTask;
     }
 
+    public async Task<Dictionary<Guid, int>> ContarItemsPorTipoAsync(CancellationToken ct)
+    {
+        return await _db.Items
+            .Where(i => i.Estado)
+            .GroupBy(i => i.TipoItemId)
+            .Select(g => new { TipoItemId = g.Key, Cantidad = g.Count() })
+            .ToDictionaryAsync(x => x.TipoItemId, x => x.Cantidad, ct);
+    }
+
     public async Task<List<AtributoDefinicion>> ObtenerAtributosAsync(Guid tipoItemId, CancellationToken ct)
     {
         return await _db.AtributosDefinicion

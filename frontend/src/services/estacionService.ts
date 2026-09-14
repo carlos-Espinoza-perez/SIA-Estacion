@@ -3,10 +3,19 @@ import {
   EstadoEstacion,
   CrearEstacionFormData,
   FiltrosEstacion,
+  ActividadEstacion,
 } from '../types/estacion';
 
 import { apiClient } from './apiClient';
 import { RespuestaEnvuelta } from '../types/api';
+
+interface ActividadEstacionBackendDto {
+  fechaHora: string;
+  persona: string;
+  operacion: string;
+  validacion: string;
+  resultado: string;
+}
 
 interface EstacionBackendDto {
   id: string;
@@ -27,6 +36,9 @@ interface EstacionBackendDto {
   fechaVinculacion?: string;
   ultimaSincronizacion?: string;
   isOnline?: boolean;
+  accesosHoy?: number;
+  operacionesHoy?: number;
+  actividadReciente?: ActividadEstacionBackendDto[];
 }
 
 const HEARTBEAT_TIMEOUT_SECONDS = 90; // Tolerancia de 3 latidos (30s cada uno)
@@ -85,13 +97,17 @@ export function mapBackendDtoToEstacion(e: EstacionBackendDto): Estacion {
     codigoVinculacion: e.codigoVinculacion,
     fechaVinculacion: e.fechaVinculacion ? new Date(e.fechaVinculacion).toLocaleString() : undefined,
     identificadorDispositivo: e.clientId,
-    modoOffline: true,
     firmware: e.firmwareVersion || 'v1.0.3',
-    accesosHoy: 0,
-    operacionesHoy: 0,
-    latenciaQrPromedio: '—',
-    latenciaFacialPromedio: '—',
-    actividadReciente: [],
+    accesosHoy: e.accesosHoy ?? 0,
+    operacionesHoy: e.operacionesHoy ?? 0,
+    actividadReciente: (e.actividadReciente || []).map((a, idx) => ({
+      id: `${e.id}-act-${idx}`,
+      fechaHora: new Date(a.fechaHora).toLocaleString(),
+      persona: a.persona,
+      operacion: a.operacion,
+      validacion: a.validacion,
+      resultado: a.resultado as ActividadEstacion['resultado'],
+    })),
   };
 }
 

@@ -162,4 +162,10 @@ public class PersonasRepository : IPersonasRepository
             .IgnoreQueryFilters()
             .CountAsync(p => p.Estado, ct);
     }
+
+    public async Task<int> ContarPersonasRegistradasEntreAsync(DateTimeOffset desde, DateTimeOffset hasta, CancellationToken ct)
+    {
+        return await _db.Personas
+            .CountAsync(p => p.FechaRegistro >= desde && p.FechaRegistro < hasta, ct);
+    }
 }

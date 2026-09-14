@@ -8,6 +8,7 @@ public class TipoItemResponse
     public bool RequiereAprobacion { get; set; }
     public bool PermiteAgrupacion { get; set; }
     public bool Estado { get; set; }
+    public int ItemsRegistrados { get; set; }
 }
 
 public class CrearTipoItemRequest

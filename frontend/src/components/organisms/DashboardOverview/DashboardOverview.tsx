@@ -5,17 +5,31 @@ import { StationAccessBreakdown } from '../../molecules/StationBarItem/StationAc
 import { ItemStatusChart } from '../../molecules/ChartMotion/ItemStatusChart';
 import { AccesosResultChart } from '../../molecules/ChartMotion/AccesosResultChart';
 import { OperacionesMensualesChart } from '../../molecules/ChartMotion/OperacionesMensualesChart';
-import { dashboardService, DashboardMetrics } from '../../../services/dashboardService';
+import { dashboardService, DashboardMetrics, PeriodoDashboard } from '../../../services/dashboardService';
+
+const OPCIONES_PERIODO: { value: PeriodoDashboard; label: string }[] = [
+  { value: 'hoy', label: 'Hoy' },
+  { value: 'semana', label: 'Últimos 7 días' },
+  { value: 'mes', label: 'Últimos 30 días' },
+];
+
+const formatearTendencia = (valor: number | null | undefined): string => {
+  if (valor === null || valor === undefined) return '—';
+  const signo = valor > 0 ? '+' : '';
+  return `${signo}${valor}%`;
+};
 
 export const DashboardOverview: React.FC = () => {
   const [metricas, setMetricas] = useState<DashboardMetrics | null>(null);
   const [error, setError] = useState(false);
+  const [periodo, setPeriodo] = useState<PeriodoDashboard>('hoy');
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
 
-  const cargarMetricas = () => {
+  const cargarMetricas = (periodoSeleccionado: PeriodoDashboard) => {
     let montado = true;
     setError(false);
     dashboardService
-      .getMetricas()
+      .getMetricas(periodoSeleccionado)
       .then((data) => {
         if (montado) setMetricas(data);
       })
@@ -29,9 +43,9 @@ export const DashboardOverview: React.FC = () => {
   };
 
   useEffect(() => {
-    return cargarMetricas();
+    return cargarMetricas(periodo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [periodo]);
 
   if (error) {
     return (
@@ -53,7 +67,7 @@ export const DashboardOverview: React.FC = () => {
           Revisa tu conexión o intenta de nuevo en unos segundos.
         </span>
         <button
-          onClick={cargarMetricas}
+          onClick={() => cargarMetricas(periodo)}
           style={{
             marginTop: '4px',
             padding: '8px 16px',
@@ -103,26 +117,68 @@ export const DashboardOverview: React.FC = () => {
           Resumen
         </h2>
 
-        <button
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 10px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.06)',
-            border: '0.5px solid rgba(255, 255, 255, 0.12)',
-            color: 'rgba(255, 255, 255, 0.75)',
-            fontSize: '12px',
-            fontFamily: 'Inter, sans-serif',
-            cursor: 'pointer',
-          }}
-        >
-          <span>Hoy</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setSelectorAbierto((v) => !v)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              border: '0.5px solid rgba(255, 255, 255, 0.12)',
+              color: 'rgba(255, 255, 255, 0.75)',
+              fontSize: '12px',
+              fontFamily: 'Inter, sans-serif',
+              cursor: 'pointer',
+            }}
+          >
+            <span>{OPCIONES_PERIODO.find((o) => o.value === periodo)?.label}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {selectorAbierto && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                right: 0,
+                backgroundColor: '#242424',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                zIndex: 10,
+                minWidth: '160px',
+              }}
+            >
+              {OPCIONES_PERIODO.map((opcion) => (
+                <button
+                  key={opcion.value}
+                  onClick={() => {
+                    setPeriodo(opcion.value);
+                    setSelectorAbierto(false);
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px 12px',
+                    backgroundColor: opcion.value === periodo ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    border: 'none',
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    fontSize: '12px',
+                    fontFamily: 'Inter, sans-serif',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {opcion.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tarjetas Estadísticas */}
@@ -137,28 +193,28 @@ export const DashboardOverview: React.FC = () => {
         <StatCard
           title="Accesos hoy"
           value={metricas ? metricas.totalAccesosHoy.toLocaleString() : '—'}
-          trend={metricas ? (metricas.totalAccesosHoy > 0 ? '+100%' : '0%') : '—'}
-          isPositive={true}
+          trend={formatearTendencia(metricas?.tendenciaAccesosPorcentaje)}
+          isPositive={(metricas?.tendenciaAccesosPorcentaje ?? 0) >= 0}
           bgColor="#E6F1FD"
         />
         <StatCard
           title="Operaciones"
           value={metricas ? metricas.totalOperaciones.toLocaleString() : '—'}
-          trend={metricas ? (metricas.totalOperaciones > 0 ? '+100%' : '0%') : '—'}
-          isPositive={true}
+          trend={formatearTendencia(metricas?.tendenciaOperacionesPorcentaje)}
+          isPositive={(metricas?.tendenciaOperacionesPorcentaje ?? 0) >= 0}
           bgColor="#EDEEFC"
         />
         <StatCard
           title="Personas"
           value={metricas ? metricas.totalPersonas.toLocaleString() : '—'}
-          trend={metricas ? (metricas.totalPersonas > 0 ? '+100%' : '0%') : '—'}
-          isPositive={true}
+          trend={formatearTendencia(metricas?.tendenciaPersonasPorcentaje)}
+          isPositive={(metricas?.tendenciaPersonasPorcentaje ?? 0) >= 0}
           bgColor="#E6F1FD"
         />
         <StatCard
           title="Estaciones"
           value={metricas ? metricas.totalEstaciones.toLocaleString() : '—'}
-          trend={metricas ? (metricas.totalEstaciones > 0 ? '+100%' : '0%') : '—'}
+          trend="—"
           isPositive={true}
           bgColor="#EDEEFC"
         />

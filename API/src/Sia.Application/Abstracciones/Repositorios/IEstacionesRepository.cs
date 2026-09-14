@@ -17,4 +17,10 @@ public interface IEstacionesRepository
     
     Task<int> ContarEstacionesActivasGlobalAsync(CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
+
+    Task<Dictionary<Guid, int>> ContarAccesosHoyPorEstacionAsync(CancellationToken ct);
+    Task<Dictionary<Guid, int>> ContarOperacionesHoyPorEstacionAsync(CancellationToken ct);
+    Task<List<EventoAcceso>> ObtenerUltimosEventosAsync(int limite, CancellationToken ct);
+    Task<List<OperacionItem>> ObtenerUltimasOperacionesAsync(int limite, CancellationToken ct);
+    Task<Dictionary<Guid, string>> ObtenerNombresPorIdsAsync(IEnumerable<Guid> ids, CancellationToken ct);
 }

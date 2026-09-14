@@ -20,5 +20,6 @@ public interface IPersonasRepository
     Task AgregarFotoAsync(FotoReferencia foto, CancellationToken ct);
     
     Task<int> ContarPersonasRegistradasGlobalAsync(CancellationToken ct);
+    Task<int> ContarPersonasRegistradasEntreAsync(DateTimeOffset desde, DateTimeOffset hasta, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

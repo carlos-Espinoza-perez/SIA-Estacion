@@ -35,7 +35,9 @@ public class ServicioEstaciones
     public async Task<Result<List<EstacionResponse>>> ObtenerTodasAsync(CancellationToken ct)
     {
         List<Estacion> estaciones = await _repository.ObtenerTodasAsync(ct);
-        return Result<List<EstacionResponse>>.Exitoso(_mapper.Map<List<EstacionResponse>>(estaciones));
+        List<EstacionResponse> respuesta = _mapper.Map<List<EstacionResponse>>(estaciones);
+        await AplicarTelemetriaAsync(respuesta, ct);
+        return Result<List<EstacionResponse>>.Exitoso(respuesta);
     }
 
     public async Task<Result<EstacionResponse>> ObtenerPorIdAsync(Guid id, CancellationToken ct)
@@ -43,7 +45,58 @@ public class ServicioEstaciones
         Estacion? estacion = await _repository.ObtenerPorIdAsync(id, ct);
         if (estacion is null)
             throw new EntidadNoEncontradaException(nameof(Estacion), id);
-        return Result<EstacionResponse>.Exitoso(_mapper.Map<EstacionResponse>(estacion));
+
+        EstacionResponse response = _mapper.Map<EstacionResponse>(estacion);
+        await AplicarTelemetriaAsync([response], ct);
+        return Result<EstacionResponse>.Exitoso(response);
+    }
+
+    private async Task AplicarTelemetriaAsync(List<EstacionResponse> estaciones, CancellationToken ct)
+    {
+        if (estaciones.Count == 0) return;
+
+        const int LimiteActividadGlobal = 200;
+        const int LimiteActividadPorEstacion = 5;
+
+        Dictionary<Guid, int> accesosHoy = await _repository.ContarAccesosHoyPorEstacionAsync(ct);
+        Dictionary<Guid, int> operacionesHoy = await _repository.ContarOperacionesHoyPorEstacionAsync(ct);
+        List<EventoAcceso> ultimosEventos = await _repository.ObtenerUltimosEventosAsync(LimiteActividadGlobal, ct);
+        List<OperacionItem> ultimasOperaciones = await _repository.ObtenerUltimasOperacionesAsync(LimiteActividadGlobal, ct);
+
+        var actividad = ultimosEventos
+            .Select(e => new
+            {
+                e.EstacionId,
+                Item = new ActividadEstacionItem
+                {
+                    FechaHora = e.FechaHoraLocal,
+                    Persona = e.Persona is not null ? $"{e.Persona.Nombres} {e.Persona.Apellidos}" : "No identificado",
+                    Operacion = $"Acceso · {(e.Direccion == DireccionAcceso.Ingreso ? "Ingreso" : "Egreso")}",
+                    Validacion = e.ModoValidacion.ToString(),
+                    Resultado = e.Resultado.ToString()
+                }
+            })
+            .Concat(ultimasOperaciones.Select(o => new
+            {
+                o.EstacionId,
+                Item = new ActividadEstacionItem
+                {
+                    FechaHora = o.FechaSolicitud,
+                    Persona = $"{o.Persona.Nombres} {o.Persona.Apellidos}",
+                    Operacion = $"{o.TipoOperacion} · {o.ItemEscaneado.Nombre}",
+                    Validacion = "—",
+                    Resultado = o.EstadoActual.ToString()
+                }
+            }))
+            .GroupBy(x => x.EstacionId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Item.FechaHora).Take(LimiteActividadPorEstacion).Select(x => x.Item).ToList());
+
+        foreach (EstacionResponse estacion in estaciones)
+        {
+            estacion.AccesosHoy = accesosHoy.GetValueOrDefault(estacion.Id);
+            estacion.OperacionesHoy = operacionesHoy.GetValueOrDefault(estacion.Id);
+            estacion.ActividadReciente = actividad.GetValueOrDefault(estacion.Id) ?? [];
+        }
     }
 
     public async Task<Result<CrearEstacionResponse>> CrearAsync(CrearEstacionRequest request, CancellationToken ct)

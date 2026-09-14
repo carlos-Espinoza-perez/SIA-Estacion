@@ -31,6 +31,7 @@ interface TipoItemBackendDto {
   descripcion?: string;
   requiereAprobacion?: boolean;
   estado: boolean;
+  itemsRegistrados?: number;
 }
 
 export const itemService = {
@@ -79,7 +80,7 @@ export const itemService = {
       id: t.id,
       nombre: t.nombre,
       descripcion: t.descripcion || 'Sin descripción',
-      itemsRegistrados: 0,
+      itemsRegistrados: t.itemsRegistrados || 0,
       requiereAprobacion: t.requiereAprobacion ? 'Sí' : 'No',
       estado: t.estado ? 'Activo' : 'Inactivo',
     }));

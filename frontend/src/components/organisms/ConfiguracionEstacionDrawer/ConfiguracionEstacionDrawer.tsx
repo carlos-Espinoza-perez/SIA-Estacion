@@ -1022,7 +1022,7 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                   <line x1="15" y1="9" x2="9" y2="15" />
                 </svg>
                 <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', margin: 0, maxWidth: '320px', lineHeight: 1.4 }}>
-                  No hay un dispositivo físico (ESP32) conectado a esta estación. Para activar la telemetría, monitoreo de firmware y latencia, vincula el hardware escaneando su código QR.
+                  No hay un dispositivo físico (ESP32) conectado a esta estación. Para activar la telemetría y el monitoreo de firmware, vincula el hardware escaneando su código QR.
                 </p>
                 <button
                   type="button"
@@ -1090,23 +1090,6 @@ export const ConfiguracionEstacionDrawer: React.FC<ConfiguracionEstacionDrawerPr
                   </span>
                 </div>
 
-                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                    Latencia QR
-                  </span>
-                  <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
-                    {estacion.latenciaQrPromedio || '—'}
-                  </span>
-                </div>
-
-                <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', display: 'block' }}>
-                    Latencia Facial
-                  </span>
-                  <span style={{ fontSize: '13px', color: '#4ADE80', fontWeight: 600 }}>
-                    {estacion.latenciaFacialPromedio || '—'}
-                  </span>
-                </div>
               </div>
             )}
           </div>

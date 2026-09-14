@@ -31,15 +31,12 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
   const [encargadoId, setEncargadoId] = useState('');
   const [encargado, setEncargado] = useState('');
   const [encargadosDisponibles, setEncargadosDisponibles] = useState<Persona[]>([]);
-  const [identificadorDispositivo, setIdentificadorDispositivo] = useState('EST-LAB-C-01');
-  const [modoOffline, setModoOffline] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setNombre('');
       setUbicacion('');
-      setIdentificadorDispositivo(`EST-PUNTO-0${Math.floor(1 + Math.random() * 9)}`);
       personaService.getPersonas({ tipo: 'Personal', estado: 'Activo', limite: 100 })
         .then((res) => {
           const personal = res.data.filter((p) => p.tipo !== 'Estudiante');
@@ -66,8 +63,6 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
         flujo: tipoRecurso === 'Control de acceso' ? '—' : flujo,
         encargadoId: encargadoId || undefined,
         encargado: encargado || 'Sin asignar',
-        identificadorDispositivo: identificadorDispositivo.trim(),
-        modoOffline,
       });
 
       onClose();
@@ -255,65 +250,9 @@ export const ModalCrearEstacion: React.FC<ModalCrearEstacionProps> = ({
           </select>
         </div>
 
-        {/* Identificador del dispositivo */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Identificador del dispositivo
-          </label>
-          <input
-            type="text"
-            placeholder="EST-LAB-C-01"
-            value={identificadorDispositivo}
-            onChange={(e) => setIdentificadorDispositivo(e.target.value)}
-            style={{
-              height: '38px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              color: '#FFFFFF',
-              fontSize: '14px',
-              fontFamily: 'Inter, sans-serif',
-              outline: 'none',
-            }}
-          />
-        </div>
-
-        {/* Modo offline (Segmented) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            Modo offline
-          </label>
-          <div
-            style={{
-              display: 'flex',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '8px',
-              padding: '3px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              gap: '4px',
-            }}
-          >
-            <Button
-              type="button"
-              variant={modoOffline ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setModoOffline(true)}
-              style={{ flex: 1, height: '32px' }}
-            >
-              Habilitado
-            </Button>
-            <Button
-              type="button"
-              variant={!modoOffline ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setModoOffline(false)}
-              style={{ flex: 1, height: '32px' }}
-            >
-              Deshabilitado
-            </Button>
-          </div>
-        </div>
+        <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.45)', margin: 0, lineHeight: 1.4 }}>
+          El identificador del dispositivo físico y su código de vinculación se generan automáticamente al crear la estación; el siguiente paso será escanear su código QR para emparejarlo.
+        </p>
       </form>
     </Modal>
   );

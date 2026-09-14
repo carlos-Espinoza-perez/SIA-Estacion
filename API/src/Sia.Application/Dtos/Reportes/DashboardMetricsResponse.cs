@@ -10,6 +10,11 @@ namespace Sia.Application.Dtos.Reportes
         public int TotalPersonas { get; set; }
         public int TotalEstaciones { get; set; }
 
+        public string Periodo { get; set; } = "hoy";
+        public double? TendenciaAccesosPorcentaje { get; set; }
+        public double? TendenciaOperacionesPorcentaje { get; set; }
+        public double? TendenciaPersonasPorcentaje { get; set; }
+
         public List<ItemEstadoDto> ItemsPorEstado { get; set; } = new();
         public List<AccesoEstacionDto> AccesosPorEstacion { get; set; } = new();
 

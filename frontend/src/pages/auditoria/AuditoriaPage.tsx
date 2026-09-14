@@ -3,6 +3,7 @@ import { DashboardLayoutTemplate } from '../../components/templates/DashboardLay
 import { EventoAuditoria, TipoEventoAuditoria } from '../../types/auditoria';
 import { auditoriaService } from '../../services/auditoriaService';
 import { estacionService } from '../../services/estacionService';
+import { accesoService, PresenciaActualRow, PrestamoVencidoRow } from '../../services/accesoService';
 import { Estacion } from '../../types/estacion';
 import { Button } from '../../components/atoms/Button/Button';
 import { Spinner } from '../../components/atoms/Spinner/Spinner';
@@ -14,6 +15,11 @@ export const AuditoriaPage: React.FC = () => {
   const [estaciones, setEstaciones] = useState<Estacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'eventos' | 'reportes'>('eventos');
+
+  // Datos del tab "Reportes"
+  const [presenciaActual, setPresenciaActual] = useState<PresenciaActualRow[]>([]);
+  const [prestamosVencidos, setPrestamosVencidos] = useState<PrestamoVencidoRow[]>([]);
+  const [loadingReportes, setLoadingReportes] = useState(false);
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
@@ -71,6 +77,18 @@ export const AuditoriaPage: React.FC = () => {
   useEffect(() => {
     cargarEventos();
   }, [cargarEventos]);
+
+  useEffect(() => {
+    if (activeTab !== 'reportes') return;
+    setLoadingReportes(true);
+    Promise.all([accesoService.getPresenciaActual(), accesoService.getPrestamosVencidos()])
+      .then(([presencia, vencidos]) => {
+        setPresenciaActual(presencia);
+        setPrestamosVencidos(vencidos);
+      })
+      .catch((error) => showToast(error.message || 'Error al cargar los reportes', 'error'))
+      .finally(() => setLoadingReportes(false));
+  }, [activeTab, showToast]);
 
   // Lista de nombres de estaciones reales
   const estacionesNombres = useMemo(() => {
@@ -180,6 +198,8 @@ export const AuditoriaPage: React.FC = () => {
           </div>
         </div>
 
+        {activeTab === 'eventos' && (
+        <>
         {/* Barra de Filtros */}
         <div
           style={{
@@ -720,6 +740,124 @@ export const AuditoriaPage: React.FC = () => {
             </>
           )}
         </div>
+        </>
+        )}
+
+        {activeTab === 'reportes' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {loadingReportes ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                <Spinner size={32} color="var(--primary)" />
+              </div>
+            ) : (
+              <>
+                {/* Presencia actual */}
+                <div
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: '18px',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>
+                      Presencia actual ({presenciaActual.length})
+                    </h3>
+                    <span style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                      Personas cuyo último evento registrado hoy fue un ingreso, sin egreso posterior
+                    </span>
+                  </div>
+                  {presenciaActual.length === 0 ? (
+                    <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.4)', padding: '12px 0' }}>
+                      No hay personas dentro de las instalaciones en este momento
+                    </span>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'left', color: 'rgba(255, 255, 255, 0.45)', fontSize: '12px' }}>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Persona</th>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Ingreso registrado</th>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Estación</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {presenciaActual.map((p) => (
+                            <tr key={p.personaId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <td style={{ padding: '10px 12px', color: '#FFFFFF', fontWeight: 500 }}>{p.nombreCompleto}</td>
+                              <td style={{ padding: '10px 12px', color: 'rgba(255, 255, 255, 0.7)' }}>{p.fechaHora}</td>
+                              <td style={{ padding: '10px 12px', color: 'rgba(255, 255, 255, 0.7)' }}>{p.estacion}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Préstamos vencidos */}
+                <div
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: '18px',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>
+                      Préstamos vencidos ({prestamosVencidos.length})
+                    </h3>
+                    <span style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                      Ítems prestados cuya fecha de compromiso de devolución ya pasó
+                    </span>
+                  </div>
+                  {prestamosVencidos.length === 0 ? (
+                    <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.4)', padding: '12px 0' }}>
+                      No hay préstamos vencidos
+                    </span>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'left', color: 'rgba(255, 255, 255, 0.45)', fontSize: '12px' }}>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Ítem</th>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Persona</th>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Fecha compromiso</th>
+                            <th style={{ padding: '10px 12px', fontWeight: 500 }}>Días vencido</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {prestamosVencidos.map((p) => (
+                            <tr key={p.operacionId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <td style={{ padding: '10px 12px', color: '#FFFFFF', fontWeight: 500 }}>{p.itemNombre}</td>
+                              <td style={{ padding: '10px 12px', color: 'rgba(255, 255, 255, 0.7)' }}>{p.personaNombre}</td>
+                              <td style={{ padding: '10px 12px', color: 'rgba(255, 255, 255, 0.7)' }}>{p.fechaCompromiso}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 500, backgroundColor: 'rgba(239, 68, 68, 0.12)', color: '#F87171' }}>
+                                  {p.diasVencido} día{p.diasVencido === 1 ? '' : 's'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayoutTemplate>
   );

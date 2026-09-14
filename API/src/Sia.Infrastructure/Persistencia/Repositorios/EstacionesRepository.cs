@@ -92,4 +92,58 @@ public class EstacionesRepository : IEstacionesRepository
             .IgnoreQueryFilters()
             .CountAsync(e => e.Estado, ct);
     }
+
+    public async Task<Dictionary<Guid, int>> ContarAccesosHoyPorEstacionAsync(CancellationToken ct)
+    {
+        DateTimeOffset inicioDia = DateTimeOffset.UtcNow.Date;
+        DateTimeOffset finDia = inicioDia.AddDays(1);
+
+        return await _db.EventosAcceso
+            .Where(e => e.FechaHoraLocal >= inicioDia && e.FechaHoraLocal < finDia)
+            .GroupBy(e => e.EstacionId)
+            .Select(g => new { EstacionId = g.Key, Cantidad = g.Count() })
+            .ToDictionaryAsync(x => x.EstacionId, x => x.Cantidad, ct);
+    }
+
+    public async Task<Dictionary<Guid, int>> ContarOperacionesHoyPorEstacionAsync(CancellationToken ct)
+    {
+        DateTimeOffset inicioDia = DateTimeOffset.UtcNow.Date;
+        DateTimeOffset finDia = inicioDia.AddDays(1);
+
+        return await _db.OperacionesItem
+            .Where(o => o.FechaSolicitud >= inicioDia && o.FechaSolicitud < finDia)
+            .GroupBy(o => o.EstacionId)
+            .Select(g => new { EstacionId = g.Key, Cantidad = g.Count() })
+            .ToDictionaryAsync(x => x.EstacionId, x => x.Cantidad, ct);
+    }
+
+    public async Task<List<EventoAcceso>> ObtenerUltimosEventosAsync(int limite, CancellationToken ct)
+    {
+        return await _db.EventosAcceso
+            .Include(e => e.Persona)
+            .OrderByDescending(e => e.FechaHoraLocal)
+            .Take(limite)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<OperacionItem>> ObtenerUltimasOperacionesAsync(int limite, CancellationToken ct)
+    {
+        return await _db.OperacionesItem
+            .Include(o => o.ItemEscaneado)
+            .Include(o => o.Persona)
+            .OrderByDescending(o => o.FechaSolicitud)
+            .Take(limite)
+            .ToListAsync(ct);
+    }
+
+    public async Task<Dictionary<Guid, string>> ObtenerNombresPorIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        List<Guid> idsLista = ids.Distinct().ToList();
+        if (idsLista.Count == 0) return new Dictionary<Guid, string>();
+
+        return await _db.Estaciones
+            .IgnoreQueryFilters()
+            .Where(e => idsLista.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => e.Nombre, ct);
+    }
 }

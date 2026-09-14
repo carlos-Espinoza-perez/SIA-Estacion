@@ -130,6 +130,9 @@ public class ServicioReportes
             TotalPaginas = (int)Math.Ceiling(totalRegistros / (double)limite)
         };
 
+        Dictionary<Guid, string> nombresEstaciones = await _estacionesRepository.ObtenerNombresPorIdsAsync(
+            registros.Where(a => a.EstacionId.HasValue).Select(a => a.EstacionId!.Value), ct);
+
         var response = registros.Select(a => new AuditoriaResponse
         {
             Id = a.Id,
@@ -139,6 +142,7 @@ public class ServicioReportes
             Descripcion = a.Descripcion,
             Origen = a.Origen,
             EstacionId = a.EstacionId,
+            EstacionNombre = a.EstacionId.HasValue ? nombresEstaciones.GetValueOrDefault(a.EstacionId.Value) : null,
             UserId = a.UserId,
             NombreUsuario = a.NombreUsuario,
             FechaHora = a.FechaHora
@@ -172,8 +176,15 @@ public class ServicioReportes
         [EstadoItem.Perdido] = "#F2A6A6"
     };
 
-    public async Task<Result<DashboardMetricsResponse>> ObtenerMetricasDashboardAsync(CancellationToken ct)
+    public async Task<Result<DashboardMetricsResponse>> ObtenerMetricasDashboardAsync(string? periodo, CancellationToken ct)
     {
+        string periodoNormalizado = periodo?.Trim().ToLowerInvariant() switch
+        {
+            "semana" => "semana",
+            "mes" => "mes",
+            _ => "hoy"
+        };
+
         var totalPersonas = await _personasRepository.ContarPersonasAsync(null, null, false, null, null, ct);
         var estaciones = await _estacionesRepository.ObtenerTodasAsync(ct);
         var items = await _itemsRepository.ObtenerItemsAsync(null, null, null, ct);
@@ -183,12 +194,38 @@ public class ServicioReportes
         var hace30Dias = today.AddDays(-30);
         var accesos = await _eventosRepository.ObtenerHistorialAccesoAsync(hace30Dias, DateTimeOffset.UtcNow, ct);
 
+        // Rangos del período seleccionado y su equivalente inmediatamente anterior, para calcular tendencia real.
+        DateTimeOffset inicioActual, finActual, inicioAnterior, finAnterior;
+        int diasPeriodo = periodoNormalizado switch { "semana" => 7, "mes" => 30, _ => 1 };
+        finActual = today.AddDays(1);
+        inicioActual = today.AddDays(-(diasPeriodo - 1));
+        finAnterior = inicioActual;
+        inicioAnterior = inicioActual.AddDays(-diasPeriodo);
+
+        List<EventoAcceso> accesosParaTendencia = inicioAnterior >= hace30Dias
+            ? accesos
+            : await _eventosRepository.ObtenerHistorialAccesoAsync(inicioAnterior, DateTimeOffset.UtcNow, ct);
+
+        int accesosActual = accesosParaTendencia.Count(a => a.FechaHoraLocal >= inicioActual && a.FechaHoraLocal < finActual);
+        int accesosAnterior = accesosParaTendencia.Count(a => a.FechaHoraLocal >= inicioAnterior && a.FechaHoraLocal < finAnterior);
+        int operacionesActual = operaciones.Count(o => o.FechaSolicitud >= inicioActual && o.FechaSolicitud < finActual);
+        int operacionesAnterior = operaciones.Count(o => o.FechaSolicitud >= inicioAnterior && o.FechaSolicitud < finAnterior);
+        int personasActual = await _personasRepository.ContarPersonasRegistradasEntreAsync(inicioActual, finActual, ct);
+        int personasAnterior = await _personasRepository.ContarPersonasRegistradasEntreAsync(inicioAnterior, finAnterior, ct);
+
+        double? CalcularTendencia(int actual, int anterior) =>
+            anterior == 0 ? (actual > 0 ? 100d : 0d) : Math.Round(((actual - anterior) / (double)anterior) * 100, 1);
+
         var response = new DashboardMetricsResponse
         {
             TotalPersonas = totalPersonas,
             TotalEstaciones = estaciones.Count,
             TotalAccesosHoy = accesos.Count(a => a.FechaHoraLocal.Date == today),
             TotalOperaciones = operaciones.Count,
+            Periodo = periodoNormalizado,
+            TendenciaAccesosPorcentaje = CalcularTendencia(accesosActual, accesosAnterior),
+            TendenciaOperacionesPorcentaje = CalcularTendencia(operacionesActual, operacionesAnterior),
+            TendenciaPersonasPorcentaje = CalcularTendencia(personasActual, personasAnterior),
 
             ItemsPorEstado = items
                 .GroupBy(i => i.EstadoActual)
