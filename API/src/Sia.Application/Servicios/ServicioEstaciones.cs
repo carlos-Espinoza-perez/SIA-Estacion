@@ -301,6 +301,11 @@ public class ServicioEstaciones
         estacion.MacAddress = null;
         estacion.CodigoVinculacion = null;
         estacion.FechaVinculacion = null;
+        // Invalida el secreto actual: sin esto, el ESP32 fisico conservaba sus
+        // credenciales y podia seguir autenticando, mandando heartbeats y
+        // validando accesos/items como si siguiera vinculado. VincularAsync ya
+        // genera un secreto nuevo en cada vinculacion, asi que no hay perdida.
+        estacion.ClientSecretHash = string.Empty;
 
         await _repository.SaveChangesAsync(ct);
         return Result<bool>.Exitoso(true);

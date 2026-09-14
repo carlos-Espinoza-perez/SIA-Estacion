@@ -188,6 +188,11 @@ public class ServicioAuth
         if (estacion is null)
             return Result<TokenResponse>.Fallido(CodigosError.SecretoEstacionInvalido, "Estación no encontrada.");
 
+        // Una estación desvinculada o deshabilitada no debe poder seguir autenticando
+        // con credenciales viejas, aunque por algún motivo el hash siga coincidiendo.
+        if (!estacion.EstaVinculada || !estacion.Estado)
+            return Result<TokenResponse>.Fallido(CodigosError.SecretoEstacionInvalido, "Secreto inválido.");
+
         if (!hashService.Verificar(request.ClientSecret, estacion.ClientSecretHash))
             return Result<TokenResponse>.Fallido(CodigosError.SecretoEstacionInvalido, "Secreto inválido.");
 
