@@ -6,6 +6,7 @@ public class OperacionResponse
     public string Folio { get; set; } = string.Empty;
     public Guid ItemEscaneadoId { get; set; }
     public string ItemNombre { get; set; } = string.Empty;
+    public List<ItemOperacionResumenDto> Items { get; set; } = [];
     public Guid PersonaId { get; set; }
     public string PersonaNombre { get; set; } = string.Empty;
     public string CodigoEstudiantil { get; set; } = string.Empty;
@@ -29,6 +30,12 @@ public class OperacionDetalleResponse : OperacionResponse
 {
     public List<DetalleItemResponse> Detalles { get; set; } = [];
     public List<MovimientoResponse> Movimientos { get; set; } = [];
+}
+
+public class ItemOperacionResumenDto
+{
+    public Guid ItemId { get; set; }
+    public string Nombre { get; set; } = string.Empty;
 }
 
 public class DetalleItemResponse

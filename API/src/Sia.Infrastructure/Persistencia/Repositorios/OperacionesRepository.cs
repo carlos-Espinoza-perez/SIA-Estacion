@@ -19,6 +19,7 @@ public class OperacionesRepository : IOperacionesRepository
             .Include(o => o.ItemEscaneado)
             .Include(o => o.Persona)
             .Include(o => o.Estacion)
+            .Include(o => o.Detalles).ThenInclude(d => d.Item)
             .AsNoTracking()
             .AsQueryable();
 

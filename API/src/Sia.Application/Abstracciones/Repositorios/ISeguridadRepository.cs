@@ -25,4 +25,9 @@ public interface ISeguridadRepository
 
     Task AsegurarCatalogosDefaultAsync(CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
+
+    // Refresh tokens
+    Task AgregarRefreshTokenAsync(RefreshToken token, CancellationToken ct);
+    Task<RefreshToken?> ObtenerRefreshTokenPorHashAsync(string tokenHash, CancellationToken ct);
+    Task RevocarRefreshTokensDeUsuarioAsync(string userId, CancellationToken ct);
 }

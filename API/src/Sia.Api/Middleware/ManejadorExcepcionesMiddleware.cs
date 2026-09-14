@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Sia.Domain.Excepciones;
 
 namespace Sia.Api.Middleware;
@@ -36,20 +37,40 @@ public class ManejadorExcepcionesMiddleware
             contexto.Response.StatusCode = StatusCodes.Status409Conflict;
             await EscribirProblemDetails(contexto, "Conflicto de concurrencia", ex.Message, StatusCodes.Status409Conflict, ex.Codigo);
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            string correlacionId = Guid.NewGuid().ToString();
+            _logger.LogWarning(ex, "Conflicto de concurrencia en base de datos. Correlación: {CorrelacionId}", correlacionId);
+
+            contexto.Response.StatusCode = StatusCodes.Status409Conflict;
+            await EscribirProblemDetails(
+                contexto,
+                "Conflicto de concurrencia",
+                "El registro fue modificado por otra persona mientras se procesaba esta solicitud. Actualiza la página e inténtalo de nuevo.",
+                StatusCodes.Status409Conflict);
+        }
+        catch (DbUpdateException ex)
+        {
+            string correlacionId = Guid.NewGuid().ToString();
+            _logger.LogError(ex, "Error al guardar en base de datos. Correlación: {CorrelacionId}", correlacionId);
+
+            contexto.Response.StatusCode = StatusCodes.Status409Conflict;
+            await EscribirProblemDetails(
+                contexto,
+                "No se pudo guardar el cambio",
+                $"El dato no cumple una regla de la base de datos (por ejemplo, un valor duplicado). Referencia: {correlacionId}",
+                StatusCodes.Status409Conflict);
+        }
         catch (Exception ex)
         {
             string correlacionId = Guid.NewGuid().ToString();
             _logger.LogError(ex, "Error no controlado. Correlación: {CorrelacionId}", correlacionId);
 
-            var mensajeDetallado = ex.InnerException != null 
-                ? $"{ex.Message} -> {ex.InnerException.Message}" 
-                : ex.Message;
-
             contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await EscribirProblemDetails(
                 contexto,
                 "Error interno",
-                $"Ocurrió un error inesperado. Referencia: {correlacionId} Detalles: {mensajeDetallado} {ex.StackTrace}",
+                $"Ocurrió un error inesperado. Referencia: {correlacionId}",
                 StatusCodes.Status500InternalServerError);
         }
     }

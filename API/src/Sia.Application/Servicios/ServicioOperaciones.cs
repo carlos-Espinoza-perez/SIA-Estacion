@@ -114,6 +114,9 @@ public class ServicioOperaciones
         Folio = o.Folio,
         ItemEscaneadoId = o.ItemEscaneadoId,
         ItemNombre = o.ItemEscaneado?.Nombre ?? string.Empty,
+        Items = o.Detalles.Count > 0
+            ? o.Detalles.Select(d => new ItemOperacionResumenDto { ItemId = d.ItemId, Nombre = d.Item?.Nombre ?? string.Empty }).ToList()
+            : (o.ItemEscaneado != null ? [new ItemOperacionResumenDto { ItemId = o.ItemEscaneadoId, Nombre = o.ItemEscaneado.Nombre }] : []),
         PersonaId = o.PersonaId,
         PersonaNombre = o.Persona != null ? $"{o.Persona.Nombres} {o.Persona.Apellidos}".Trim() : string.Empty,
         CodigoEstudiantil = o.Persona?.CodigoEstudiantil ?? string.Empty,
@@ -140,6 +143,7 @@ public class ServicioOperaciones
             Folio = operacion.Folio,
             ItemEscaneadoId = operacion.ItemEscaneadoId,
             ItemNombre = operacion.ItemEscaneado.Nombre,
+            Items = operacion.Detalles.Select(d => new ItemOperacionResumenDto { ItemId = d.ItemId, Nombre = d.Item.Nombre }).ToList(),
             PersonaId = operacion.PersonaId,
             PersonaNombre = $"{operacion.Persona.Nombres} {operacion.Persona.Apellidos}",
             TipoOperacion = operacion.TipoOperacion.ToString(),
@@ -209,6 +213,9 @@ public class ServicioOperaciones
         if (estacion is null || !estacion.Estado)
             return Result<OperacionLoteResponse>.Fallido("ESTACION_INVALIDA", "Estación no encontrada o inactiva.");
 
+        List<EstacionTipoItem> tiposHabilitados = await _estacionesRepository.ObtenerAsignacionesTiposItemAsync(estacionId, ct);
+        var tipoItemIdsHabilitados = tiposHabilitados.Where(a => a.Estado).Select(a => a.TipoItemId).ToHashSet();
+
         var itemsResueltos = new List<Item>();
         foreach (Guid itemId in request.ItemIds)
         {
@@ -217,6 +224,8 @@ public class ServicioOperaciones
                 return Result<OperacionLoteResponse>.Fallido("ITEM_NO_ENCONTRADO", "Uno de los ítems escaneados ya no existe.");
             if (item.EstadoActual != EstadoItem.Disponible)
                 return Result<OperacionLoteResponse>.Fallido("ITEM_NO_DISPONIBLE", $"'{item.Nombre}' no está disponible en este momento.");
+            if (!tipoItemIdsHabilitados.Contains(item.TipoItemId))
+                return Result<OperacionLoteResponse>.Fallido("ITEM_FUERA_DE_ESTACION", $"'{item.Nombre}' no pertenece a esta estación.");
             itemsResueltos.Add(item);
         }
 

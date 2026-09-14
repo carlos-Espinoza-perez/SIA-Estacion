@@ -13,14 +13,23 @@ namespace Sia.Application.Servicios;
 public class ServicioItems
 {
     private readonly IItemsRepository _repository;
+    private readonly IEstacionesRepository _estacionesRepository;
     private readonly IMapper _mapper;
     private readonly IContextoEmpresa _contextoEmpresa;
+    private readonly IContextoUsuario _contextoUsuario;
 
-    public ServicioItems(IItemsRepository repository, IMapper mapper, IContextoEmpresa contextoEmpresa)
+    public ServicioItems(
+        IItemsRepository repository,
+        IEstacionesRepository estacionesRepository,
+        IMapper mapper,
+        IContextoEmpresa contextoEmpresa,
+        IContextoUsuario contextoUsuario)
     {
         _repository = repository;
+        _estacionesRepository = estacionesRepository;
         _mapper = mapper;
         _contextoEmpresa = contextoEmpresa;
+        _contextoUsuario = contextoUsuario;
     }
 
     public async Task<Result<List<TipoItemResponse>>> ObtenerTiposAsync(bool soloActivos, CancellationToken ct)
@@ -186,8 +195,23 @@ public class ServicioItems
         Item? item = await _repository.ObtenerItemPorQrAsync(codigo, ct);
         if (item is null)
             throw new EntidadNoEncontradaException(nameof(Item), codigo);
-            
+
+        // Cuando el llamador es una estacion (token de estacion, no un usuario del panel
+        // admin), el item solo es valido si su tipo esta habilitado para esa estacion.
+        if (_contextoUsuario.EsEstacion && _contextoUsuario.EstacionId is Guid estacionId)
+        {
+            bool habilitado = await EsTipoItemHabilitadoParaEstacionAsync(estacionId, item.TipoItemId, ct);
+            if (!habilitado)
+                return Result<ItemResponse>.Fallido("ITEM_FUERA_DE_ESTACION", $"'{item.Nombre}' no pertenece a esta estación.");
+        }
+
         return Result<ItemResponse>.Exitoso(_mapper.Map<ItemResponse>(item));
+    }
+
+    private async Task<bool> EsTipoItemHabilitadoParaEstacionAsync(Guid estacionId, Guid tipoItemId, CancellationToken ct)
+    {
+        List<EstacionTipoItem> asignaciones = await _estacionesRepository.ObtenerAsignacionesTiposItemAsync(estacionId, ct);
+        return asignaciones.Any(a => a.Estado && a.TipoItemId == tipoItemId);
     }
 
     public async Task<Result<ItemResponse>> CrearItemAsync(CrearItemRequest request, CancellationToken ct)

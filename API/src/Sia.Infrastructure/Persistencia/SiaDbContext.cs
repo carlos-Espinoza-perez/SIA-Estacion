@@ -34,6 +34,7 @@ public class SiaDbContext : IdentityDbContext<IdentityUser, ApplicationRole, str
     public DbSet<Privilegio> Privilegios => Set<Privilegio>();
     public DbSet<NivelPermiso> NivelesPermiso => Set<NivelPermiso>();
     public DbSet<RolPrivilegio> RolPrivilegios => Set<RolPrivilegio>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

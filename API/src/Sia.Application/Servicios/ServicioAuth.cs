@@ -1,9 +1,12 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Google.Apis.Auth;
 using Sia.Application.Abstracciones;
 using Sia.Application.Abstracciones.Repositorios;
+using Sia.Application.Configuracion;
 using Sia.Application.Dtos.Seguridad;
 using Sia.Application.Resultados;
 using Sia.Domain.Constantes;
@@ -19,7 +22,8 @@ public class ServicioAuth
     private readonly ISeguridadRepository _seguridadRepository;
     private readonly IPersonasRepository _personasRepository;
     private readonly IEstacionesRepository _estacionesRepository;
-    private readonly IConfiguration _configuration;
+    private readonly JwtOpciones _jwtOpciones;
+    private readonly ILogger<ServicioAuth> _logger;
 
     public ServicioAuth(
         UserManager<IdentityUser> userManager,
@@ -28,7 +32,8 @@ public class ServicioAuth
         ISeguridadRepository seguridadRepository,
         IPersonasRepository personasRepository,
         IEstacionesRepository estacionesRepository,
-        IConfiguration configuration)
+        IOptions<JwtOpciones> jwtOpciones,
+        ILogger<ServicioAuth> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -36,7 +41,30 @@ public class ServicioAuth
         _seguridadRepository = seguridadRepository;
         _personasRepository = personasRepository;
         _estacionesRepository = estacionesRepository;
-        _configuration = configuration;
+        _jwtOpciones = jwtOpciones.Value;
+        _logger = logger;
+    }
+
+    private static string HashRefreshToken(string token)
+    {
+        byte[] hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+        return Convert.ToBase64String(hash);
+    }
+
+    private async Task<string> EmitirRefreshTokenAsync(string userId, CancellationToken ct)
+    {
+        string refreshToken = _servicioJwt.GenerarRefreshToken();
+
+        await _seguridadRepository.AgregarRefreshTokenAsync(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TokenHash = HashRefreshToken(refreshToken),
+            FechaCreacion = DateTimeOffset.UtcNow,
+            FechaExpiracion = DateTimeOffset.UtcNow.AddDays(_jwtOpciones.RefreshTokenDays)
+        }, ct);
+
+        return refreshToken;
     }
 
     public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -51,13 +79,14 @@ public class ServicioAuth
 
         List<Claim> claims = await ConstruirClaimsUsuarioAsync(usuario, ct);
         string accessToken = _servicioJwt.GenerarTokenAcceso(claims);
-        string refreshToken = _servicioJwt.GenerarRefreshToken();
+        string refreshToken = await EmitirRefreshTokenAsync(usuario.Id, ct);
+        await _seguridadRepository.SaveChangesAsync(ct);
 
         return Result<TokenResponse>.Exitoso(new TokenResponse
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresInMinutes = 30
+            ExpiresInMinutes = _jwtOpciones.AccessTokenMinutes
         });
     }
 
@@ -86,17 +115,19 @@ public class ServicioAuth
 
             List<Claim> claims = await ConstruirClaimsUsuarioAsync(usuario, ct);
             string accessToken = _servicioJwt.GenerarTokenAcceso(claims);
-            string refreshToken = _servicioJwt.GenerarRefreshToken();
+            string refreshToken = await EmitirRefreshTokenAsync(usuario.Id, ct);
+            await _seguridadRepository.SaveChangesAsync(ct);
 
             return Result<TokenResponse>.Exitoso(new TokenResponse
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                ExpiresInMinutes = 30
+                ExpiresInMinutes = _jwtOpciones.AccessTokenMinutes
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Fallo al procesar el inicio de sesión con Google");
             return Result<TokenResponse>.Fallido("ERROR_GOOGLE_LOGIN", "Ocurrió un error al procesar el inicio de sesión con Google.");
         }
     }

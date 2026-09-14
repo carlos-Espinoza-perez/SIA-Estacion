@@ -188,4 +188,26 @@ public class SeguridadRepository : ISeguridadRepository
     {
         await _db.SaveChangesAsync(ct);
     }
+
+    public Task AgregarRefreshTokenAsync(RefreshToken token, CancellationToken ct)
+    {
+        _db.RefreshTokens.Add(token);
+        return Task.CompletedTask;
+    }
+
+    public async Task<RefreshToken?> ObtenerRefreshTokenPorHashAsync(string tokenHash, CancellationToken ct)
+    {
+        return await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+    }
+
+    public async Task RevocarRefreshTokensDeUsuarioAsync(string userId, CancellationToken ct)
+    {
+        DateTimeOffset ahora = DateTimeOffset.UtcNow;
+        List<RefreshToken> vigentes = await _db.RefreshTokens
+            .Where(t => t.UserId == userId && t.FechaRevocacion == null)
+            .ToListAsync(ct);
+
+        foreach (RefreshToken token in vigentes)
+            token.FechaRevocacion = ahora;
+    }
 }
